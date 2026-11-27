@@ -21,10 +21,10 @@ import { countCall } from "./ops.ts";
 import { LiveReporter } from "./live.ts";
 import { liveHub } from "./live-hub.ts";
 import { isPaused, pausedBosses, RESIDENTS_PAUSED, residentsPaused } from "./kill-switches.ts";
-import { TOWER_LINES, commitPartyFloor, preparePartyFloor, type LobbyGone, type PartyFloorPrep, type PartyRefusal } from "./tower.ts";
+import { TOWER_LINES, commitPartyFloor, preparePartyFloor, towerUnlocks, type LobbyGone, type PartyFloorPrep, type PartyRefusal } from "./tower.ts";
 import { partyOpenText } from "./town-chat.ts";
 import { chatRoomOf, townPartyPoster } from "./town-chat-api.ts";
-import { livesLeft, towerPool } from "@chessroyale/core";
+import { bossDef, livesLeft, towerPool } from "@chessroyale/core";
 import type { Env } from "./index.ts";
 
 const library = openings as unknown as Opening[];
@@ -646,7 +646,11 @@ export class SquadsParty extends DurableObject<Env> {
     try {
       if (this.record.kind === "tower") return await this.makeTowerFloor(want);
       const code = this.record.code;
-      const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, bossPartyOverrides(want), undefined, undefined, partyLobby(want, code, Date.now()))) !== false).catch(() => null);
+      // (A boss unlocked by a win, the Stranger: the leader's unlocks, read from the server's tower best.)
+      const leader = want.members.find((m) => m.seat === want.leaderSeat)?.userId;
+      const unlocked = bossDef(want.boss)?.unlock && leader && this.env.DB ? await towerUnlocks(d1Sql(this.env.DB), leader).catch(() => []) : [];
+      const overrides = bossPartyOverrides(want, unlocked, this.env.TEST_SWITCHES === "1");
+      const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, overrides, undefined, undefined, partyLobby(want, code, Date.now()))) !== false).catch(() => null);
       if (!this.record) return;
       const core = this.core();
       core.placedIn(lobby ?? null, want.id);
@@ -753,6 +757,15 @@ export class SquadsParty extends DurableObject<Env> {
     return "n" in put ? put : { message: TOWER_PARTY_LINES.openWait(put.retryMs) };
   }
 
+  /**
+   * The tower's pool now: the kill switches applied; where TEST_SWITCHES is on, a boss of his own floors (the Stranger) met as the solo
+   * routes and the floor room's writes deal him (core towerPool's `unfinished`: the review of #1000). Never an admin's pool: a party has
+   * players who aren't, so while he's admins first a party's floors deal as if he weren't there.
+   */
+  private towerPoolNow(): string[] {
+    return towerPool(pausedBosses(this.env), undefined, { unfinished: this.env.TEST_SWITCHES === "1" });
+  }
+
   /** A member's name here, by account (a plan's words). */
   private nameOf(uid: string): string {
     return this.record?.members.find((m) => m.userId === uid)?.name ?? "A member";
@@ -764,7 +777,7 @@ export class SquadsParty extends DurableObject<Env> {
     const sql = d1Sql(this.env.DB);
     const read = await (async () => {
       await ensureSchema(sql, this.env.DB);
-      return preparePartyFloor(sql, people, Date.now(), { pool: towerPool(pausedBosses(this.env)), lobbyGone: this.lobbyGone });
+      return preparePartyFloor(sql, people, Date.now(), { pool: this.towerPoolNow(), lobbyGone: this.lobbyGone });
     })().catch(() => null);
     if (!read) return { kind: "wait", message: TOWER_PARTY_LINES.reading, recheck: true };
     if (read.ok) return planOf(read.prep);
@@ -803,7 +816,7 @@ export class SquadsParty extends DurableObject<Env> {
     const uids = [...want.members].sort((a, b) => a.seat - b.seat).flatMap((m) => (m.userId ? [m.userId] : []));
     const read = await (async () => {
       await ensureSchema(sql, this.env.DB);
-      return preparePartyFloor(sql, uids, Date.now(), { pool: towerPool(pausedBosses(this.env)), lobbyGone: this.lobbyGone });
+      return preparePartyFloor(sql, uids, Date.now(), { pool: this.towerPoolNow(), lobbyGone: this.lobbyGone });
     })().catch(() => null);
     if (!this.record) return;
     if (!read) return fail("Couldn't reach the tower. Try again.");

@@ -459,6 +459,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **A test never waits to catch a moment live** (Nov 22, main's run on d30c64b: a shared floor's test polled for Grex's turn and
   it passed between two polls): a phase that can last under a second (a boss's quick turn, a reveal, a banner) is recorded every frame
   by an init script and read afterward; poll only for states that hold until the player acts.
+- **A recording read whole on every poll** (Nov 27, `docs/decisions/2026-11-27-birdie-flakes.md`): a test that polls a per-frame
+  recording copies out only the frames since its last read (`recorded()` in `e2e/birdie.spec.ts`). Copying all of it each time stalls
+  the page longer as it grows, and the stall lands on the moment being timed.
+- **A per-frame recorder sees only the frames drawn** (Nov 27, `docs/decisions/2026-11-27-rides-test-pace.md`): CI's software WebGL can
+  draw a phone's town 3 or 4 frames a second, so a moment the test must see drawn lasts well over a second there. Slow it with a test
+  hook (`__townPace`), never a shorter check; prove it with the CPU slowed (CDP `Emulation.setCPUThrottlingRate`).
 
 - **A typed "hello" that never left** (Nov 25, [story](../docs/history/lessons.md#a-typed-hello-that-never-left-nov-25-2026)):
   - Code that passes a message between two protocols forwards it whole (spread it, leave off only what the other side can't take),

@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze" | "sawswap" | "pawnbounce" | "train" | "fall";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze" | "sawswap" | "pawnbounce" | "train" | "fall" | "frostfire" | "storm";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -103,13 +103,13 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * Birdie's ?power=train brings his train's warning as every crowd turn begins from the second (no cooldown); ?power=fall brings his
  * fall at the start of his turn after the crowd's second move (the warning's train first, if it rides then).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap", "pawnbounce", "train", "fall"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap", "pawnbounce", "train", "fall", "frostfire", "storm"];
 /**
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
  * fake move a few seconds into the first move it can come on), his lying-down clock tap from the first move (`clocktap`) and his
  * "Hang on" on his second turn (`hangon`: no pop-off before it; Nov 26).
  */
-export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower", "hangon"];
+export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower", "hangon", "finisher", "finisher-flame", "finisher-ice", "finisher-cut", "finisher-frostfire"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -145,6 +145,12 @@ export interface BossDef {
   the?: true;
   /** Its bar says "LVL ???" (Eric, Oct 23: Fischer's level is not 100, it's unknown): the Hidden Boss. */
   levelUnknown?: true;
+  /**
+   * Unlocked by winning one of his own Battle Tower floors (BATTLE_TOWER.bossFloors; the Stranger, Eric Nov 27: "Beat him in the
+   * tower"): never met at random, never in the tower's deal (his floors are his alone), never in a raid's random pick; on the Boss
+   * Battle picker a locked card until you've beaten him on one (the server's `boss_unlocks`: core floorUnlocks), then picked like any other (`canPick`).
+   */
+  unlock?: "tower";
 }
 
 /**
@@ -285,6 +291,12 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // rest of the battle (the train goes on, and his brain plays much stronger: BOSS_POWERS.birdie's armored numbers). Admins first: BOSS_ADMIN_FIRST in settings.ts (the
   // test links `?boss=birdie`, `&power=train`, `&power=fall`).
   { id: "birdie", name: "Birdie", icon: "🐦", kit: "Birdie", offset: -250, powers: { passive: "train", ultimate: "fall" } },
+  // The Stranger (working id "stranger"; Eric, Nov 27; his rules: bosses/stranger.ts; docs/decisions/2026-11-27-stranger-rules.md): his
+  // Frostfire strike every few of his turns (the crowd's most valuable piece but the king frozen for your next turn, thawed the turn
+  // after, your one chance to move it off; then the tile burns whatever is on it, never a king); his ultimate, the Storm of Two Worlds
+  // (Eric, Nov 27; `storm`, up to twice a battle): three of your turns, Ice and Fire by turns, the engine leaving you a good move each.
+  // Unlocked by beating him on a Battle Tower floor (`unlock`: BATTLE_TOWER.bossFloors, 10, 30 and 50, his alone); no building in town.
+  { id: "stranger", name: "The Stranger", icon: "⚔️", kit: "Stranger", offset: -250, powers: { passive: "frostfire", ultimate: "storm" }, unlock: "tower" },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -298,15 +310,35 @@ export const BOSS_ROSTER: readonly BossDef[] = [
 ];
 
 /** The one rule for choosing a boss: it has a complete character and its powers, and isn't hidden from players. */
-export const isPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null && !b.adminOnly && !adminFirst(b);
+export const isPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null && !b.adminOnly && !adminFirst(b) && !b.unlock;
+/**
+ * A boss unlocked by a win (`unlock`: the Stranger) that's ready to meet: his powers and his character (`unfinished`: a test's, his
+ * powers alone, with placeholders), never hidden. Never at random; on the picker locked until the account's unlocks name him. While
+ * he's in the game for admins first (BOSS_ADMIN_FIRST, Nov 27: until his ult lands), ready only for an admin (`admin`) or a test's
+ * (`unfinished`): for anyone else his tower floors deal as any other and his card isn't on the picker, as before his art.
+ */
+export const unlockReady = (b: BossDef | null | undefined, unfinished = false, admin = false): b is BossDef =>
+  !!b && !!b.unlock && b.powers !== null && !b.adminOnly && (b.kit !== null || unfinished) && (!adminFirst(b) || admin || unfinished);
+/** The bosses unlocked by a win that are ready to meet (unlockReady), in roster order: the picker's cards, locked or not. */
+export const unlockBosses = (roster: readonly BossDef[] = BOSS_ROSTER, unfinished = false, admin = false): BossDef[] => roster.filter((b) => unlockReady(b, unfinished, admin));
+/**
+ * A boss a player may pick for a battle (Boss alone, a raid, a party): a playable one, or one unlocked by a win that's ready (for an
+ * admin, `admin`, while admins first) and that `unlocked` names (the account's unlocks, from the server: floorUnlocks). The server's
+ * raid and party picks pass no `admin`: a boss in the game for admins first is never picked online but on a test's server.
+ */
+export const canPick = (b: BossDef | null | undefined, unlocked: readonly string[] = [], unfinished = false, admin = false): boolean =>
+  !!b && (isPlayable(b) || (unlockReady(b, unfinished, admin) && unlocked.includes((b as BossDef).id)));
 /**
  * A new boss in the game for admins first (BOSS_ADMIN_FIRST in settings.ts; Timber, Nov 1): complete, but met only by an
  * admin until Eric says go. He shows on an admin's boss select and boss menu (Boss alone and a Solo raid), never at random,
  * never in a player's. Taking his id out of BOSS_ADMIN_FIRST puts him live for everyone.
  */
 export const adminFirst = (b: Pick<BossDef, "id"> | null | undefined): boolean => !!b && BOSS_ADMIN_FIRST.includes(b.id);
-/** The bosses in the game for admins first (adminFirst), in roster order. */
-export const adminFirstBosses = (roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] => roster.filter((b) => adminFirst(b) && !b.adminOnly && b.kit !== null && b.powers !== null);
+/**
+ * The bosses in the game for admins first (adminFirst), in roster order: an admin's tiles like any other's. Never one unlocked by a win
+ * (the Stranger): for an admin too, he's his card, locked until won (unlockBosses).
+ */
+export const adminFirstBosses = (roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] => roster.filter((b) => adminFirst(b) && !b.adminOnly && !b.unlock && b.kit !== null && b.powers !== null);
 /** An admin may meet it in Boss alone: a playable boss, or one hidden from players with its character and powers. */
 export const adminPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null;
 /** The bosses only admins meet (in Boss alone), in roster order. */
@@ -365,7 +397,9 @@ export function chooseBoss(roll: number, wanted?: string | null, avoid?: string 
   // (Testing, solo only: a boss whose powers are built but whose art isn't yet, with placeholders. Never a hidden one
   // but for an admin's Boss alone.)
   if (unfinished && pick?.powers && (!pick.adminOnly || hidden)) return pick;
-  if (isPlayable(pick) || (hidden && adminPlayable(pick))) return pick;
+  // (A boss unlocked by a win: whoever set `wanted` checked the unlock and, while he's admins first, the admin (the server's lobby and
+  // party, the tower's deal; solo, the device): `admin` true here.)
+  if (isPlayable(pick) || unlockReady(pick, false, true) || (hidden && adminPlayable(pick))) return pick;
   const all = playableBosses(roster);
   if (!all.length) throw new Error("No playable boss");
   const pool = all.length > 1 ? all.filter((b) => b.id !== avoid) : all;
@@ -845,6 +879,8 @@ export interface BossPowerState {
   chandy?: ChandyState | null;
   /** Birdie's powers (the Train's warning and its last ride, his fall into Armored Birdie). */
   birdie?: BirdieState | null;
+  /** The Stranger's powers (his Frostfire strike: the frozen piece, its tile and when it burns; the last burn). */
+  stranger?: StrangerState | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -897,6 +933,35 @@ export interface BirdieState {
   /** The crowd's moves in a row the judge put at the danger line (BOSS_POWERS.dangerAt), its last included: his Fall at birdie.fallDangerMoves. */
   danger?: number;
 }
+
+/**
+ * The Stranger's powers in a battle (id stranger; Eric, Nov 27; the chess package's bosses/stranger.ts).
+ * - `next`: the first crowd turn whose start may bring his next Frostfire strike (BOSS_POWERS.stranger.strikeFrom, then strikeEvery
+ *   turns after the last strike's). A turn with no piece to strike moves it on a turn.
+ * - `strike`: the strike under way, cast as crowd turn `turn` began (after his move) on the crowd's piece on `square` (`piece` its
+ *   kind): frozen through crowd turn `frozenUntil`; its tile burns whatever stands on it as crowd move `burnAt` lands (the start of
+ *   his turn). Cleared once it has burnt. Null: none.
+ * - `burn`: the last burn, after crowd move `at`: the piece on `square` (`piece` its kind, `side` whose) burnt; `spared`: a piece
+ *   whose loss would leave a position no game can have (a king, too, always spared); nothing there: neither.
+ */
+export interface StrangerState {
+  next: number;
+  strike: { turn: number; square: string; piece: string; frozenUntil: number; burnAt: number } | null;
+  burn?: { at: number; square: string; piece?: string; side?: "w" | "b"; spared?: true } | null;
+  /** His Storm of Two Worlds under way: its first crowd turn (its turns `at` to `at + stormTurns - 1`) and the kind it began with. */
+  storm?: { at: number; first: StormKind } | null;
+  /**
+   * The storm's pick for crowd turn `turn`, made with his move before it (the engine's, checked: stormCheck): `squares`, the crowd's
+   * pieces frozen (ice) or the squares marked (fire); `free`, the ice's free pieces (the king's never frozen either); `mild`, the
+   * fairness check's milder pick; `calm`, no answer (no engine): nothing frozen or marked that turn.
+   */
+  pick?: { turn: number; kind: StormKind; squares: string[]; free?: string[]; mild?: true; calm?: true } | null;
+  /** A fire turn's burn, after crowd move `at`: each marked square's outcome (`piece`, `side` burnt; `spared`; neither: empty). */
+  scorch?: { at: number; burnt: { square: string; piece?: string; side?: "w" | "b"; spared?: true }[] } | null;
+}
+
+/** A turn of the Stranger's storm: Fire (marked squares burn after your move) or Ice (all your pieces but the king and two frozen). */
+export type StormKind = "fire" | "ice";
 
 export interface MooState {
   moves: number;
@@ -1877,7 +1942,24 @@ export type PowerEventKind =
   | "trainSignal"
   | "trainSmash"
   | "trainWin"
-  | "birdieFall";
+  | "birdieFall"
+  // The Stranger (Nov 27): his Frostfire strike (as the crowd's turn after his move begins: `square` the piece frozen, `shape` its kind);
+  // its tile burning (as the crowd's move that ends the flee turn lands, the start of his turn: `square`, `shape` the piece burnt if
+  // any, `fizzled` [the square] when the piece there was spared: a king, or a loss no game can have).
+  | "frostfire"
+  | "frostfireBurn"
+  // His Storm of Two Worlds (Nov 27): its opening scene as its first turn begins (`storm`); each of its turns as it begins, after his
+  // move (`stormIce`: `squares` the pieces frozen; `stormFire`: `squares` the marked squares); a fire turn's burn as your move lands,
+  // the start of his turn (`stormBurn`: `squares` the marks, `fizzled` those that spared a piece).
+  | "storm"
+  | "stormIce"
+  | "stormFire"
+  | "stormBurn"
+  // His finisher (Nov 27, Eric: "he jumps down and does either like a flame strike ... or a literal strike with a sword"): as his move
+  // that takes a piece of yours that isn't a pawn is about to show (`square` the piece, `shape` its kind, `pick` which finisher, from
+  // the seed, `move` the held move itself: his piece takes the square as the finisher kills it; Eric, Nov 27), while he still thinks; the
+  // move shows after it, held as Chandy's lock is (bossMoveMoment).
+  | "finisher";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -1930,7 +2012,7 @@ export interface PowerEvent {
   /** Dash's Clock Slap: the ms it took from your clock (`bank`: from the time bank, else off your next move's clock). */
   ms?: number;
   bank?: boolean;
-  /** Dash's Time Scramble: how many of your moves it covers (`count`) and the seconds each gets; his flag: the move played for you. */
+  /** Dash's Time Scramble: how many of your moves it covers (`count`) and the seconds each gets; his flag: the move played for you. The Stranger's finisher: his held move. */
   count?: number;
   seconds?: number;
   move?: string;

@@ -238,7 +238,7 @@ export class Lobby extends DurableObject<Env> {
       const sql = d1Sql(this.env.DB);
       await ensureSchema(sql, this.env.DB);
       const env = await withSecrets(this.env);
-      const how: SaveContext = { sql, mode: this.mode(), mail: caseMailer(env), signedInOnly: signInRequired(env), paused: isPaused(this.env, "rewards"), off: pausedBosses(this.env) };
+      const how: SaveContext = { sql, mode: this.mode(), mail: caseMailer(env), signedInOnly: signInRequired(env), paused: isPaused(this.env, "rewards"), off: pausedBosses(this.env), testSwitches: this.env.TEST_SWITCHES === "1" };
       // A Battle Tower party's floor's ends, first (writeTowerEnds).
       const tower = await writeTowerEnds(how, rec);
       written += tower.written;
@@ -841,6 +841,8 @@ export interface SaveContext {
   /** The kill switches PAUSE_REWARDS and the bosses resting. */
   paused: boolean;
   off: ReturnType<typeof pausedBosses>;
+  /** TEST_SWITCHES is "1" here: the tower's pool meets a boss of his own floors as an admin would (core towerPool's `unfinished`). */
+  testSwitches?: boolean;
 }
 
 /**
@@ -859,7 +861,7 @@ export interface SaveContext {
  * without its crate (logged), so a lasting fault in the ledger never costs the party's floor. `crate`: the grant (tests stand one in).
  */
 export async function writeTowerEnds(
-  c: Pick<SaveContext, "sql" | "paused" | "off">,
+  c: Pick<SaveContext, "sql" | "paused" | "off" | "testSwitches">,
   rec: LobbyRecord,
   now = Date.now(),
   crate: (sql: Sql, uid: string, floor: number) => Promise<unknown> = (sql, uid, floor) => grantReward(sql, uid, 0, 1, towerCrateKey(floor), now),
@@ -875,7 +877,7 @@ export async function writeTowerEnds(
         countCall("lobby.towerCrateFailed");
       });
     try {
-      await partyFloorWrite(c.sql, now, t.fight, t.end, { pool: towerPool(c.off), ...(c.paused ? {} : { crate: pay }) });
+      await partyFloorWrite(c.sql, now, t.fight, t.end, { pool: towerPool(c.off, undefined, { unfinished: !!c.testSwitches }), ...(c.paused ? {} : { crate: pay }) });
       rec.towerQueue!.splice(rec.towerQueue!.indexOf(t), 1);
       written++;
     } catch (e) {

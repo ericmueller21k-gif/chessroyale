@@ -17,7 +17,11 @@ async function yourMove(page: Page) {
   await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
 }
 
-/** Your move: never onto his dough (a quiet one, so it rises), a knight to an empty square when it may, else the first allowed. */
+/**
+ * Your move: never onto his dough (a quiet one, so it rises), a knight to an empty square when it may, else the first allowed; and
+ * never one that leaves him a mate in one, when another doesn't (Nov 27: main's run on ac75eaa lost to a mate before the dough rose,
+ * the knights' shuffle leaving it open).
+ */
 async function playOne(page: Page, onto?: string) {
   await yourMove(page);
   const s = await page.evaluate(() => {
@@ -26,7 +30,18 @@ async function playOne(page: Page, onto?: string) {
   });
   const legal = new Chess(s.fen).moves({ verbose: true }).map((m) => ({ uci: m.from + m.to + (m.promotion ?? ""), knight: m.piece === "n" && !m.captured, to: m.to as string, quiet: !m.captured }));
   const ok = legal.filter((m) => (!s.allowed || s.allowed.includes(m.uci)) && (onto ? m.to === onto : !s.lumps.includes(m.to))).sort((a, b) => (a.uci < b.uci ? -1 : 1));
-  const pick = ok.find((m) => m.knight) ?? ok.find((m) => m.quiet) ?? ok[0];
+  const mates = (uci: string) => {
+    const g = new Chess(s.fen);
+    g.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
+    return g.moves({ verbose: true }).some((r) => {
+      const h = new Chess(g.fen());
+      h.move(r.san);
+      return h.isCheckmate();
+    });
+  };
+  const safe = ok.filter((m) => !mates(m.uci));
+  const from = safe.length ? safe : ok;
+  const pick = from.find((m) => m.knight) ?? from.find((m) => m.quiet) ?? from[0];
   await submitMove(page, pick!.uci, s.fen);
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
 }

@@ -1482,7 +1482,10 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
     await page.waitForTimeout(100);
   }
   expect(seen.size).toBeGreaterThanOrEqual(4);
-  // Walking: its move, its view and its facing the way it goes, and its trail (watched every frame from before the tap: a step is 90 ms).
+  // Walking: its move, its view and its facing the way it goes, and its trail (watched every frame from before the tap). Its steps slowed to
+  // 450 ms for these walks (`__townPace`): at its 90 ms a step, CI's slowest runs drew frames 300 ms apart, none of them in the 3-step walk
+  // down ("move:2:1" never seen, Nov 27, main 3d8b5ae; slowed CPU made it every time). Its pace is checked above, standing.
+  await page.evaluate(() => (window as unknown as { __townPace: (ms: number | null) => void }).__townPace(450));
   await page.evaluate(() => {
     const w = window as unknown as { __townRide: () => RideSeen; __rideSeen: Set<string>; __marksSeen: Set<string> };
     w.__rideSeen = new Set();
@@ -1552,6 +1555,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
   // Standing after walking down: its front view's idle.
   expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view]).toEqual(["idle", 2]);
+  await page.evaluate(() => (window as unknown as { __townPace: (ms: number | null) => void }).__townPace(null));
+  expect((await rideNow(page)).you.stepMs, "its own pace again").toBe(90);
   const steps = await page.evaluate(() => [...(window as unknown as { __rideSeen: Set<string> }).__rideSeen]);
   // Side (0) walking left and right, mirrored to face its walk; back (1) up and front (2) down, as drawn (never mirrored).
   expect(steps).toEqual(expect.arrayContaining(["move:0:1", "move:0:-1", "move:1:1", "move:2:1", "idle:0:-1", "idle:1:1", "idle:2:1"]));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHAT_NOT_ALLOWED, CHAT_NO_CONTACT, chatRefusal, isBlockedText, rot13, seatName } from "../src/text-filter.ts";
+import { CHAT_NOT_ALLOWED, CHAT_NO_CONTACT, chatRefusal, isBlockedText, isReservedName, rot13, seatName } from "../src/text-filter.ts";
 
 /**
  * The name filter (text-filter.ts). The words under test are written ROT13-encoded, as in the list, so no slur is
@@ -420,5 +420,18 @@ describe("the filter after the re-review", () => {
   it("catches the v-for-u and ph-for-f spellings, and lets Phuket through (N3)", () => {
     for (const text of [rot13("sipx"), `${rot13("sipx")}ing`, rot13("cuhx"), `${rot13("cuhx")} off`]) expect(chatRefusal(text), text).toBe(CHAT_NOT_ALLOWED);
     expect(chatRefusal("holiday in Phuket")).toBeNull();
+  });
+});
+
+describe("HunChess in a name is staff's only (Eric, Nov 27)", () => {
+  it("finds it however it's written, and only it", () => {
+    for (const n of ["HunChess", "hunchess", "Hun Chess", "HUN_CHESS", "xHunChessx", "hunch3ss", "Hün-Chéss", "h u n c h e s s"]) expect(isReservedName(n), n).toBe(true);
+    for (const n of ["Hunter", "Chess Fan", "Hun", "chessking", "Player 1", ""]) expect(isReservedName(n), n).toBe(false);
+  });
+  it("a non-admin's lobby seat under it gets the fallback; an admin's keeps it", () => {
+    expect(seatName("HunChess", "Player 2", false)).toBe("Player 2");
+    expect(seatName("Hun Chess", "Player 2", false)).toBe("Player 2");
+    expect(seatName("HunChess", "Player 2", true)).toBe("HunChess");
+    expect(seatName("Ann", "Player 2", false)).toBe("Ann");
   });
 });

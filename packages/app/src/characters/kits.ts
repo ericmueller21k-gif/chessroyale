@@ -7,7 +7,8 @@
  */
 import { BIRDIE_SOUND_EVERY, BOSS_ROSTER, type BossDef } from "@chessroyale/core";
 import type { SoundName } from "../sound.ts";
-import type { Beat, BeatLines, Loop, Stage } from "./boss-beats.ts";
+import { hash, type Beat, type BeatLines, type BeatResult, type BeatState, type Loop, type Stage } from "./boss-beats.ts";
+import { hisLoss } from "@chessroyale/chess";
 import { BIGBOY_ATTACK, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT, BIGBOY_SPRITE } from "./bigboy.ts";
 import { CLOWN, CLOWN_ATTACK, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_ATTACK, GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT } from "./gingerbread.ts";
@@ -39,6 +40,8 @@ import { BOSS_ZEBRA as ZEBRA, BOSS_ZEBRA_PORTRAIT } from "./zebra.ts";
 import { ZEBRA_ATTACK } from "./zebra-figure.ts";
 import { CHANDY, CHANDY_BAR, CHANDY_PORTRAIT, CHANDY_SOUNDS, CHANDY_SPRITE } from "./chandy.ts";
 import { CHANDY_LINES } from "./chandy-lines.ts";
+import { STRANGER, STRANGER_PORTRAIT, STRANGER_SOUNDS } from "./stranger.ts";
+import { STRANGER_LINES } from "./stranger-lines.ts";
 import { BIRDIE_FIGURE } from "./birdie-figure.ts";
 import { BIRDIE_LINES } from "./birdie-lines.ts";
 import { birdieArmoredNow } from "./birdie-state.ts";
@@ -126,6 +129,12 @@ export interface BossKit extends BeatLines {
    * he's White and the game opened 1.e4: his real quote that reads right only then). Undefined: the kit's lines.
    */
   lineOf?: (beat: Beat, boss: BossView) => string | undefined;
+  /**
+   * The animation for a beat from the moment itself, when one beat plays different animations (the Stranger: a capture of a pawn one of
+   * three slashes by the move; a piece of his taken, not a pawn, his block; every third move of his, his swords drawn and twirled). From
+   * the shared match state alone (the beat's key and state), so every device plays the same. Undefined (or it returns undefined): `anims`.
+   */
+  animOf?: (beat: BeatResult, s: BeatState) => string | undefined;
   /** Frame cues to sounds. */
   sounds: Record<string, SoundName>;
   /**
@@ -211,6 +220,26 @@ export interface BossKit extends BeatLines {
   suit?: boolean;
 }
 
+
+/** The Stranger's slashes for a capture of your pawn, one by the move (Eric, Nov 27: "one of several different slashing animations"). */
+export const STRANGER_SLASHES = ["strike", "sweep", "rise"] as const;
+/** Every this many of his moves (a quiet one), his swords drawn and twirled (Eric, Nov 27: "every few moves he draws his swords"). */
+export const STRANGER_FLOURISH_EVERY = 3;
+/**
+ * The Stranger's animation for a beat (BossKit.animOf; Eric, Nov 27), from the shared state alone (the same on every device):
+ * - his capture of your pawn: one of his three slashes where he stands (by the moment's key); of any other piece: his finisher played it on
+ *   the board before the move showed (components/Stranger.tsx), so he rests (his mood's loop);
+ * - a piece of his taken that isn't a pawn (he lost 3 or more): his block ("he takes them out and blocks ... took a blow"); a pawn: his flinch;
+ * - every third of his quiet moves: his swords drawn, twirled and sheathed.
+ */
+export function strangerAnim(beat: Pick<BeatResult, "anim" | "key">, s: Pick<BeatState, "fen" | "history" | "bases" | "crowdSide" | "lastMove">): string | undefined {
+  const took = s.lastMove?.captured;
+  if (beat.anim === "capture" || beat.anim === "check") return took === "p" ? STRANGER_SLASHES[hash(beat.key) % STRANGER_SLASHES.length] : took ? "idle" : undefined;
+  // (The same rule as his thinking's minimum for it: hisLoss, strangerTurnMs.)
+  if (beat.anim === "hurt") return hisLoss(s, s.crowdSide) >= 3 ? "block" : undefined;
+  if (beat.anim === "move") return Math.ceil(s.history.length / 2) % STRANGER_FLOURISH_EVERY === 0 ? "flourishAll" : undefined;
+  return undefined;
+}
 
 /** His chirp on a heard move of his (the nod), taken in turn by his move's number (the same on every device). */
 const BIRDIE_NOD: readonly SoundName[] = ["birdieCheer", "birdieTsip"];
@@ -1250,12 +1279,50 @@ export const BOSS_KITS: Record<string, BossKit> = {
     portrait: { x: 10, y: 12, w: 36, h: 36, anim: "idle", frame: 0 },
     powered: { on: birdieArmoredNow, idle: "p_idle" },
   },
+  // The Stranger (docs/decisions/2026-11-27-stranger-art.md; his rules 2026-11-27-stranger-rules.md, admins first until his ult): the fire-and-ice swordsman, his swords on his back at rest, drawn for a
+  // capture, a check or his strike (draw, the double slash, sheathe) and for his power (draw, the twin-tip cast, sheathe). His sounds are
+  // his own (stranger-sounds.ts), but his shout, the God King's recorded four (Eric, Nov 27); his lines are placeholders for Eric. His
+  // swords (2026-11-27-stranger-swords.md): a slash of three for your pawn, his finisher on the board for any other piece, his block,
+  // his flourish every third move (strangerAnim).
+  Stranger: {
+    // (His phone bar's fit, measured with packages/app/test/bar-fit.ts's barFit over his rest frames.)
+    barScale: 0.79,
+    // (2, was 1: his swords twirled and swept reach a pixel further left, Nov 27.)
+    barShift: 2,
+    ch: STRANGER,
+    anims: {
+      entrance: "nod",
+      thinking: "think",
+      // (A move, a square struck: he stays at rest, no hum; his entrance alone nods with it.)
+      move: "idle",
+      capture: "strike",
+      hurt: "hit",
+      check: "strike",
+      smug: "smug",
+      rattled: "rattled",
+      defeat: "defeat",
+      victory: "victory",
+      strike: "strike",
+      power: "castFull",
+      powerHit: "idle",
+      ultimateWarn: "draw",
+      ultimate: "strike",
+      ultimateHit: "idle",
+    },
+    loops: { thinking: "think", defeat: "defeatLoop" },
+    // (His slash by the move, his block, his flourish every few moves: strangerAnim.)
+    animOf: strangerAnim,
+    sounds: STRANGER_SOUNDS,
+    lines: STRANGER_LINES,
+    chance: { entrance: 1, capture: 0.3, rattled: 0.3, victory: 1, defeat: 1, ultimateWarn: 1 },
+    portrait: { ...STRANGER_PORTRAIT, anim: "idle", frame: 0 },
+  },
 };
 
 /**
  * Kits drawn ahead of their boss (Nov 16): a boss's art, complete as a kit, before his rules put him in the roster. Not in BOSS_KITS
  * (that's the roster's: its tests walk every playable boss), so nothing in the game plays one; the art's previews do. The rules job
- * moves a kit into BOSS_KITS (Chandy's moved there with his rules, Nov 16). None now.
+ * moves a kit into BOSS_KITS (Chandy's moved there with his rules, Nov 16; the Stranger's, Nov 27). None waiting now.
  */
 export const ART_KITS: Readonly<Record<string, BossKit>> = {};
 
@@ -1302,6 +1369,8 @@ export const bossKitOf = (boss: { name: string; form?: string } | null | undefin
 
 // Folio's voice (Eric, Oct 27): each of its lines heard as it starts, its chirp (speech.tsx, `lineSounds`).
 for (const lines of Object.values(FOLIO_LINES)) for (const line of lines ?? []) lineSounds.set(line, "folioVoice");
+// The Stranger's voice (Nov 27): a low, calm "hm" as each of his lines starts.
+for (const lines of Object.values(STRANGER_LINES)) for (const line of lines ?? []) lineSounds.set(line, "strangerVoice");
 
 /** Every moment a kit may name an animation for (and so every `anims` key a powered twin may replace). */
 const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "plantMany", "plant", "cheer", "bigCheer", "shrug", "place", "wince", "fold", "revision", "gnawNone", "kingAttack"] as const satisfies readonly Beat[];

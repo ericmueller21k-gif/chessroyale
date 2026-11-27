@@ -1376,6 +1376,14 @@ export const BATTLE_TOWER = {
   soloWinMinSeconds: 10,
   rageScale: [1, 0.75, 0.6] as readonly number[],
   /**
+   * Floors that are one boss's alone (Eric, Nov 27, the Stranger: "he shows up after 10 rounds of the battle tower ... He'll show up a
+   * few times in the battle tower at different strengths"): on each, that boss alone, at a lone boss's strength for the floor
+   * (floorStrength with one boss), whatever the pattern says; the deal skips the floor (the decks go on to the next). He's never in a
+   * deck. Beating him on one of them unlocks him in the Boss Battle picker (core tower.ts, floorUnlocks). His floors deal as any
+   * other while he isn't ready to meet (unlockReady: no art yet, or in the game for admins first and the climb not an admin's) or rests.
+   */
+  bossFloors: { 10: "stranger", 30: "stranger", 50: "stranger" } as Readonly<Record<number, string>>,
+  /**
    * Bosses whose ultimate never comes on a tower floor of several (2 or 3 bosses; solo and party alike; the runner sets it up as the
    * floor starts, so solo and online agree). Eric, Nov 20: "Disable wrangler ult plz in battle tower", then "if wrangler is solo in battle
    * tower he fires his ult off still ... just make sure in all modes for him he can only ult once a game then it turns gray": alone on a
@@ -1508,9 +1516,11 @@ export const BOSS_POWERS = {
    * 1.80 a battle, under 2: his battles are shorter now he keeps his turn; reports/tiger-sim.md). Folio 1.3 (the director's call,
    * Oct 27, after the first sim put it among the easiest; was the brief's start, 1): 2.8 Creases a battle of 50 moves in
    * the raid sim (reports/folio-sim.md). Dash 1 (Nov 3): about 1.9 Time Scrambles a battle of 46 moves in the
-   * raid sim with the player's clock, the crowd 0.15 (reports/dash-sim.md).
+   * raid sim with the player's clock, the crowd 0.15 (reports/dash-sim.md). The Stranger 2.5 (Nov 27, Eric: two storms "about 70% of
+   * the time"): the raid sim at 2.3 saw both in 25 of 40 battles (reports/boss-sim/raid-stranger-storm.jsonl; his Frostfire's strike holds
+   * the warning, first storm at turn 12, the second at 23, battles of 29 moves), so 2.5 by estimate for about 70%.
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1, zebra: 1, chandy: 1 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1, zebra: 1, chandy: 1, stranger: 2.5 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -2032,10 +2042,16 @@ export const BOSS_POWERS = {
    * was small (only plants), and nothing placed would only be less. Each outcome
    * weighs at most waterLooks squares (seeded among those its guards allow; a killer plant the crowd's pieces first, his
    * own only when none keeps the band), each searched at waterNodes; a watering searches at most waterBudget positions in
-   * all, besides the one before it, so ten seeds never stall a phone.
+   * all, besides the one before it and the pass alone, so ten seeds never stall a phone.
    */
   waterBand: [0.5, 2.5] as readonly [number, number],
   waterTarget: 1.5,
+  /**
+   * The placement's floor (Nov 27): no outcome goes where it leaves him more than this under the band's bottom, or under
+   * where he stands before the seeds (the pass alone, or with the regrowth) if that's lower; with no square above it, the
+   * outcome comes up as nothing. Without it a seed step could pull him far under (−6.99 in one probe: every option bad).
+   */
+  waterFloorMargin: 0.5,
   jackpotMax: 6,
   waterLooks: 4,
   waterNodes: 20_000,
@@ -2412,6 +2428,49 @@ export const BOSS_POWERS = {
     armoredMaiaBoost: 400,
     armoredStockfishAbove: 100,
   },
+  /**
+   * The Stranger (Eric, Nov 27; packages/chess/src/bosses/stranger.ts; docs/decisions/2026-11-27-stranger-rules.md): his Frostfire
+   * strike, "a dual fire and ice move, like where it hits a square, freezes your piece, and then that ... tile also becomes like in 2
+   * turns, it burns whatever's on it" (timing: "Freeze 1 turn, then flee").
+   * - As crowd turn `strikeFrom` begins (after his reply to your 2nd move), then `strikeEvery` crowd turns from one strike to the
+   *   next (the director's call: near Birdie's 5 and Ginger's freeze), it comes with his move: your most valuable piece but the king
+   *   (ties: the most central, then the seed's pick), only one whose freeze leaves you a move and whose burning would be legal now.
+   * - Frozen `freezeTurns` crowd turns (that turn: it can't move); then `fleeTurns` turns thawed, your chance to move it off; then, as
+   *   the last of those moves lands (the start of his turn), the tile burns whatever is on it, his own pieces too, never a king (and
+   *   never a loss no game can have: spared). No piece fits: it waits a turn.
+   * - The judge counts a piece left on the tile on the flee turn as gone (its value at `burnPawnLogit` log-odds a pawn, the fire's
+   *   way), and always scores the moves that save it.
+   * His ultimate, the Storm of Two Worlds (Eric, Nov 27: "every turn it toggles between scattering spots on the board where anything
+   * that's left there will freeze or burn ... it kind of forces you to find a good move that does exist"; "He can use it up to 2 times a
+   * game ... you lose like a pawn at most of value each time"; docs/decisions/2026-11-27-stranger-storm.md): the rage meter's, at most
+   * `stormMax` a battle; `stormTurns` of your turns, Fire and Ice by turns, the first of them from the seed.
+   * - Ice: all your pieces but the king and `iceFree` are frozen that turn; one of the free ones holds the engine's best move.
+   * - Fire: `fireMarks` squares marked (3 or 4, from the seed), burning whatever stands on them after your move (the Frostfire's burn and
+   *   its guards): never his pieces, at most one of yours, the piece of the engine's best move (which moves it off), the rest empty.
+   * - The fairness check (the engine's `stormLines` top moves at `stormNodes`, with his move: the host's engines online, this device's
+   *   solo): your best move under the storm within `fairPawns` of your best without it, and your next best within `decentPawns` (or no
+   *   worse than the position's own second best by more than `fairPawns`). Up to `stormTries` picks; none passes: a milder one (Ice: the
+   *   pieces of your top three moves free; Fire: one mark fewer, none where your top three moves land). No answer: that turn is calm.
+   * - The host gets `stormTimeMs` more for the request that asks for it. His Frostfire waits from the warning to `stormRest` turns after.
+   */
+  stranger: {
+    strikeFrom: 3,
+    strikeEvery: 4,
+    freezeTurns: 1,
+    fleeTurns: 1,
+    burnPawnLogit: 1,
+    stormMax: 2,
+    stormTurns: 3,
+    iceFree: 2,
+    fireMarks: [3, 4] as readonly number[],
+    stormLines: 10,
+    stormNodes: 60_000,
+    fairPawns: 0.35,
+    decentPawns: 1.25,
+    stormTries: 8,
+    stormTimeMs: 4_000,
+    stormRest: 2,
+  },
 } as const;
 
 /**
@@ -2426,6 +2485,7 @@ export const BOSS_POWERS = {
 // (docs/decisions/2026-11-16-chandy-rules.md): in the roster now, an admin's in every mode until Eric says go.)
 // (Nov 23: "birdie": his rules, art and the fall's cutscene wiring, his armored power and the cutscene's art still to come: an admin's
 // in every mode until Eric says go, as Chandy.)
+// (Nov 27: "stranger" was here until his ultimate, the Storm of Two Worlds, landed the same day: live for everyone since.)
 export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy", "birdie"];
 
 /**
@@ -4042,6 +4102,14 @@ export const CRATE_OPEN = {
    * 3 s makes the whole thing long." One number, so Eric can change it.
    */
   spinMs: 4000,
+  /**
+   * The pull-back before a crate's strip spins (Eric, Nov 27: "like a rubber band style where the slot of items looks like it's pulled
+   * back slightly before going full speed into the normal shuffle spin"): the strip, drawn and still, eases `pullPx` against the
+   * spin's direction over `pullMs`, then lets go at full speed. Before the first strip only (the one an Open tap starts); every beat
+   * after it keeps its timing from the spin's first frame.
+   */
+  pullMs: 280,
+  pullPx: 16,
 } as const;
 
 /**
@@ -4054,6 +4122,17 @@ export const CRATE_OPEN = {
 export const CRATE_BONUS = {
   /** The chance an opening also gives a bonus crate (and its key, if it opens with one). */
   chance: 0.25,
+} as const;
+
+/**
+ * The Mythic Crate (Eric, Nov 9: "the exceedingly rare crate"; Nov 10: "that one secret crate... the super secret item is the banana
+ * suit"; docs/decisions/2026-11-27-banana-suit-prize.md; core's `MYTHIC_CRATE`). Every opening is a Transcendent spin over the series
+ * crates' Legendary (80) and Mythic (20) items, plus its secret prize. Rolled only on the server, held and opened with a key as a
+ * series crate.
+ */
+export const MYTHIC_CRATE_ODDS = {
+  /** The Banana Suit's chance per opening, out of 100, taken from the Mythic share (20): the other Mythic items share the rest. */
+  bananaSuit: 2,
 } as const;
 
 /**
@@ -4743,7 +4822,15 @@ export const OUTFIT = {
  * or never started). The server counts and grants them (server/welcome.ts); the prize is welcome.ts in core.
  */
 export const WELCOME_GIFT = {
+  /**
+   * Each Welcome Crate's stored key (`welcome_crates.milestone`) and the finished games it needs: the second at 25. The first (5)
+   * is given on the account's first visit since Nov 27 (`firstOnVisit`; Eric: "a golden ride beta crate is given when you open the
+   * game for the first time"): 5 stays its key, so crates earned before are unchanged.
+   */
   milestones: [5, 25],
+  firstOnVisit: true,
+  /** The level from which a Welcome Crate opens (Eric, Nov 27: "it's only openable after level 5 is reached"); the server refuses below. */
+  openLevel: 5,
   /**
    * A solo game counts toward them only with XP.minMoves of your own moves (as its XP) and at least this many seconds of the server's
    * time (POST /api/xp/solo/start, then its result): its result is the device's word, and empty posts earned crates (the outside
@@ -6350,3 +6437,12 @@ export const RESIDENTS = {
   gamePollMs: 30_000,
   host: { sleepAfter: "30m", args: ["--follow-deploys"], versionCheckMinutes: 2, drainMinutes: 20 },
 } as const;
+
+/**
+ * Rare item frames (Eric, Nov 12: "a nice clean like gold border or like diamond border";
+ * docs/decisions/2026-11-27-rare-frames-preview.md): the frame an item's tile wears by its tier, in the locker, a crate's
+ * "Possible items" and the item's preview. A tier not listed has no frame (its colored edge, as before).
+ */
+export const ITEM_FRAMES: Readonly<Record<string, "gold" | "diamond">> = { legendary: "gold", mythic: "diamond" };
+/** The tile class for an item tier's frame (" frame-gold", " frame-diamond", or "" for none). */
+export const frameClass = (tier: string) => (ITEM_FRAMES[tier] ? ` frame-${ITEM_FRAMES[tier]}` : "");

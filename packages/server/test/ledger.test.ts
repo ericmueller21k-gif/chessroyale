@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { OPS, SHOP_ITEMS, bossCrateOf, crateDef, itemDef, mulberry32, rollCrate, tokenBosses, type CrateDef } from "@chessroyale/core";
+import { OPS, SHOP_ITEMS, WELCOME_OPEN_XP, bossCrateOf, crateDef, itemDef, mulberry32, rollCrate, tokenBosses, type CrateDef } from "@chessroyale/core";
 import { buyItem, createGuest, createSession, ensureSchema, grantReward, recordResult, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { buyBossCrate, countBossBattle, grantTestItems, openBossCrate } from "../src/boss-tokens.ts";
@@ -165,6 +165,8 @@ describe("each path, keyed by its event: replayed or raced, it changes a balance
     // (Solo games the server timed, with enough moves: only those count toward a Welcome Crate since Nov 10.)
     for (let i = 0; i < 5; i++) await recordResult(sql, a.id, { mode: "classic", online: false, placement: 1, players: 8, playMs: 5 * 60_000, moves: 20 }, T0 + i);
     expect((await Promise.all([1, 2, 3].map(() => grantWelcomeCrate(sql, a.id, T0 + 9)))).flat()).toEqual([5]);
+    // (A Welcome Crate opens from level 5, Nov 27.)
+    expect(await setTestXp(sql, a.id, WELCOME_OPEN_XP, T0 + 9)).toBe(WELCOME_OPEN_XP);
     const opens = await Promise.all([1, 2, 3].map(() => openWelcomeCrate(sql, a.id, T0 + 10)));
     expect(opens.filter((r) => r.ok && !r.again)).toHaveLength(1);
     const ride = opens.find((r) => r.ok && !r.again)!;

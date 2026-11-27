@@ -146,10 +146,11 @@ export const ACCOUNT_STORES: AccountStore[] = [
   },
   {
     // The Battle Tower (tower.ts, Nov 19): your climbs (each one's kind, the floor it's on or ended on, how it ended, the bosses of
-    // every floor dealt, when it began and last changed, when a floor under way began, the last floor result your device sent) and your best floor of each kind. Never a
+    // every floor dealt, when it began and last changed, when a floor under way began, the last floor result your device sent), your best floor of each kind and
+    // the bosses you unlocked by beating them there (Nov 27), with when. Never a
     // run's seed or the bosses still to deal: they're the game's dealing, not about you (and would show the floors to come).
     name: "tower",
-    tables: ["tower_runs", "tower_best"],
+    tables: ["tower_runs", "tower_best", "boss_unlocks"],
     export: (sql, u) => towerDownload(sql, u.id),
     erase: (u) => towerDeletes(u.id),
   },
@@ -169,7 +170,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u) => questDeletes(u.id),
   },
   {
-    // The Welcome Crates (welcome.ts, Nov 6: at 5 and 25 finished games): for each, when the player earned it and the finished
+    // The Welcome Crates (welcome.ts, Nov 6; Nov 27: the first on the first visit, the second at 25 finished games): for each, when the player earned it and the finished
     // games counted then, when they closed its notice, and when they opened it and the ride it gave (that ride is in their items).
     name: "welcomeCrate",
     tables: ["welcome_crates"],

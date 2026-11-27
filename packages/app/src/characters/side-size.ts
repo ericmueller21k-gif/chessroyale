@@ -40,7 +40,8 @@ export const SIDE_FEEL = {
    * out of SIDE_WIDEST, so every boss keeps today's size; drawn at the same size, his far side lies over the menu beside the empty column
    * where it must, never past the window's edge (Eric's rule, Nov 4: "over the board or a menu is fine").
    */
-  overMenu: ["chandy"] as readonly string[],
+  // (The Stranger, Nov 27: his crossed swords reach 101 wide at rest, past the 87 the rest fit: left out the same way.)
+  overMenu: ["chandy", "stranger"] as readonly string[],
   /** The God King and your pawn: the bosses' size over 2, at most this (15% under Nov 4's 2), the same in every fight. */
   kingMax: 1.7,
   /** The share of the room right of the board they fill at most (Nov 7: 15% smaller than they were, "so then the king fits"). */
@@ -86,6 +87,8 @@ export const SIDE_REACH: Readonly<Record<string, readonly [left: number, up: num
   chandy: [57, 117, 43, 3],
   // (Birdie, young and armored: the armored stands taller.)
   birdie: [37, 83, 35, 2],
+  // (The Stranger, Nov 27: his swords crossed on his back reach past his shoulders.)
+  stranger: [50, 120, 51, 2],
 };
 
 /**
@@ -117,14 +120,16 @@ export const SIDE_SWING: Readonly<Record<string, readonly [left: number, right: 
   recluse: [31, 30],
   chandy: [57, 98],
   birdie: [37, 36],
+  // (The Stranger: his slash and cast reach past his rest; 63 and 62 (was 61 and 61, Nov 27) with his twirl and sweep.)
+  stranger: [63, 62],
 };
 
 /**
  * Animations whose drawing lies over the board on a computer, left out of a boss's SIDE_REACH (his room is his rest's): Chandy's level
- * rifle, aiming and firing (Nov 16), at every stage. Over the board is fine (Eric's rule, Nov 4); the e2e guard still checks every frame
+ * rifle, aiming and firing (Nov 16), at every stage; the Stranger's hop, finishers and storm's scene, played on the board itself (Nov 27). Over the board is fine (Eric's rule, Nov 4); the e2e guard still checks every frame
  * whole in the window.
  */
-export const OVER_BOARD: Readonly<Record<string, RegExp>> = { chandy: /^(aim|fire)(_s\d)?$/ };
+export const OVER_BOARD: Readonly<Record<string, RegExp>> = { chandy: /^(aim|fire)(_s\d)?$/, stranger: /^(hop|fin_\w+|storm[A-Z]\w*)$/ };
 /** The God King's the same (characters/god-king.ts: his frame 108 × 104, his feet at 64, 99), measured by the same test. */
 export const KING_REACH = [38, 98, 34, 3] as const;
 

@@ -14,6 +14,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   to move, each with its own powers and meter, stronger every floor: Maia from 600, +20 a floor to floor 5, +30 to 10, +40 to 30,
   then +4 a floor (held about 1630 to 1710 to floor 50; a lone boss +100); from floor 51 Stockfish from 1750, +31 a floor, its best
   on floor 99 (Eric, Nov 20).
+- **A boss's own floors** (`BATTLE_TOWER.bossFloors`, Nov 27): floors 10, 30 and 50 are the Stranger's alone (a lone boss's strength), never dealt from a deck; his floors deal as any other while he isn't ready (admins first: any climb but an admin's solo one; a test server's deals him to all) or rests. Beating him on one of them unlocks him in the Boss Battle picker: the win writes `boss_unlocks` (core `floorUnlocks`; a life spent on his floor never does), which `GET /api/tower` (`unlocked`) and the raid's and party's pick checks (`towerUnlocks`) read.
 - Every boss's moves are in, a few with a one-line rule; Hollow and Smudgy never share a floor, and for now neither do Smudgy + Alfil, Alfil + Grex and Dash + Smudgy (Nov 19); the Hidden Boss isn't in the tower.
 - You play White (random sides later). Two lives (Nov 20, below): a floor lost, drawn or left counts and costs one, the climb going on; the
   third loss ends the run. Every floor is one snug room in HunChess's colors (the town's
@@ -183,6 +184,8 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   (`lobby.ts` `hiddenRook`, the side's bosses); the reveal after your move draws every part's board layer (`Crowd.tsx`), so Hollow's dark
   stays on its squares while another boss is next. Checks: app `camo.test.ts`, `tower-side.test.ts`, server `smudgy-lobby.test.ts`,
   e2e `battle-tower.spec.ts` ("a shared floor with Smudgy"). [2026-11-21-smudgy-shared-mask.md](../decisions/2026-11-21-smudgy-shared-mask.md).
+  Another boss's rook move of the hidden rook reveals it (`followRook`); under `?paint` the others never move it (`paintHeld`, so the
+  e2e stays deterministic: [2026-11-27-flakes-shared-rook-dough.md](../decisions/2026-11-27-flakes-shared-rook-dough.md)).
 
 - **Eric's playtest fixes (Nov 20):** Wrangler has no ultimate on a floor of several (`BATTLE_TOWER.noUltimate: ["pig"]`: the runner marks
   his powers `noUlt` as a shared floor starts; his meter stays on the bar empty and dimmed, aria "Rage: no ultimate in the Battle Tower");
@@ -347,7 +350,7 @@ take from `startSide`) fixed in PR 8 (above).
 
 `packages/chess/test/board-layer.test.ts` (every mark, overlaps, the lift, castling, promotion, en passant); each family's twin
 (today's rule, frozen, against the layer over seeded battles: `held-layer-twin.test.ts` for the held pieces, `square-layer-twin.test.ts` for the square marks, `shield-layer-twin.test.ts` for the shields); the boss kit (`packages/chess/test/boss-kit.test.ts`) and `e2e/boss-smoke.spec.ts` guard every boss
-moved onto the layer; `boss-kit-side.test.ts` runs the kit over every pair and a sample of threes (and audit 1's seeds), `several-bosses.test.ts` the side's
+moved onto the layer; `boss-kit-side.test.ts` runs the kit over every pair (on main; a PR plays 1 in 4, rotated by its number: `KIT_PAIR_SHARE`) and a sample of threes (and audit 1's seeds), `several-bosses.test.ts` the side's
 rules (Chandy in every order: a mate in one brings no Dodge, your mate is a mate on a floor of several; Folio's crease line at the floor's rates), and `boss-kit-parity.test.ts` solo against online
 for every boss in a pair and two threes (more by hand: `KIT_PARITY_SIDES`); core `tower.test.ts` (the design's table, the deal over 300 seeds and two pools, the run's steps and lives, finding 7's start) and the runner's
 side of finding 7 in `several-bosses.test.ts`; server `tower.test.ts` (the index, every route's happy path and refusals, a result once and

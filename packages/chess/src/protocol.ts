@@ -15,6 +15,7 @@ import type { DashView } from "./bosses/dash.ts";
 import type { ZebraView } from "./bosses/zebra.ts";
 import type { ChandyView } from "./bosses/chandy.ts";
 import type { BirdieView } from "./bosses/birdie.ts";
+import type { StormAsk, StrangerView } from "./bosses/stranger.ts";
 import type { Phase2Result } from "./bosses/recluse-phase2.ts";
 import type { MoveScore } from "./uci.ts";
 /**
@@ -550,6 +551,11 @@ export interface NetBossPowers {
    */
   birdie?: BirdieView | null;
   /**
+   * The Stranger (missing for other bosses and from older servers; an older app ignores it): his Frostfire strike under way (its
+   * tile, the piece it struck, its last frozen crowd turn, the crowd move it burns after) and the last burn.
+   */
+  stranger?: StrangerView | null;
+  /**
    * The circus tiger (missing for other bosses and from older servers; an older app ignores them): the balloon on his
    * nozzle (`balloon`: its shape as everyone sees it, a fake queen's "q"; its color; when it went on and when it's fully
    * blown, on the battle's clock: the server's online, the page's visible time solo, so every device draws the same stage;
@@ -705,13 +711,15 @@ export type ClientMessage =
    * tiger's, asked with `balloon`): the square his balloon lands on after his move (landFrom); the server checks it. `hoops`
    * (the circus tiger's, asked with `hoops`): the cast after his move, its blocks by their corners in throw order
    * (hoopsAnswer's, "c3 f5 b6"; "" none); the server checks it (hoopsCheck). `crease` (Folio's, asked with `crease`): the
-   * Crease's line after his move (creaseAnswer's, "d|e" or "4|5"; "" none); the server checks it (creaseCheck).
+   * Crease's line after his move (creaseAnswer's, "d|e" or "4|5"; "" none); the server checks it (creaseCheck). `storm` (the
+   * Stranger's, asked with `storm`): his storm's next turn after his move (stormAnswer's: the free pieces or the marked squares,
+   * "e2 g1"; "" none); the server checks it (stormCheck).
    */
   /**
    * `by` (a request with a `brain`): which brain played it, "maia", or "stockfish" (a fallback: Maia not ready, late or failed, a
    * guard's swap). Two devices' different Maia moves are settled by it (BOSS_CHECK). Missing: "stockfish".
    */
-  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string; by?: "maia" | "stockfish" }
+  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string; storm?: string; by?: "maia" | "stockfish" }
   /**
    * This device's Maia is loaded (its `init` succeeded): it may check the boss's Maia moves, and as the host play them (BOSS_CHECK).
    * `off`: it failed after all (its worker broke): no longer loaded.
@@ -1145,6 +1153,13 @@ export type ServerMessage = { now: number } & (
        * next move.
        */
       crease?: CreaseAsk;
+      /**
+       * A turn of the Stranger's storm comes after this move (its first, or its next): its kind and the order ties are broken in. Play
+       * his move as ever, then answer the turn's pick as the move's `storm` (stormAnswer, on the position after the move: an ice turn's
+       * free pieces, a fire turn's marked squares; "" with no engine). The server checks it (stormCheck). An older app ignores it and
+       * sends the move alone: that turn is calm.
+       */
+      storm?: StormAsk;
       /**
        * The circus tiger's balloon is due at the end of this turn: where it lands (landFrom, on the position after his move,
        * with the cast's hoops when `hoops` is asked too: hoopsAnswer), answered as the move's `balloon`. Asked the same for a

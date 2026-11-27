@@ -1,5 +1,5 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { OPS, RAID_SETTINGS, bossIdFromLink, lockedLine, modeSettings, type RankedLeaves } from "@chessroyale/core";
+import { OPS, RAID_SETTINGS, bossDef, bossIdFromLink, lockedLine, modeSettings, type RankedLeaves } from "@chessroyale/core";
 import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
@@ -10,6 +10,7 @@ import { cachedUserId } from "./presence.ts";
 import { TOWER_PARTY_LINES } from "./squads-party.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
+import { towerUnlocks } from "./tower.ts";
 import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, sha256, type User } from "./accounts.ts";
 import { purgeTokenDrops } from "./boss-tokens.ts";
 import { ledgerCheck, ledgerCheckDue } from "./ledger.ts";
@@ -327,7 +328,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const refused = await mayPlay(request, env, waitUntil);
       if (refused instanceof Response) return refused;
       const test = asksTestSwitches(url.searchParams) && (await testSwitches(request, env, waitUntil));
-      const { overrides, keepMs } = lobbyOptions(url.searchParams, test, env.TEST_SWITCHES === "1");
+      // (A boss unlocked by a win, the Stranger: the creator's unlocks, read from the server's tower best, never the device's word.)
+      const unlocked = picked && bossDef(picked)?.unlock && env.DB && refused.uid ? await towerUnlocks(d1Sql(env.DB), refused.uid).catch(() => []) : [];
+      const { overrides, keepMs } = lobbyOptions(url.searchParams, test, env.TEST_SWITCHES === "1", unlocked);
       const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, overrides, undefined, keepMs)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
     }

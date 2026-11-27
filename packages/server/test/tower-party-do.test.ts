@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MATCH_SAVE, TOWER_PARTY, TOWN_CHAT, finishFloor, newRun, pausedLine, towerPool } from "@chessroyale/core";
+import { BOSS_ADMIN_FIRST, MATCH_SAVE, TOWER_PARTY, TOWN_CHAT, finishFloor, newRun, pauseVariable, pausedLine, towerPool } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, type PartyServerMessage } from "@chessroyale/chess/squads";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { deleteAccount } from "../src/account-data.ts";
@@ -13,6 +13,8 @@ import { memoryDb } from "./memory-db.ts";
 vi.mock("../src/engine.ts", () => ({ SERVER_RECHECK_NODES: 2_000_000, serverRecheck: async () => null, serverScoreAt: async () => null, serverAllMovesAt: async () => null, warmEngine: async () => false, countRecluseNoResult: () => undefined }));
 import { SquadsParty } from "../src/squads-do.ts";
 import { writeTowerEnds } from "../src/lobby-do.ts";
+import { lobbyOptions } from "../src/lobby-options.ts";
+import { bossPartyOverrides } from "../src/boss-party.ts";
 
 /**
  * The Battle Tower party's Durable Object (SquadsParty, kind "tower") on a fake runtime with a real (in-memory) database, and the floor
@@ -339,5 +341,76 @@ describe("the floor room's writes (writeTowerEnds; the review of #835, finding 7
     expect(rec.towerQueue).toEqual([]);
     expect(await copy(sql, bo.id)).toMatchObject({ floor: 26, fight: null });
     expect(paid).toEqual([`${ann.id}:25`]);
+  });
+});
+
+describe("the Stranger online: the server's pick gates (the review of #1000, S1 and SF1)", () => {
+  // (Live since his storm landed, Nov 27: a raid's or a party's pick meets him for a creator who unlocked him, on any server; his floors
+  // deal him to everyone. An unlock is still needed: never without one.)
+  it("a raid's ?boss=stranger meets him for a creator who unlocked him, on production and a test's server alike; never without the unlock", () => {
+    expect(BOSS_ADMIN_FIRST).not.toContain("stranger");
+    const raid = new URLSearchParams("mode=raid&boss=stranger");
+    for (const test of [false, true]) {
+      expect(lobbyOptions(raid, false, test, []).overrides.bossId).toBeUndefined();
+      expect(lobbyOptions(raid, false, test, ["stranger"]).overrides).toMatchObject({ bossId: "stranger", bossPicked: "stranger" });
+    }
+  });
+
+  it("a Boss Battle party's pick: the same, on the leader's unlock", () => {
+    const start = { boss: "stranger", difficulty: "normal" as const };
+    for (const test of [false, true]) {
+      expect(bossPartyOverrides(start, [], test).bossId).toBeUndefined();
+      expect(bossPartyOverrides(start, ["stranger"], test)).toMatchObject({ bossId: "stranger", bossPicked: "stranger" });
+    }
+  });
+
+  it("a party floor's write (writeTowerEnds) deals his floor 10 to everyone, with TEST_SWITCHES or without", async () => {
+    const floorTen = async (testSwitches: boolean) => {
+      const { sql } = memoryDb();
+      await ensureSchema(sql);
+      const now = Date.now();
+      const [ann, bo] = [await signedIn(sql, "ann@example.com", now), await signedIn(sql, "bo@example.com", now)];
+      const read = await preparePartyFloor(sql, [ann.id, bo.id], now, { pool: POOL, seed: 777 });
+      if (!read.ok) throw new Error("refused");
+      const fight: Fight = { id: "f00000000000000088", startedAt: now, lobby: "FLOOR" };
+      expect(await commitPartyFloor(sql, read.prep, fight, now, new Set())).toBe(true);
+      // (Both copies on floor 9 under way: a win deals floor 10, his own floor, from the pool the room's write passes.)
+      let run = newRun(777, POOL);
+      for (let f = 1; f < 9; f++) run = finishFloor(run, "won", POOL);
+      await sql.run("UPDATE tower_runs SET floor = 9, met = ? WHERE kind = 'party'", JSON.stringify({ floors: run.floors, deck: run.deck, decks: run.decks }));
+      const rec = { code: "FLOOR", towerQueue: [ann.id, bo.id].map((uid) => ({ fight: fight.id, end: { uid, outcome: "won" as const } })) } as unknown as LobbyRecord;
+      expect(await writeTowerEnds({ sql, paused: false, off: [], testSwitches }, rec, now + 1000, async () => undefined)).toEqual({ written: 2, failure: null });
+      const met = await sql.first<{ met: string }>("SELECT met FROM tower_runs WHERE user_id = ? AND kind = 'party'", ann.id);
+      return (JSON.parse(met!.met) as { floors: string[][] }).floors[9];
+    };
+    expect(await floorTen(false)).toEqual(["stranger"]);
+    expect(await floorTen(true)).toEqual(["stranger"]);
+  });
+
+  it("SF1: the party's plan pool (towerPoolNow): a party regrouping on copies dealt him on floor 10 keeps him, with TEST_SWITCHES or without; resting, re-dealt", async () => {
+    const regroup = async (extra: Record<string, string>) => {
+      const W = await world(extra);
+      const [ann, bo] = [await signedIn(W.sql, "ann@example.com", Date.now()), await signedIn(W.sql, "bo@example.com", Date.now())];
+      await climbedOnce(W.sql, [ann.id, bo.id], Date.now());
+      // (Their copies on floor 10, him dealt there, as the climb that reached it dealt him: they regroup in a new party.)
+      let run = newRun(4, POOL);
+      for (let f = 1; f < 10; f++) run = finishFloor(run, "won", POOL);
+      expect(run.floors[9]).toEqual(["stranger"]);
+      await W.sql.run("UPDATE tower_runs SET floor = 10, met = ?, last = json_set(last, '$.floor', 9), members = json_set(members, '$.party', 10) WHERE kind = 'party'", JSON.stringify({ floors: run.floors, deck: run.deck, decks: run.decks }));
+      const a = await W.join(ann.id, "Ann");
+      const b = await W.join(bo.id, "Bo");
+      expect(b.party()!.party.tower!.plan).toMatchObject({ kind: "continue", floor: 10 });
+      await W.send(b, { t: "ready", on: true });
+      await W.send(a, { t: "start" });
+      expect(W.made).toHaveLength(1);
+      const met = await W.sql.first<{ met: string }>("SELECT met FROM tower_runs WHERE user_id = ? AND kind = 'party' AND status = 'open'", ann.id);
+      return (JSON.parse(met!.met) as { floors: string[][] }).floors[9];
+    };
+    expect(await regroup({})).toEqual(["stranger"]);
+    expect(await regroup({ TEST_SWITCHES: "1" })).toEqual(["stranger"]);
+    // (Resting, his kill switch: the floor re-dealt from the deck, without him.)
+    const off = await regroup({ [pauseVariable("boss:stranger")]: "1" });
+    expect(off!.length).toBeGreaterThan(0);
+    expect(off).not.toContain("stranger");
   });
 });

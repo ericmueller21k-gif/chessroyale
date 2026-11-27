@@ -1,4 +1,4 @@
-import { WELCOME_CRATE, WELCOME_CRATE_ID, WELCOME_GIFT, XP, mulberry32, nextWelcomeMilestone, rollWelcome, type CrateRoll, type ItemInstance } from "@chessroyale/core";
+import { WELCOME_CRATE, WELCOME_CRATE_ID, WELCOME_GIFT, WELCOME_OPEN_XP, WELCOME_TEXT, XP, mulberry32, nextWelcomeMilestone, rollWelcome, welcomeGamesNeeded, type CrateRoll, type ItemInstance } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { applyOp, cond, leg, ledgerAccount, type LedgerAccount } from "./ledger.ts";
 
@@ -60,7 +60,8 @@ export async function finishedGames(sql: Sql, userId: string): Promise<number> {
 const SIGNED_IN = "EXISTS (SELECT 1 FROM users WHERE id = ? AND (email IS NOT NULL OR google_sub IS NOT NULL))";
 
 /**
- * Grants every Welcome Crate this account has earned and hasn't got (WELCOME_GIFT.milestones: at 5 finished games, then 25): each is
+ * Grants every Welcome Crate this account has earned and hasn't got (WELCOME_GIFT.milestones: the first, keyed 5, on its first visit
+ * since Nov 27 (`welcomeGamesNeeded`: no games; Eric: "given when you open the game for the first time"), the second at 25 finished games): each is
  * a ledger op (`welcome:<ledger id>:<n>`) that applies only while the account is signed in, its finished games (counted in the same
  * transaction) reach the milestone and it has no row for it; the row is keyed by (account, milestone) too. So a second grant of one
  * does nothing: retries, races, two tabs and two Workers grant each once. Only a signed-in account (bots have no account). Answers the
@@ -73,7 +74,7 @@ export async function grantWelcomeCrate(sql: Sql, userId: string, now: number): 
   const due = WELCOME_GIFT.milestones.filter((m) => !had.has(m));
   if (!due.length) return [];
   const games = await sql.first<{ n: number }>(`SELECT ${FINISHED_GAMES_SQL} AS n WHERE ${SIGNED_IN}`, userId, userId, userId);
-  const earned = due.filter((m) => games && games.n >= m);
+  const earned = due.filter((m) => games && games.n >= welcomeGamesNeeded(m));
   const me = earned.length ? await ledgerAccount(sql, userId) : null;
   const granted: number[] = [];
   for (const m of me ? earned : []) {
@@ -86,7 +87,7 @@ export async function grantWelcomeCrate(sql: Sql, userId: string, now: number): 
         userId,
         userId,
         userId,
-        m,
+        welcomeGamesNeeded(m),
         userId,
         m,
       ),
@@ -141,6 +142,9 @@ export async function seenWelcomeNotice(sql: Sql, userId: string, now: number): 
   await sql.run("UPDATE welcome_crates SET seen_at = ? WHERE user_id = ? AND seen_at IS NULL", now, userId);
 }
 
+/** An account's XP (as xp.ts's `xpOf`: imported there, this file loads before it). */
+const xpOf = async (sql: Sql, userId: string): Promise<number> => (await sql.first<{ xp: number | null }>("SELECT xp FROM wallets WHERE user_id = ?", userId))?.xp ?? 0;
+
 const randomHex = (bytes: number) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 /** Why the Welcome Crate couldn't be opened. */
@@ -153,7 +157,7 @@ export const NO_WELCOME_CRATE = "You have no Welcome Crate to open.";
  * and (while another is left) no Welcome Crate of yours gave that ride; then the ride goes in and the crate is marked opened with it.
  * Two opens at once with two crates waiting open both, with different rides (the second finds the first crate's op taken, and opens
  * the next, rolling with the first's ride counted); with one waiting, one ride. An open with none waiting gives nothing new: it answers
- * the ride the latest gave (`again`). An account that hasn't earned one is refused.
+ * the ride the latest gave (`again`). An account that hasn't earned one is refused, and one below WELCOME_GIFT.openLevel (level 5, Nov 27) with one to open.
  */
 export async function openWelcomeCrate(
   sql: Sql,
@@ -168,6 +172,8 @@ export async function openWelcomeCrate(
       userId,
     );
     const next = rows.find((r) => r.opened_at === null);
+    // (Below WELCOME_GIFT.openLevel, Nov 27: refused, the crate kept unopened. XP only grows, so the op's own check below only backs it.)
+    if (next && (await xpOf(sql, userId)) < WELCOME_OPEN_XP) return { ok: false, message: WELCOME_TEXT.tooLow };
     me ??= next ? await ledgerAccount(sql, userId) : null;
     if (!next || !me) break;
     const won = rows.flatMap((r) => (r.def ? [r.def] : []));
@@ -179,12 +185,14 @@ export async function openWelcomeCrate(
       reason: "welcome open",
       now,
       when: cond(
-        "EXISTS (SELECT 1 FROM welcome_crates WHERE user_id = ? AND milestone = ? AND opened_at IS NULL) AND (? = 0 OR NOT EXISTS (SELECT 1 FROM welcome_crates WHERE user_id = ? AND def = ?))",
+        "EXISTS (SELECT 1 FROM welcome_crates WHERE user_id = ? AND milestone = ? AND opened_at IS NULL) AND (? = 0 OR NOT EXISTS (SELECT 1 FROM welcome_crates WHERE user_id = ? AND def = ?)) AND COALESCE((SELECT xp FROM wallets WHERE user_id = ?), 0) >= ?",
         userId,
         next.milestone,
         fresh,
         userId,
         roll.def,
+        userId,
+        WELCOME_OPEN_XP,
       ),
       legs: [leg.welcomeOut(userId, next.milestone, item, now), leg.item(userId, { ...roll, id: item.id, fischer: true }, WELCOME_CRATE_ID, now)],
     });

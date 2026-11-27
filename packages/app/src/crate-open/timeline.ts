@@ -13,13 +13,16 @@ export const TILE_STEP = 96 + 6;
 export const STRIPS = { crate: { tiles: 46, land: 38 }, fischer: { tiles: 30, land: 24 } } as const;
 
 /**
- * Every beat, in ms from the first frame of the spin. `spinMs` (CRATE_OPEN.spinMs) is the only one a player would feel as "length".
- * `box`: a crate's present drops in, shakes and opens; without it (Fischer Random's second strip) the beam comes straight up out of
- * the winning tile.
+ * Every beat, in ms from the opening's first frame: the pull-back (`pullMs`, Nov 27: the strip eased back a few px, a rubber band
+ * drawn) and then the spin from `spinAt`. `spinMs` (CRATE_OPEN.spinMs) is the only one a player would feel as "length". `box`: a
+ * crate's present drops in, shakes and opens; without it (Fischer Random's second strip) the beam comes straight up out of the winning
+ * tile. `pull`: the first strip's pull-back (CRATE_OPEN.pullMs; the second strip, under its banner, starts at once).
  */
-export function timeline(spinMs: number = CRATE_OPEN.spinMs, box = true) {
+export function timeline(spinMs: number = CRATE_OPEN.spinMs, box = true, pull = box) {
+  const pullMs = pull ? CRATE_OPEN.pullMs : 0;
+  const spinAt = pullMs; // the spin's first frame: every beat after it as it was from it
   const settleMs = 220; // the strip's overshoot settling back onto the winner (the last click)
-  const stop = spinMs + settleMs;
+  const stop = spinAt + spinMs + settleMs;
   const dropAt = stop + 60; // the box drops into the middle as the strip dims away
   const dropMs = 260;
   const landAt = dropAt + dropMs; // it lands (a thud, a squash)
@@ -30,7 +33,7 @@ export function timeline(spinMs: number = CRATE_OPEN.spinMs, box = true) {
   const cardAt = riseAt + riseMs - 120; // the reveal card forms round it
   const cardMs = 340;
   const bannerAt = stop + 450; // Transcendent's banner comes up (a strip that lands on it: no box, no item), with its sound
-  return { spinMs, settleMs, stop, dropAt, dropMs, landAt, shakeMs, burstAt, riseAt, riseMs, cardAt, cardMs, bannerAt, box };
+  return { pullMs, pullPx: pull ? CRATE_OPEN.pullPx : 0, spinAt, spinMs, settleMs, stop, dropAt, dropMs, landAt, shakeMs, burstAt, riseAt, riseMs, cardAt, cardMs, bannerAt, box };
 }
 export type Timeline = ReturnType<typeof timeline>;
 
@@ -58,10 +61,11 @@ export const OVERSHOOT = 12;
 export const stripTarget = (width: number, land: number) => land * TILE_STEP + TILE_STEP / 2 - width / 2 + LAND_AT * TILE_STEP;
 
 /**
- * The strip's clicks: the moments (ms) a tile edge crosses the center line, for a window `width` px wide landing on tile `land`.
+ * The strip's clicks: the moments (ms from the spin's first frame) a tile edge crosses the center line, for a window `width` px wide
+ * landing on tile `land`, its spin starting `pullPx` back (the pull-back's, CRATE_OPEN.pullPx: silent, no edge crossed on the way).
  * Worked out ahead, so the sound is laid on the audio clock instead of a frame loop.
  */
-export function clickTimes(spinMs: number, width: number, land: number): number[] {
+export function clickTimes(spinMs: number, width: number, land: number, pullPx = 0): number[] {
   const peak = stripTarget(width, land) + OVERSHOOT;
   const out: number[] = [];
   // Tile edge k (the left edge of tile k) crosses the center line when x + width/2 = k * step.
@@ -69,8 +73,8 @@ export function clickTimes(spinMs: number, width: number, land: number): number[
   for (let k = first; ; k++) {
     const x = k * TILE_STEP - width / 2;
     if (x > peak) break;
-    // x = peak * ease(u)  =>  u = 1 - (1 - x/peak)^(1/power)
-    const u = 1 - Math.pow(1 - x / peak, 1 / EASE_POWER);
+    // The strip at -(pull) + (peak + pull) * ease(u) of travel: x reached at u = 1 - (1 - (x + pull)/(peak + pull))^(1/power).
+    const u = 1 - Math.pow(1 - (x + pullPx) / (peak + pullPx), 1 / EASE_POWER);
     out.push(u * spinMs);
   }
   return out;
@@ -96,12 +100,13 @@ export function tickLevel(gap: number): number {
  * and the clip script play the same list.
  */
 export function cues(T: Timeline, clicks: readonly number[], tier: ItemTier | "transcendent" | null): CrateCue[] {
+  // (The pull-back is silent: the whirr and the clicks from the spin's first frame.)
   const out: CrateCue[] = [
-    { at: 0, sound: "whirr" },
+    { at: T.spinAt, sound: "whirr" },
   ];
   clicks.forEach((ms, i) => {
     const gap = Math.min((clicks[i + 1] ?? ms + 400) - ms, 400);
-    out.push({ at: ms, sound: `tick${tickLevel(gap)}${i % 2 ? "b" : "a"}` });
+    out.push({ at: T.spinAt + ms, sound: `tick${tickLevel(gap)}${i % 2 ? "b" : "a"}` });
   });
   out.push({ at: T.stop - 40, sound: "lock" });
   // (A strip landing on Transcendent: its own sound as its banner comes up, in place of the banner's usual whoosh; Nov 24.)

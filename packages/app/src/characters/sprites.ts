@@ -34,6 +34,8 @@ const ART_FACING: Readonly<Record<string, ArtFacing>> = {
   // (Birdie, Nov 23: his train's nose and his face to our left.)
   birdie: "left",
   recluse: "front",
+  // (The Stranger, Nov 27: drawn facing front, as the God King.)
+  stranger: "front",
 };
 
 /**

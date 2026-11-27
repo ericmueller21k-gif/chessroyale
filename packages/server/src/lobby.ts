@@ -24,9 +24,11 @@ import {
   zebraTurnMs,
   bigboyTurnMs,
   chandyTurnMs,
+  strangerTurnMs,
   dodgeSeen,
   dodgeOver,
   popOffMs,
+  popOffPending,
   folioTurnMs,
   sawyerTurnMs,
   birdieTurnMs,
@@ -49,6 +51,7 @@ import {
   type WaterAsk,
   type HoopsAsk,
   type CreaseAsk,
+  type StormAsk,
   type BoardScore,
   type ClientMessage,
   type NetFinal,
@@ -468,6 +471,8 @@ export interface LobbyRecord {
   bossMinAt?: number;
   /** When Birdie's moments at the start of his turn began (his thinking's start, server time), for that crowd turn (BirdieView.turnAt). */
   birdieAt?: { turn: number; at: number };
+  /** When Dash's pop-off or "Hang on" hold began (his thinking's start, server time), for that battle and crowd turn (DashView popOff.since). */
+  popOffAt?: { key: string; at: number };
   bossIntroDone?: boolean;
   /**
    * The boss's brain for this battle, decided as it begins (bossBrainFor; BOSS_BRAIN): Maia (with its rating, and the
@@ -743,7 +748,7 @@ const FINAL_CUT_MS = 1800;
 const BOSS_KILL_MS = 3800;
 const BOSS_TIMEOUT_MS = 15_000;
 /** What may come with the boss's move (Wrangler's drag or showdown line-up, Moo's lines, the tiger's balloon and hoops, Folio's Crease). */
-type BossExtras = { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string };
+type BossExtras = { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string; storm?: string };
 /** A device's answer to a checked boss move: the move, what came with it, and `by` "maia" when Maia played it (else a fallback). */
 type BossAnswer = { move: string; extras: BossExtras; by?: "maia" };
 /** The boss's moves two devices play with one seed (checkBoss): his own (the brain's, a slip, a stagger, a power's best) and Boingo's funhouse move. */
@@ -773,12 +778,18 @@ const hoopsAsk = (runner: MatchRunner): { hoops?: HoopsAsk } => {
   const hoops = runner.hoopsAsk();
   return hoops ? { hoops } : {};
 };
-const hoopsMs = (runner: MatchRunner | null): number => (runner?.hoopsAsk() ? BOSS_POWERS.hoopsTimeMs : 0) + (runner?.creaseAsk() ? BOSS_POWERS.creaseTimeMs : 0);
+const hoopsMs = (runner: MatchRunner | null): number => (runner?.hoopsAsk() ? BOSS_POWERS.hoopsTimeMs : 0) + (runner?.creaseAsk() ? BOSS_POWERS.creaseTimeMs : 0) + (runner?.stormAsk() ? BOSS_POWERS.stranger.stormTimeMs : 0);
 
 /** Folio's Crease for the host to pick after its move (the boss request's `crease`), or nothing (hoopsMs gives the host its time too). */
 const creaseAsk = (runner: MatchRunner): { crease?: CreaseAsk } => {
   const crease = runner.creaseAsk();
   return crease ? { crease } : {};
+};
+
+/** The Stranger's storm turn for the host to pick after his move (the boss request's `storm`), or nothing (hoopsMs gives it its time). */
+const stormAsk = (runner: MatchRunner): { storm?: StormAsk } => {
+  const storm = runner.stormAsk();
+  return storm ? { storm } : {};
 };
 
 export class LobbyCore {
@@ -1235,7 +1246,8 @@ export class LobbyCore {
     const seat = admit?.seat ?? -1;
     if (pl && (!admit || Object.values(pl.seats).includes(seat) || (admit.userId !== undefined && admit.userId !== userId))) return { ok: false as const, message: PARTY_ONLY };
     // (A name the filter refuses becomes "Player N", like an empty one: text-filter.ts.)
-    const clean = seatName(name, `Player ${this.r.humans.length + 1}`);
+    // ("HunChess" in a name is staff's only, Nov 27: a non-admin's seat gets "Player N" for it.)
+    const clean = seatName(name, `Player ${this.r.humans.length + 1}`, admin);
     const id = `p${++this.r.counter}`;
     const newToken = reseat ? token! : Array.from({ length: 24 }, () => Math.floor(this.rng() * 16).toString(16)).join("");
     this.r.humans.push({
@@ -1824,7 +1836,7 @@ export class LobbyCore {
       }
       case "bossMove": {
         if (this.r.phase !== "boss" || this.r.bossKey !== msg.key || typeof msg.move !== "string" || msg.move.length > 128) return;
-        const extras: BossExtras = { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}), ...(typeof msg.balloon === "string" ? { balloon: msg.balloon.slice(0, 2) } : {}), ...(typeof msg.hoops === "string" ? { hoops: msg.hoops.slice(0, 32) } : {}), ...(typeof msg.crease === "string" ? { crease: msg.crease.slice(0, 8) } : {}) };
+        const extras: BossExtras = { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}), ...(typeof msg.balloon === "string" ? { balloon: msg.balloon.slice(0, 2) } : {}), ...(typeof msg.hoops === "string" ? { hoops: msg.hoops.slice(0, 32) } : {}), ...(typeof msg.crease === "string" ? { crease: msg.crease.slice(0, 8) } : {}), ...(typeof msg.storm === "string" ? { storm: msg.storm.slice(0, 48) } : {}) };
         // (The Hidden Boss's move out to the engine server, no device having answered in time: the server's alone now.)
         if (this.r.recluse1?.key === msg.key) return;
         // (His own move and the funhouse's: the host's and a second device's, compared. His powers' picks: the host's, checked by their rules.)
@@ -2137,7 +2149,7 @@ export class LobbyCore {
    * device back from a reload, `last`, gets no more than everyone had then.)
    */
   private bossViewSent(justKilled: string | null = null): NetBoss {
-    const view = this.withBirdieAt(this.runner!.bossView(justKilled)!);
+    const view = this.withPopOffAt(this.withBirdieAt(this.runner!.bossView(justKilled)!));
     const d = view.powers?.chandy?.dodge;
     if (!d || dodgeOver(d)) return view;
     const l = this.r.dodge;
@@ -2151,6 +2163,14 @@ export class LobbyCore {
     if (!at || !bd || view.powers!.turn !== at.turn) return view;
     const impact = birdieImpactMs(view);
     return { ...view, powers: { ...view.powers!, birdie: { ...bd, turnAt: { ...at, ...(impact !== null ? { dropAt: at.at + impact } : {}) } } } };
+  }
+
+  /** Dash's view with when his pop-off's (or "Hang on"'s) hold began (popOff.since), while it plays. */
+  private withPopOffAt(view: NetBoss): NetBoss {
+    const at = this.r.popOffAt;
+    const d = view.powers?.dash;
+    if (!at || !d?.popOff || !popOffPending(view) || at.key !== `${view.startMove}:${view.powers!.turn}`) return view;
+    return { ...view, powers: { ...view.powers!, dash: { ...d, popOff: { ...d.popOff, since: at.at } } } };
   }
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
@@ -2457,12 +2477,14 @@ export class LobbyCore {
     const b = this.runner!.state.boss;
     const burnt = fireShows(b);
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
-    // transformation at the start of his turn, Ginger's Super Freeze and Sawyer's Saw Swap.)
-    const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b) + sawyerTurnMs(view) + birdieTurnMs(view);
+    // transformation at the start of his turn, Ginger's Super Freeze and Sawyer's Saw Swap; the Stranger's block, a piece of his just taken.)
+    const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b) + sawyerTurnMs(view) + birdieTurnMs(view) + strangerTurnMs(view);
     // (Birdie's moments begin with this thinking: when, kept for every message of it, so a device rejoining carries them on. A second
     // thinking of the same turn, if any, keeps the first's.)
     const turn = view.powers?.turn ?? -1;
     if (birdieTurnMs(view) && this.r.birdieAt?.turn !== turn) this.r.birdieAt = { turn, at: this.io.now() };
+    // (Dash's pop-off and "Hang on" too: a device that first sees them late plays them from here, with this hold. Nov 27.)
+    if (popOffMs(b) && this.r.popOffAt?.key !== `${view.startMove}:${turn}`) this.r.popOffAt = { key: `${view.startMove}:${turn}`, at: this.io.now() };
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 
@@ -2471,7 +2493,7 @@ export class LobbyCore {
     const runner = this.runner!;
     const kind = this.r.bossKind;
     const asks = this.bossAsks();
-    return (kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best") && !!(runner.bossBeam() || runner.balloonAsk() || runner.hoopsAsk() || runner.creaseAsk() || asks?.drag || asks?.showdown);
+    return (kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best") && !!(runner.bossBeam() || runner.balloonAsk() || runner.hoopsAsk() || runner.creaseAsk() || runner.stormAsk() || asks?.drag || asks?.showdown);
   }
 
   /** What the boss's own turn asks the host for besides its move (Wrangler's long pull, drag or showdown), or null. */
@@ -2545,6 +2567,7 @@ export class LobbyCore {
       // (The circus tiger's hoops, due after this move: the host places them on the position after it; Folio's Crease line too.)
       ...(move ? hoopsAsk(runner) : {}),
       ...(move ? creaseAsk(runner) : {}),
+      ...(move ? stormAsk(runner) : {}),
       // (A step that spends his whole turn: the pass guard, on the host's engine. The server never searches.)
       ...(kind === "fuse" || kind === "carrots" || kind === "queenlock" ? { pass: true as const } : {}),
       // (`only`: the move that plays, its extras asked of the host (playChecked, N2): that move alone, no long pull, no brain.)
@@ -2879,7 +2902,7 @@ export class LobbyCore {
     }
     // (Wrangler's drag or showdown line-up, Moo's lines for his Moonbeam, the circus tiger's hoops and balloon square,
     // Folio's Crease line: the runner checks each against the rules before it's used.)
-    this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null, beam: extras.beam ?? null, balloon: extras.balloon ?? null, hoops: extras.hoops ?? null, crease: extras.crease ?? null });
+    this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null, beam: extras.beam ?? null, balloon: extras.balloon ?? null, hoops: extras.hoops ?? null, crease: extras.crease ?? null, storm: extras.storm ?? null });
     // As the turn passes to the crowd, any power that comes with it (a freeze, a pie, the warning, the blizzard)
     // plays out before the crowd's clock starts.
     // (At a mate, the boss's attack on the crowd's king, if it has one: the result waits for it.)

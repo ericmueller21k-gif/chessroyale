@@ -117,6 +117,8 @@ async function world() {
   const fight = (await startTowerFloor(sql, a.id, T0 + 17, { pool: towerPool() })).body.fight as { id: string };
   expect((await finishTowerFloor(sql, a.id, T0 + 60_000, { fight: fight.id, outcome: "won" }, { pool: towerPool(), minWinMs: 0 })).status).toBe(200);
   await startTowerFloor(sql, a.id, T0 + 60_001, { pool: towerPool() });
+  // (And a boss she unlocked by beating him on a floor of his own, the Stranger: the review of #1000, N8.)
+  await sql.run("INSERT INTO boss_unlocks (user_id, boss, at) VALUES (?, 'stranger', ?)", a.id, T0 + 18);
   return { sql, d1, ann, bo, cy, a, phone };
 }
 
@@ -128,6 +130,7 @@ async function world() {
 const SCHEMA_COLUMNS: Record<string, string> = {
   blocks: "user_id blocked_id at",
   boss_crates: "id user_id crate bought_at",
+  boss_unlocks: "user_id boss at",
   boss_token_drops: "id user_id boss at battle",
   boss_tokens: "user_id boss n",
   chat_mod_log: "id user_id at action until by reason note ended_at seen",
@@ -253,6 +256,7 @@ describe("download my data", () => {
     expect(d.tower.runs).toMatchObject([{ kind: "solo", floor: 2, status: "open", fight_at: new Date(T0 + 60_001).toISOString(), started_at: new Date(T0 + 16).toISOString() }]);
     expect(d.tower.runs[0].floors).toHaveLength(2);
     expect(d.tower.best).toEqual([{ kind: "solo", floor: 1, at: new Date(T0 + 60_000).toISOString() }]);
+    expect(d.tower.unlocked).toEqual([{ boss: "stranger", at: new Date(T0 + 18).toISOString() }]);
     // Nothing of anyone else's but the names the app shows her: no other email, no report about her, no hash.
     const text = JSON.stringify(d);
     for (const secret of ["bo@example.com", "cy@example.com", "Offensive name or icon", "token_hash", "code_hash", DEVICE, "more bosses", "bang", "taunting", "eric@example.com", "spamming"]) {

@@ -139,6 +139,9 @@ import {
   blackedOut,
   chandyBattle,
   CHANDY_FX,
+  strangerBattle,
+  stormAnswer,
+  type StormAsk,
   dodgeWon,
   mateHeld,
   trainSquare,
@@ -1484,7 +1487,8 @@ export class MatchRunner {
     // (Test switch ?paint=1: Smudgy's hidden rook steps like a pawn, whose name the e2e reads.)
     const paint = this.settings.bossPaintTest ? smudgyBattle.paintStep(this.battle, this.bossAllowed() ?? legalMoves(fen)) : undefined;
     // (Test switch ?power=lockon: Chandy takes a piece as soon as he can, so his first lock comes early.)
-    const grab = chandyBattle.testMove(this.battle, this.bossAllowed()) ?? undefined;
+    // (Test switch ?power=finisher: the Stranger takes a piece of yours that isn't a pawn whenever he can.)
+    const grab = chandyBattle.testMove(this.battle, this.bossAllowed()) ?? strangerBattle.testMove(this.battle, this.bossAllowed()) ?? undefined;
     // (His brain for this move (brainNow): the Hidden Boss's child's rating now, Armored Birdie's stronger one, or Stockfish.)
     const now = this.brainNow(this.humanBrain?.rating ?? null);
     const brain = this.humanBrain && now.rating !== null ? { ...this.humanBrain, rating: now.rating } : null;
@@ -1497,11 +1501,13 @@ export class MatchRunner {
     const raceLook = this.bossRace(kind);
     this.raceCheck = null;
     const race = raceLook && { ...raceLook, onCheck: (c: RaceCheck) => (this.raceCheck = c) };
+    // (Test switch ?paint=1 or 2 on a shared floor: the other bosses leave Smudgy's hidden rook where it is, so it stays his to move.)
+    const allowed = this.paintHeld(fen);
     const ordinary = async () =>
       mate ??
       paint ??
       grab ??
-      (await bossMoveFrom(engine, fen, elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race, false, this.bossLocks()));
+      (await bossMoveFrom(engine, fen, elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race, false, this.bossLocks()));
     const asks = this.bossAsks();
     if (asks) {
       // (His long pull, drag or showdown on every engine of this device; his ordinary move on `engine`, as ever.)
@@ -1517,13 +1523,16 @@ export class MatchRunner {
     const hoops = this.hoopsAsk();
     // (Folio's Crease, wanted with this move: its line on the position after it, on this device's engines, as the host's.)
     const crease = this.creaseAsk();
+    // (The Stranger's storm: its next turn's pick on the position after this move, on this device's engines, as the host's.)
+    const storm = this.stormAsk();
     const move = await ordinary();
     const end = balloon || hoops ? await this.tigerTurnEnd(fen, move, hoops, balloon, engine) : {};
     const line = crease ? await creasePick(this.opts.engines.length ? this.opts.engines : [engine], applyMove(fen, move), crease).catch(() => null) : null;
+    const gust = storm ? await stormAnswer(this.opts.engines.length ? this.opts.engines : [engine], applyMove(fen, move), storm).catch(() => "") : null;
     // (A moment that plays with his move known, before it shows: a taught capture's lock, Chandy's. Solo shows it and waits; the sims don't.)
     const holdMs = this.bossMoveMoment(move);
     if (holdMs && beforeShow) await beforeShow(holdMs);
-    this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...end, ...(crease ? { crease: line?.line ?? null, creaseLoss: line?.loss ?? null } : {}) });
+    this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...end, ...(crease ? { crease: line?.line ?? null, creaseLoss: line?.loss ?? null } : {}), ...(storm ? { storm: gust } : {}) });
     return move;
   }
 
@@ -1674,6 +1683,11 @@ export class MatchRunner {
     return folioBattle.creaseAsk(this.battle);
   }
 
+  /** The Stranger's storm turn comes next: what the host's engines need to pick it after his move now (stormPick), or null. */
+  stormAsk(): StormAsk | null {
+    return strangerBattle.stormAsk(this.battle);
+  }
+
   /**
    * The test trigger (an admin's): the boss's ultimate comes as the next crowd turn begins, without the warning. Does
    * nothing (false) when it can't: no ultimate, spent, the battle over. Never touches a turn in progress.
@@ -1817,6 +1831,19 @@ export class MatchRunner {
     return chandyBattle.applyQueenLock(this.battle, answer);
   }
 
+  /**
+   * The moves the boss to move may make (bossAllowed), but with the test switch ?paint=1 or 2 on a shared floor, for every boss
+   * but Smudgy, none of his hidden rook's: the e2e's hidden square then stays his to the end (Nov 27: Grex's engine slid it on
+   * main's run of #1006, revealing it, as any boss's rook move does). Off the switch: bossAllowed, as ever.
+   */
+  private paintHeld(fen: string): string[] | null {
+    const allowed = this.bossAllowed();
+    if (!this.settings.bossPaintTest || !this.several() || this.state.boss?.id === "smudgy") return allowed;
+    const sq = this.sideBosses().find((b) => b.id === "smudgy")?.powers?.camo?.square;
+    const held = sq ? (allowed ?? legalMoves(fen)).filter((m) => !m.startsWith(sq)) : [];
+    return held.length ? held : allowed;
+  }
+
   /** Chandy's locked squares for his move now (the boss request's `lock`: his engine steered toward them), or null. */
   bossLocks(): string[] | null {
     return chandyBattle.steer(this.battle);
@@ -1824,13 +1851,16 @@ export class MatchRunner {
 
   /**
    * A moment of the boss's that plays with his move known, before it shows (Chandy's first captures, chandy.teachCaptures: the
-   * crosshair locks onto the piece he's about to take, chandyBattle.firstLock): marks it and returns how long it holds the screen (ms) before the move may show; 0:
+   * crosshair locks onto the piece he's about to take, chandyBattle.firstLock; the Stranger's capture of a piece of yours that isn't a pawn: his
+   * finisher, strangerBattle.finisher): marks it and returns how long it holds the screen (ms) before the move may show; 0:
    * none. The server holds the host's move that long; solo's playBoss waits (its `beforeShow`).
    */
   bossMoveMoment(move: string): number {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     if (!(this.bossAllowed() ?? legalMoves(fen)).includes(move)) return 0;
-    return chandyBattle.firstLock(this.battle, move) ? CHANDY_FX.lockOn : 0;
+    if (chandyBattle.firstLock(this.battle, move)) return CHANDY_FX.lockOn;
+    // (The Stranger's finisher on a piece of yours that isn't a pawn: his leap, the strike, then the move.)
+    return strangerBattle.finisher(this.battle, move);
   }
 
   /** Boingo's funhouse: he plays the crowd's move this turn (the funhouse's first, once), before the crowd picks. */

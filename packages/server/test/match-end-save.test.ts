@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Chess } from "chess.js";
 import { DEFAULT_SETTINGS, MATCH_SAVE, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
 import { legalMoves, type BoardScore, type ServerMessage } from "@chessroyale/chess";
+import { grantWelcomeCrate } from "../src/welcome.ts";
 import { LobbyCore, newLobbyRecord, type LobbyRecord } from "../src/lobby.ts";
 import { library } from "./lobby-fixture.ts";
 import { createGuest, d1Sql, ensureSchema, recordResult, signInWithIdentity } from "../src/accounts.ts";
@@ -160,6 +161,8 @@ async function world(n: number) {
   for (const id of ids) {
     const g = await createGuest(sql, Date.now(), id);
     rec.accounts[id] = (await signInWithIdentity(sql, g.user, "email", `${id}@example.com`, {}, Date.now())).id;
+    // (Each has opened the app before playing: its first visit's Welcome Crate is given then (Nov 27), not at the match's end.)
+    await grantWelcomeCrate(sql, rec.accounts[id]!, Date.now());
   }
   const counting = countingD1(d1);
   // (The room's own schema check, done: a failure below is a write's.)

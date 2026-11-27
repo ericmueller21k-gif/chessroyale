@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOSS_ROSTER, adminFirst, isPlayable, type PowerEventKind, type PowerId } from "@chessroyale/core";
+import { BOSS_ROSTER, adminFirst, isPlayable, unlockReady, type PowerEventKind, type PowerId } from "@chessroyale/core";
 import { asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
 
 /**
@@ -32,11 +32,13 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
   dough: ["doughDrop"],
   lockon: ["lockOn"],
   train: ["trainSignal"],
+  frostfire: ["frostfire"],
 };
 
 // (A boss in the game for admins first, Timber and Dash, is checked too: the test plays as an admin.)
 // (Admins-first bosses too, but not an admin-only one: the Hidden Boss joined admins first for his town building, Nov 13; e2e/recluse.spec.ts covers him.)
-const PLAYABLE = BOSS_ROSTER.filter((b) => (adminFirst(b) && !b.adminOnly) || isPlayable(b));
+// (And a boss unlocked by a win, the Stranger: `?boss=` meets him as his won floor would.)
+const PLAYABLE = BOSS_ROSTER.filter((b) => (adminFirst(b) && !b.adminOnly) || isPlayable(b) || unlockReady(b));
 /**
  * A boss whose ultimate needs a position the usual start doesn't give: his own test switch's start instead of his
  * passive's. Smudgy's Repaint can't come while the crowd has all eight pawns (a ninth is a position the engine refuses),
@@ -104,10 +106,11 @@ PLAYABLE.forEach((def, i) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await asAdmin(page);
-    await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=${def.id}&power=${SMOKE_POWER[def.id] ?? powers.passive}`);
-    // His tile on the Boss raid screen.
+    await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=${def.id}&power=${SMOKE_POWER[def.id] ?? powers.passive}${def.unlock ? "&wip=1" : ""}`);
+    // His tile on the Boss raid screen (a boss unlocked by a win: his card, locked until won: "Locked boss: The Stranger. …").
     await openBossRaid(page);
-    await expect(page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: def.name, exact: true })).toBeVisible();
+    const tile = def.unlock ? { name: `Locked boss: ${def.name}.` } : { name: def.name, exact: true };
+    await expect(page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", tile)).toBeVisible();
     // The battle, through the test switches.
     await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
     await expect.poll(() => phase(page), { timeout: 45_000 }).toBe("play");

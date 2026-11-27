@@ -315,6 +315,33 @@ describe("several bosses: each boss's own turn, and every move reaching every bo
     expect(r.bossView()?.lastMove?.san).toBe("d6");
   });
 
+  it("another boss's rook move of Smudgy's hidden rook ends the disguise, as his own would: the rook shows, with his unmasking (Nov 27)", async () => {
+    // (?paint=1: the swap long past, so the rook may strike; Grex slides it d7-e7, as his engine did on main's run of #1006.)
+    const r = runner(["grex", "smudgy"], "", 5, { bossPaintTest: 1 });
+    r.deal();
+    await r.score(new Map([["h0", { move: "c2c3", thinkMs: 1000 }]]));
+    expect(r.boss!.id).toBe("grex");
+    r.applyBossMove("d7e7");
+    expect(sideBoss(r, "smudgy").powers!.camo).toMatchObject({ square: null, reveal: { square: "e7", how: "move", from: "d7" } });
+    expect(sideTracked(sideBoss(r, "smudgy"))).toEqual([]);
+    expect(r.bossView()?.powers?.events).toContainEqual(expect.objectContaining({ kind: "unmask", square: "e7", squares: ["d7", "e7"], reveal: "move", boss: "smudgy" }));
+  });
+
+  it("the test switch ?paint on a shared floor: the other boss never moves the hidden rook (the e2e's square stays Smudgy's); off it, he may", async () => {
+    const r = runner(["grex", "smudgy"], "", 5, { bossPaintTest: 1 });
+    r.deal();
+    await r.score(new Map([["h0", { move: "c2c3", thinkMs: 1000 }]]));
+    const fen = r.boards.get(0)!.fen;
+    const allowed = (r as unknown as { paintHeld(fen: string): string[] | null }).paintHeld(fen)!;
+    expect(legalMoves(fen)).toContain("d7e7");
+    expect(allowed.length).toBeGreaterThan(0);
+    expect(allowed.filter((m) => m.startsWith("d7"))).toEqual([]);
+    expect(allowed).toEqual(legalMoves(fen).filter((m) => !m.startsWith("d7")));
+    // (A battle without the switch: as bossAllowed says.)
+    const plain = runner(["grex", "smudgy"]);
+    expect((plain as unknown as { paintHeld(fen: string): string[] | null }).paintHeld(plain.boards.get(0)!.fen)).toEqual(plain.bossAllowed());
+  });
+
 
   for (const partner of ["zebra", "sawyer", "gingerbread"]) {
     it(`Folio's Revision (with ${partner}): the crowd move it crosses out reaches no other boss (his hooks, his judged numbers)`, async () => {
@@ -576,7 +603,9 @@ describe("several bosses: a tower floor of three, one ultimate each (BATTLE_TOWE
    */
   const trios = (): string[][] => {
     const hidden = new Set(hiddenBosses().map((b) => b.id));
-    const ids = [...new Set([...towerPool(), ...kitBosses().map((d) => d.id).filter((id) => !hidden.has(id))])];
+    // (Never a boss of his own floors, the Stranger: he fights alone there, BATTLE_TOWER.bossFloors, and never shares a floor.)
+    const own = new Set(Object.values(BATTLE_TOWER.bossFloors));
+    const ids = [...new Set([...towerPool(), ...kitBosses().map((d) => d.id).filter((id) => !hidden.has(id) && !own.has(id))])];
     const left = [...ids];
     const out: string[][] = [];
     while (left.length) {

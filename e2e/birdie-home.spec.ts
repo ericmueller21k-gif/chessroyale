@@ -19,6 +19,7 @@ type Hooks = {
   __birdieSteps?: string[];
   __birdieGates?: string[];
   __birdieLooks?: string[];
+  __covered?: boolean;
   __birdieBirds?: () => { n: number; shown: number; flying: number; fled: number; near: boolean } | null;
   __townReport?: (raw?: boolean) => { state: string; raw: { flags: number[]; ups: number[]; bakes: number[] } | null } | null;
 };
@@ -114,13 +115,18 @@ test("his challenge: his hello as he says his line at the middle table, the boar
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
+    // (His wipe covering the screen, noted as it's set: covered, it can be gone in coveredMinMs + wipeOutMs, 670 ms, when the battle
+    // loads fast, and a locator's wait looks only once a second by then: on a busy runner it looked past it, Nov 27.)
+    new MutationObserver(() => {
+      if (document.querySelector('canvas.boss-wipe[data-boss="birdie"][data-covered="1"]')) w.__covered = true;
+    }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-covered"] });
   });
   await page.goto("/town?sky=day&introPreview=1");
   await townReady(page);
   const card = await birdieCard(page);
   await card.getByRole("button", { name: "Challenge alone" }).click();
   await page.getByRole("dialog", { name: "Challenge Birdie?" }).getByRole("button", { name: "Fight" }).click();
-  await expect(page.locator('canvas.boss-wipe[data-boss="birdie"][data-covered="1"]')).toBeAttached({ timeout: 90_000 });
+  await expect.poll(() => page.evaluate(() => (window as unknown as Hooks).__covered === true), { timeout: 90_000 }).toBe(true);
   const steps = await page.evaluate(() => (window as unknown as Hooks).__birdieSteps ?? []);
   expect(steps).toEqual(expect.arrayContaining(["face", "line", "board", "table"]));
   expect(steps.indexOf("line")).toBeLessThan(steps.indexOf("board"));

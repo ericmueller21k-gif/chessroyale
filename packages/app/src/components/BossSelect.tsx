@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BOSS_DIFFICULTY, hiddenBosses, menuBosses, type BossDef, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
+import { BOSS_DIFFICULTY, hiddenBosses, menuBosses, unlockBosses, type BossDef, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
 import { isAdmin } from "../boss-brain.ts";
 import { DressedPawn } from "./FrontDoor.tsx";
 import { rowSizes, SAY_AT, SAY_AT_DEFAULT, SELECT_SOUND, SELECT_TINT, selectLine, STAGE_RISE, TILE_GAP, TILE_RATIO, TILES_PER_ROW } from "../characters/boss-select.ts";
@@ -10,6 +10,7 @@ import { BossArt, BossPortrait } from "./BossPortrait.tsx";
 import { game } from "../lazy-game.ts";
 import { portraitName } from "../characters/portraits.ts";
 import { useMedia } from "./QuickChat.tsx";
+import { unlockLine, unlockTest, useUnlocks } from "../unlocks.ts";
 
 /**
  * The Boss raid screen's character select (Eric, Oct 16: "old school Street Fighter 2 style… slanted squares… the current
@@ -45,9 +46,10 @@ const lastLine = new Map<string, string>();
  * meets the bosses in the game for admins first (BOSS_ADMIN_FIRST: Timber, until Eric says go), each a tile like any other;
  * nobody else sees them.
  */
-export function selectBosses(admin = isAdmin()): { bosses: BossDef[]; hidden: BossDef[] } {
+export function selectBosses(admin = isAdmin()): { bosses: BossDef[]; hidden: BossDef[]; unlock: BossDef[] } {
   const on = (b: BossDef) => !isPaused(`boss:${b.id}`);
-  return { bosses: menuBosses({ admin, raid: true }).filter(on), hidden: hiddenBosses().filter(on) };
+  // (And the bosses unlocked by a win, the Stranger (Eric, Nov 27): a card each after the others, darkened and locked until won.)
+  return { bosses: menuBosses({ admin, raid: true }).filter(on), hidden: hiddenBosses().filter(on), unlock: unlockBosses(undefined, unlockTest(), admin).filter(on) };
 }
 
 /** The "?" tile's value, and the stage's when a random boss is picked. */
@@ -154,7 +156,9 @@ export function BossSelect({
     return () => removeEventListener("keydown", key);
   }, [!!menuFor]);
   const locked = !!party?.locked;
-  const { bosses, hidden } = selectBosses();
+  const { bosses, hidden, unlock } = selectBosses();
+  const unlocked = useUnlocks();
+  const lockedIds = new Set(unlock.filter((b) => !unlocked.includes(b.id)).map((b) => b.id));
   const still = useMedia("(prefers-reduced-motion: reduce)");
   // (The speech band rises over a boss on a window 740 px tall or more, guests only: the admins' fourth row takes that room.)
   const roomy = useMedia("(min-height: 740px)");
@@ -165,7 +169,7 @@ export function BossSelect({
   const [drop, setDrop] = useState({ n: 0, at: Date.now() });
   const hiddenIds = new Set(hidden.map((b) => b.id));
   const dark = hiddenIds.has(value);
-  const def = [...bosses, ...hidden].find((b) => b.id === value) ?? null;
+  const def = [...bosses, ...unlock, ...hidden].find((b) => b.id === value) ?? null;
   // Their sounds made ahead (in the sound worker), so a tap never waits on one.
   useEffect(() => {
     warmSounds(Object.values(SELECT_SOUND));
@@ -192,7 +196,7 @@ export function BossSelect({
     const next = BOSS_DIFFICULTY[at + by];
     if (next) onDifficulty(next.id);
   };
-  const rise = roomy && (twoRows || rowSizes(bosses.length + hidden.length + 1, TILES_PER_ROW).length <= 3);
+  const rise = roomy && (twoRows || rowSizes(bosses.length + unlock.length + hidden.length + 1, TILES_PER_ROW).length <= 3);
   // The bubble's tail: moved along its bottom edge to the picked boss's mouth (SAY_AT), angled when the mouth is past its edge.
   // Only its custom properties change, so nothing moves; re-measured when the boss drops in, the line changes or the stage resizes.
   const sayStage = useRef<HTMLElement | null>(null);
@@ -239,6 +243,8 @@ export function BossSelect({
   );
   const tiles = [
     ...bosses.map((b) => tile(b.id, b.name, <BossArt boss={b} />, "", SELECT_TINT[b.id])),
+    // (Locked until won (Eric, Nov 27: "You can click on him and it'll show him"): a tap shows him on the stage, START greyed, and how.)
+    ...unlock.map((b) => (lockedIds.has(b.id) ? tile(b.id, `Locked boss: ${b.name}. ${unlockLine(b.id)}`, <BossArt boss={b} class="bs-shadow" />, " bs-locked bs-unlock") : tile(b.id, b.name, <BossArt boss={b} />, "", SELECT_TINT[b.id]))),
     ...hidden.map((b) => tile(b.id, "Locked boss", <BossArt boss={b} class="bs-shadow" />, " bs-locked")),
     tile(RANDOM, "Random boss", <span class="bs-q" aria-hidden="true">?</span>, " bs-random"),
   ];

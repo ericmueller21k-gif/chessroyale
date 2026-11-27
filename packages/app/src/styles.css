@@ -6709,6 +6709,7 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-size: 20px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -8416,6 +8417,32 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   font-weight: 700;
   opacity: 1;
 }
+/* The crate's Open button under its hero (Eric, Nov 27): the width of the hero and the rows, its height and text as before. */
+.crate-open-btn {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  text-align: center;
+}
+/* A crate you can open: its art is a button (a tap asks first, see the pop-up below). Looks the same, but for the pointer. */
+.crate-art-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+/* "Open this crate?": the game's confirm card (MatchMenu's Confirm) centered over the dimmed page. A tap outside closes it. */
+.crate-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
 .odds-list {
   display: grid;
   gap: 6px;
@@ -8928,6 +8955,126 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
 .ff-button.danger {
   background: linear-gradient(180deg, #d63939 0%, #9b1c1c 60%, #5f0f0f 100%);
 }
+
+/* Rare item frames (Eric, Nov 12; ITEM_FRAMES in settings.ts, docs/decisions/2026-11-27-rare-frames-preview.md): a gold border
+   for Legendary, a diamond one for Mythic, painted on the tile's own border (same widths as an unframed tile: nothing moves). Each
+   gradient has light and dark stops, so it reads on a light and a dark surface alike. Still: no animation. */
+.frame-gold {
+  --frame: linear-gradient(135deg, #fff3b0 0%, #f2b91e 22%, #8a5a00 45%, #ffe27a 62%, #c98c06 80%, #fff3b0 100%);
+}
+.frame-diamond {
+  --frame: linear-gradient(135deg, #ffffff 0%, #8fe3ff 18%, #2f6fdc 38%, #e8fbff 52%, #a78bfa 70%, #38bdf8 86%, #ffffff 100%);
+}
+.locker-item.frame-gold,
+.locker-item.frame-diamond,
+.odds-art.frame-gold,
+.odds-art.frame-diamond {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--frame-fill, var(--surface)), var(--frame-fill, var(--surface))) padding-box,
+    var(--frame) border-box;
+}
+.locker-item.worn {
+  --frame-fill: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+/* A framed tile keeps its "Worn" ring as a glow, its border being the frame. */
+.locker-item.worn.frame-gold,
+.locker-item.worn.frame-diamond {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+/* The locker's grid cell: the tile, and its preview control over the tile's right edge, under the count. */
+.locker-cell {
+  position: relative;
+  display: grid;
+}
+.locker-peek {
+  position: absolute;
+  top: 44px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+/* Its tap area: 36 px. */
+.locker-peek::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+}
+.locker-cell .locker-covered {
+  right: 32px;
+}
+.peek-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+/* A crate's "Possible items" rows (and the Welcome Crate's rides): each a button that opens the preview. */
+.odds-row.odds-item {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.odds-item .odds-art {
+  position: relative;
+  box-sizing: border-box;
+  border: 2px solid transparent;
+  border-radius: 8px;
+}
+.odds-item .peek-icon {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 18px;
+  height: 18px;
+  padding: 2px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  stroke-width: 2.8;
+}
+/* The preview: the pawn wearing or riding the item in its own box (the locker preview's blue), framed by its tier. */
+.item-preview-stage {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 200px;
+  height: 200px;
+  padding: 14px;
+  border: 4px solid var(--line);
+  border-radius: 14px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tier) 30%, #13207a) 0%, #0a1150 75%);
+}
+.item-preview-stage.frame-gold,
+.item-preview-stage.frame-diamond {
+  border-color: transparent;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--tier) 30%, #13207a) 0%, #0a1150 75%) padding-box,
+    var(--frame) border-box;
+}
+.item-preview-stage .avatar {
+  width: 100%;
+  height: 100%;
+}
+.item-preview-tier {
+  font-weight: 800;
+  color: color-mix(in srgb, var(--tier) 70%, #fff);
+}
 /* A shiny item's shine rolls across it: slowly over, then a pause. */
 .item-shine {
   mix-blend-mode: screen;
@@ -9024,6 +9171,24 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   }
   .ia-live .ia-puff {
     animation: ia-puff 7s ease-out infinite;
+  }
+}
+/* The Gift-Wrap Tube's twist (Eric, Nov 27: "like a barber shop pole"): its stripes scroll up it, one cell (TUBE_TWIST: two turns, 27.6
+   units) every 3 s, on a loop with no seam. Wherever it's drawn, not only under `.ia-live` (like the shine); one transform, never with
+   reduced motion. Not in the crate strip (review of #1012, S1): at strip speed it can't be seen, and a Fischer spin can draw a
+   dozen tubes in each track (the blurred one under a filter); the reveal card still twists. gift-tube.test.ts checks the distance
+   against TUBE_TWIST. */
+@media (prefers-reduced-motion: no-preference) {
+  .ia-twist {
+    animation: ia-twist 3s linear infinite;
+  }
+  .cox-track .ia-twist {
+    animation: none;
+  }
+}
+@keyframes ia-twist {
+  to {
+    transform: translateY(-27.6px);
   }
 }
 @keyframes ia-flicker {
@@ -26649,7 +26814,8 @@ body.mo-on .mm-scrim {
   box-shadow: inset 0 0 0 1px #f2c14e;
 }
 /* A locked Welcome Crate: greyed a little, with its padlock over the crate (shown, not hidden: its page still opens). */
-.welcome-crate-row.locked {
+.welcome-crate-row.locked,
+.welcome-crate-hero.locked {
   opacity: 0.7;
 }
 .welcome-crate-hero .crate-hero-art {
@@ -29485,4 +29651,88 @@ piece.bd-smashed {
   50% {
     opacity: 0;
   }
+}
+
+/* ---------------- The Stranger's Storm of Two Worlds (components/Stranger.tsx) ---------------- */
+
+/* The storm's ring: one small canvas, scaled up as pixel art, the board and RING.margin (12%) past it each side, over the pieces (its band
+   reaches onto the edge squares a little), never taking a tap. Cut only by the screen's own edges. */
+/* (Past the screen's edge it's cut, never scrolled to, on a phone too: the review of #1009, S1. A computer's game page already clips:
+   `.gm-main:has(.screen.game > .boss-dock)`.) */
+.gm-main:has(.sg-storm) {
+  overflow-x: clip;
+}
+.power-board .sg-storm {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * -0.12);
+  top: calc(var(--board-size, 100%) * -0.12);
+  width: calc(var(--board-size, 100%) * 1.24);
+  height: calc(var(--board-size, 100%) * 1.24);
+  image-rendering: pixelated;
+  pointer-events: none;
+  z-index: 3;
+}
+/* The board's cracks and the swords' ripples, in % of the board (the SVG's units), under his figure and the nudged pieces. */
+.sg-cracks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  z-index: 2;
+}
+.sg-crack {
+  fill: none;
+  stroke: #120b14;
+  stroke-width: 0.55;
+  stroke-linejoin: bevel;
+}
+.sg-glow {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linejoin: bevel;
+  opacity: 0.85;
+}
+.sg-glow.sg-fire {
+  stroke: #ff6a1e;
+}
+.sg-glow.sg-ice {
+  stroke: #5fd3ff;
+}
+.sg-ripple {
+  fill: none;
+  stroke-width: 0.9;
+}
+.sg-ripple.sg-fire {
+  stroke: #ff7a2a;
+}
+.sg-ripple.sg-ice {
+  stroke: #7fdcff;
+}
+/* His red and blue aura as he charges, his grip on both hilts (a glow by turns, on his own small box). */
+.sg-fig.sg-charge {
+  animation: sg-charge 0.36s steps(2, jump-none) infinite;
+}
+@keyframes sg-charge {
+  from {
+    filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3)) drop-shadow(-1.2cqw 0 1.6cqw rgba(255, 90, 30, 0.85));
+  }
+  to {
+    filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3)) drop-shadow(1.2cqw 0 1.6cqw rgba(95, 211, 255, 0.85));
+  }
+}
+/* His banner, fire into ice. */
+.fight-banner.power-cut.storm .fb-band {
+  background: linear-gradient(90deg, #1a0700, #9a3412 24%, #3b1d4f 50%, #0c4a6e 76%, #04121c);
+  border-color: #e9d5ff;
+  box-shadow: 0 0 0 3px #0b0b1a, -14px 0 26px rgba(251, 146, 60, 0.55), 14px 0 26px rgba(125, 211, 252, 0.55), 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.fight-banner.power-cut.storm .kc-label {
+  color: #f3e8ff;
+}
+.fight-banner.power-cut.storm .kc-text {
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    -6px 0 var(--fb-glow, 24px) rgba(253, 186, 116, 0.9),
+    6px 0 var(--fb-glow, 24px) rgba(186, 230, 253, 0.9);
 }

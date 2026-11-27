@@ -223,7 +223,8 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   drawn once per look into a small canvas; a frame only places them (a slow drift and a little parallax).
 - **`rimLine`** (`feel.ts`, off): a dark line along the world's rim instead of the haze alone (Eric was curious), with its
   color and width.
-- **The chips** show each boss's head (`BOSS_FACE` in `render.ts`: a box in its first idle frame), and the Colosseum's
+- **The chips** (and the large map's portraits) show each boss's head (`BOSS_FACE` in `render.ts`: a square round its portrait
+  window in portraits.gen.ts, so it follows a redraw; a home with nobody out front: `HOUSE_*_CHIP` in its house module), and the Colosseum's
   a gold crown over the board's squares (`COLISEUM_CHIP`, `houses/coliseum.ts`).
 - **The Colosseum** (`town/houses/coliseum.ts`, slice 5; redrawn about twice the size in slice 6): a Roman amphitheater of
   warm stone, chess-themed (checkered bands, a chessboard arena, marble pawns in the middle tier's arches, pieces carved over
@@ -489,6 +490,8 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   is drawn: the town (Canvas 2D and WebGL), the locker, the profiles, home's pawn and ring (`RideLayers`'s `k`; the boxes keep their
   size; the item's own tile keeps 1). **`?rideScale=K`** (0.5 to 1.25), a test switch (admins on the live site): every ride on that
   page at K, to try sizes; read once as the page opens (`test-switches.ts`).
+  **`__townPace(ms | null)`** (Nov 27, a test hook): your steps take `ms` (null: your look's pace again). The rides test walks its views
+  at 450 ms a step, so even CI's slowest frames (300 ms apart) draw each walk ([2026-11-27-rides-test-pace.md](../decisions/2026-11-27-rides-test-pace.md)).
   **Its moving sound** (Nov 14, Eric: "one continuous sound"; [2026-11-14-ride-sounds.md](../decisions/2026-11-14-ride-sounds.md)): a
   ride listed in `RIDE_SOUND.rides` (its file `/sounds/rides/<id>.wav`) sounds as your own pawn moves on it, in the town and a shop's
   room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer, Puddles's Mower, the Candy Cane Sled's bells (Nov 15; `bright`: round the 6 kHz softening, `gameBus(true)`) and Birdie's Train (Nov 23; `synth`: no file, his own medium train run made in code, looped over its last four puffs, `BIRDIE_RIDE_LOOP`; made as the town shows, before the audio too, never on a moving frame) (`kind: "loop"`)
@@ -1287,7 +1290,8 @@ The street town was an admin's town only (`STREET_TOWN`, gone Nov 13) until it b
     `mapMaxPx`), `mapOpacity` 0.7, rounded; under the chat where the chat takes the whole top (a narrow frame). Drawn once a size to its
     canvas; each frame only your dot's transform moves (`MapDot`, `mapFrame`). The map button (`TownChatTools`) turns it off and on,
     stored per device (`brc.townMap`, on by default), grayed inside a building. A tap opens it large in the middle (every boss home's
-    chip portrait, the park and Colosseum icons, your dot; no names); a tap anywhere closes it. A tap on a boss's portrait or its home's
+    chip portrait, the park (a small chessboard) and Colosseum icons, your dot; no names); a tap anywhere closes it; a tap on the park's
+    icon walks you to the park's middle (Nov 27, [2026-11-27-town-map-faces-park.md](../decisions/2026-11-27-town-map-faces-park.md)). A tap on a boss's portrait or its home's
     block (within 2 squares of its middle, the nearest) also walks you to that home as a tap on it in the town would, by its door, with
     no card (Nov 11, `walkHome`; [2026-11-11-map-walk.md](../decisions/2026-11-11-map-walk.md)). The chips and `pick` keep off its box
     (`MAP_BOX`).

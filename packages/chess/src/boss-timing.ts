@@ -20,6 +20,7 @@ import { DASH_FX } from "./bosses/dash.ts";
 import { ZEBRA_FX } from "./bosses/zebra.ts";
 import { CHANDY_FIRE_AT, CHANDY_FX } from "./bosses/chandy.ts";
 import { BIRDIE_BEATS, BIRDIE_FX } from "./bosses/birdie.ts";
+import { STRANGER_FX } from "./bosses/stranger.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -74,7 +75,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: Grex drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, rushWarn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX, ...FOLIO_FX, ...TIMBER_FX, ...DASH_FX, ...ZEBRA_FX, ...CHANDY_FX, ...BIRDIE_FX } as const;
+export const POWER_FX = { warn: 1700, rushWarn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX, ...FOLIO_FX, ...TIMBER_FX, ...DASH_FX, ...ZEBRA_FX, ...CHANDY_FX, ...BIRDIE_FX, ...STRANGER_FX } as const;
 
 /** What a moment's length reads of its event: its kind, Hollow's first cover, the hippo gardener's watering's outcomes. */
 type FxEvent = { kind: keyof typeof POWER_FX; first?: boolean; growth?: readonly { kind: string }[] };
@@ -95,6 +96,7 @@ export const powerFxMs = (e: FxEvent): number => (POWER_FX[e.kind] ?? 0) + (POWE
 export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (readonly [from: number, window: number])[]>> = {
   warn: [[0, 1500]],
   freeze: [[0, 1500]],
+  frostfire: [[0, 1500]],
   // (Ginger's SUPER FREEZE!, Nov 18: off the board as he starts charging.)
   superFreeze: [[0, SUPER_FREEZE_BEATS.chargeAt]],
   blizzard: [[0, 1300]],
@@ -157,6 +159,8 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   // (Birdie's END OF THE LINE!, Nov 23: his train on your king, off the board before it leaves. His warning, his train on any other
   // piece and his fall have none: the crossing, the ride and the cutscene say it.)
   trainWin: [[0, 1500]],
+  // (The Stranger's STORM OF TWO WORLDS!, Nov 27: over his leap onto the board. His storm's turns and its burn have none: the dock says them.)
+  storm: [[0, 1500]],
 };
 
 /** How long a moment's own clock holds at its start while its banner shows longer (ms; 0 without one from its start). */

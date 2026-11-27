@@ -7,6 +7,7 @@ import { accountDownload } from "../src/account-data.ts";
 import { deleteLockerItems, equipLocker, lockerState, looksOf, openCrate } from "../src/locker.ts";
 import { rankedSummary } from "../src/ranked-schema.ts";
 import { duelEntrant } from "../src/ranked.ts";
+import { grantWelcomeCrate } from "../src/welcome.ts";
 import { memoryDb, stockCrates } from "./memory-db.ts";
 
 /**
@@ -59,6 +60,8 @@ async function setup() {
     sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES (?, ?, ?, 'cobalt', 40, 7, 'winter-1', ?)", id, userId, def, T0);
   await add("erics-hat", eric.id, "santa-hat");
   await add("pats-beanie", player.id, "beanie");
+  // (Both have been here before: their first visit's Welcome Crate is theirs already, Nov 27, so a read below grants and writes nothing.)
+  for (const u of [eric, player]) await grantWelcomeCrate(sql, u.id, T0);
   const cookie = async (u: User) => `hc_session=${await createSession(sql, u.id, Date.now())}`;
   return { ...db, eric, player, ericCookie: await cookie(eric), playerCookie: await cookie(player) };
 }

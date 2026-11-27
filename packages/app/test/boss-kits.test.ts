@@ -24,8 +24,9 @@ describe("the playable rule: a complete character and its powers", () => {
 
   it("a boss with a kit but no powers, or powers but no kit, is never playable", () => {
     // (A boss hidden from players, the Hidden Boss, is never playable either: only an admin meets him, in Boss alone.)
-    // (Nor one in the game for admins first, BOSS_ADMIN_FIRST: Timber, until Eric says go.)
-    for (const b of BOSS_ROSTER) expect(isPlayable(b)).toBe(b.kit !== null && b.powers !== null && !b.adminOnly && !adminFirst(b));
+    // (Nor one in the game for admins first, BOSS_ADMIN_FIRST: Timber, until Eric says go. Nor one unlocked by a win, the Stranger: his
+    // card, locked until won, never picked at random.)
+    for (const b of BOSS_ROSTER) expect(isPlayable(b)).toBe(b.kit !== null && b.powers !== null && !b.adminOnly && !adminFirst(b) && !b.unlock);
     expect(playableBosses().every((b) => b.powers)).toBe(true);
   });
 });

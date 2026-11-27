@@ -150,6 +150,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 - **Names** pass the server's name filter (slurs and hate: [chat.md](chat.md), "Moderation"): a profile can't take
   such a name, and a lobby or Squads seat asked for with one is "Player N". A moderator can reset a name and icon from
   the player's page on fair play's review page. A lobby seat takes its account's name as the player joins.
+  **"HunChess" in a name is staff's only** (Eric, Nov 27; `isReservedName`, read as the filter reads names): a non-admin's
+  profile change to it is refused, a new guest under it is "Player", a non-admin's lobby seat under it is "Player N". Admins keep it.
 - **Download my data and Delete account** (Settings → ACCOUNT, for guests too;
   [docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md](../decisions/2026-10-15-delete-my-account-and-download-my-data.md)):
   - **The download:** GET `/api/me/data` answers a JSON file of everything kept about the account (every store's rows,
@@ -251,7 +253,7 @@ Who's online, who's in a match and what they're doing (`?doing=`) stay in the li
 | Purchases, refunds and the account's buying columns (D1): the checkout, the credit, earned-first spending, refundable | `packages/server/src/purchases.ts`, `ledger.ts`; [payments.md](payments.md) |
 | App side: Settings → ACCOUNT's download link and delete confirmation | `packages/app/src/components/AccountData.tsx`, `account.ts` (`deleteMyAccount`) |
 | Fair play's tables (made with the rest of the schema) | `packages/server/src/fairplay-schema.ts` |
-| The Battle Tower's climbs and bests (`tower_runs`, `tower_best`), `/api/tower*`, its part of the merge, the download and deleting | `packages/server/src/tower.ts`, routed from `api.ts`; [battle-tower.md](battle-tower.md) |
+| The Battle Tower's climbs, bests and bosses unlocked there (`tower_runs`, `tower_best`, `boss_unlocks`), `/api/tower*`, its part of the merge, the download and deleting | `packages/server/src/tower.ts`, routed from `api.ts`; [battle-tower.md](battle-tower.md) |
 | Friends: requests, blocks, invites, settings, caps (D1); the API (`/api/friends`, its kill switch) | `packages/server/src/friends.ts`, `friends-api.ts`; shared types `packages/core/src/friends.ts` |
 | App side: the friends list, actions, the invite toast, who's blocked | `packages/app/src/friends.ts`; screens on [hub.md](hub.md) |
 

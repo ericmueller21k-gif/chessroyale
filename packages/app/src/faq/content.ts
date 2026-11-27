@@ -61,6 +61,8 @@ import {
   PREGAME_VOTES,
   PRIOR_RATING,
   PURITY_BANDS,
+  PURITY_EXACT,
+  purityOddsText,
   RAID_SETTINGS,
   RANKED_1V1,
   RANKING,
@@ -80,12 +82,15 @@ import {
   crowdFinalBoss,
   fixedLevel,
   isPlayable,
+  unlockBosses,
   adminFirst,
   maiaTopRating,
   rankedMinHumans,
   lastStandBar,
   liveStrip,
   tierItems,
+  fischerOdds,
+  MYTHIC_CRATE,
   itemDef,
   maiaRatingFor,
   scoreGroup,
@@ -131,6 +136,8 @@ export interface FaqSources {
   ratingMinMoves: number;
   rankedShare: number;
   crates: readonly CrateDef[];
+  /** The Mythic Crate (Nov 27): every opening a Transcendent spin, and its secret prize. */
+  mythicCrate: CrateDef;
   /** Boss crates (sold in the bosses' shops for their tokens), boss tokens' rules and a boss crate's price. */
   bossCrates: readonly BossCrateDef[];
   bossTokens: typeof BOSS_TOKENS;
@@ -190,6 +197,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   ratingMinMoves: RATING_MIN_MOVES,
   rankedShare: RANKING.rankedMinHumanShare,
   crates: CRATES,
+  mythicCrate: MYTHIC_CRATE,
   // (Not the crate of a boss in the game for admins first, Timber's: his block shows once he's live for everyone.)
   bossCrates: BOSS_CRATES.filter((c) => !adminFirst({ id: c.boss })),
   bossTokens: BOSS_TOKENS,
@@ -913,7 +921,7 @@ Plays from the game so far. Moo is a cow who can't talk; the Moon, his best frie
 Always plays from the starting position, whichever side he has. A hippo with a garden hose: he plants seeds as the clock runs and waters them when he's angry. ${b.offset < 0 ? `His powers are why he plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `He plays ${b.offset} over the usual strength.` : "He plays at the usual strength."}
 
 - **Seeds** (passive): ${num(p.seedsAtStart)} seeds go in as the battle begins, then one more every ${num(p.seedEverySec)} seconds of real time, whoever's turn it is, up to ${num(p.seedMax)} waiting. His seed meter shows how many are waiting and fills toward the next. Where they are isn't decided until he waters, so there's nothing to spot: the seeds you see him toss and sink in are only for show. Online the server's clock counts; playing alone, it counts only while the game is on your screen. Take your time if you like, but every ${num(p.seedEverySec)} seconds is another seed.
-- **Watering** (ultimate): at the start of his turn, after the warning, he waters the board, and that's his whole turn, so you move next. Every waiting seed comes up, and his seed meter starts again from none. Each seed is a roll: nothing (${o.nothing}%), a plain plant (${o.plant}%), a killer plant (${o.killer}%), a pawn for him (${o.pawn}%), a knight, bishop or rook for him (${o.piece}%), or a queen for him (${o.queen}%). A plain plant grows on an empty square and blocks it for ${n(p.plantTurns, "turn")} of yours (green, then fall colors, then dropping its leaves), then it's gone: nothing can move onto it or through it, his pieces included; a knight jumps it, and it never stops a check or an attack. A killer plant eats a piece, yours or his (never a king). A grown piece is his, on an empty square (a pawn never on the first or last row, and never a ninth). The engine decides where everything comes up, so that what he gains is about ${n(p.waterTarget, "pawn")} (at most ${num(p.waterBand[1])}); anything that can't come up without gaining him more than that comes up as nothing instead. A queen is his jackpot, and it has no cap: the engine puts it where it does him real good, and whatever else comes up with it takes his gain no further than ${n(p.jackpotMax, "pawn")}, or than the queen alone did. While all eight of his pawns are on the board, he can't grow a piece he still has a full set of (a second queen, a third rook, bishop or knight): that seed comes up as nothing. Never anything that puts either side in check, hands either a mate in one, or leaves you without a move. If watering would leave a piece of his hanging (a knight, bishop, rook or queen you'd win), the same kind of piece also grows back for him, besides what the seeds rolled, so passing doesn't lose him it; the engine counts it in what he gains, so his total stays about the same. If watering would still cost him real material (that piece can't grow back, say while he has his full set of it and all eight pawns), it waits for his next turn, at most ${n(p.ultWaitMax, "time")}; then it comes anyway (never while he's in check). On a Battle Tower floor with other bosses, only one boss's power that adds pieces is on: the first of them in the turn order. Behind another such boss his Watering still comes, but a seed that would grow a piece comes up as nothing (plants only).`;
+- **Watering** (ultimate): at the start of his turn, after the warning, he waters the board, and that's his whole turn, so you move next. Every waiting seed comes up, and his seed meter starts again from none. Each seed is a roll: nothing (${o.nothing}%), a plain plant (${o.plant}%), a killer plant (${o.killer}%), a pawn for him (${o.pawn}%), a knight, bishop or rook for him (${o.piece}%), or a queen for him (${o.queen}%). A plain plant grows on an empty square and blocks it for ${n(p.plantTurns, "turn")} of yours (green, then fall colors, then dropping its leaves), then it's gone: nothing can move onto it or through it, his pieces included; a knight jumps it, and it never stops a check or an attack. A killer plant eats a piece, yours or his (never a king). A grown piece is his, on an empty square (a pawn never on the first or last row, and never a ninth). The engine decides where everything comes up, so that what he gains is about ${n(p.waterTarget, "pawn")} (at most ${num(p.waterBand[1])}); anything that can't come up without gaining him more than that comes up as nothing instead. Nor does anything come up where it would cost him: what would leave him more than ${num(p.waterFloorMargin)} of a pawn under ${num(p.waterBand[0])} (or under where he already stood, if that's lower) comes up as nothing too. A queen is his jackpot, and it has no cap: the engine puts it where it does him real good, and whatever else comes up with it takes his gain no further than ${n(p.jackpotMax, "pawn")}, or than the queen alone did. While all eight of his pawns are on the board, he can't grow a piece he still has a full set of (a second queen, a third rook, bishop or knight): that seed comes up as nothing. Never anything that puts either side in check, hands either a mate in one, or leaves you without a move. If watering would leave a piece of his hanging (a knight, bishop, rook or queen you'd win), the same kind of piece also grows back for him, besides what the seeds rolled, so passing doesn't lose him it; the engine counts it in what he gains, so his total stays about the same. If watering would still cost him real material (that piece can't grow back, say while he has his full set of it and all eight pawns), it waits for his next turn, at most ${n(p.ultWaitMax, "time")}; then it comes anyway (never while he's in check). On a Battle Tower floor with other bosses, only one boss's power that adds pieces is on: the first of them in the turn order. Behind another such boss his Watering still comes, but a seed that would grow a piece comes up as nothing (plants only).`;
   },
   tiger: (p, b) => {
     const o = p.balloonOdds;
@@ -981,6 +989,18 @@ Plays from the game so far. A young mourning dove in a conductor's cap, riding h
 - **The Fall** (ultimate, once a battle): his meter is the material he has lost (pawn 1, knight 3, bishop 3, rook 5, queen 9). Once he's down ${n(s.fallLost, "point")} from the start, or he's in danger (your chances at ${pct(p.dangerAt, 0)} or more after ${s.fallDangerMoves <= 1 ? "your move" : `${countWords(s.fallDangerMoves)} of your moves in a row`}), he falls off his train at the start of his turn, it runs into him, and he's **Armored Birdie** for the rest of the battle. If his train rides that same turn, the train comes first.
 - **Armored Birdie** keeps the train (the same rule, every ${n(s.armoredTrainEvery, "of your turns", "of your turns")}) and plays much stronger: ${n(s.armoredMaiaBoost, "rating point")} higher, up to the strongest human-style play we have; if he was already there (Very hard), he plays the engine's own moves, a little stronger still.`;
   },
+  stranger: (p, b) => {
+    const s = p.stranger;
+    const floors = Object.entries(BATTLE_TOWER.bossFloors)
+      .filter(([, id]) => id === b.id)
+      .map(([f]) => f);
+    const where = floors.length > 1 ? `${floors.slice(0, -1).join(", ")} and ${floors.at(-1)}` : (floors[0] ?? "");
+    return `
+Plays from the game so far. ${b.offset < 0 ? `His powers are why he plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `He plays ${b.offset} over the usual strength.` : "He plays at the usual strength."} **Locked at first:** he's the Battle Tower's boss on floors ${where}, alone. Beat him on one of them (floor ${floors[0] ?? ""} is the first) and he's yours to pick in Boss Battle from then on. Only a win against him counts: a life spent on his floor doesn't, even if you climb on past it.
+
+- **Frostfire** (passive): with his reply to your ${s.strikeFrom <= 2 ? "first move" : `move ${s.strikeFrom - 1}`}, and then every ${n(s.strikeEvery, "of your turns", "of your turns")}, he strikes your most valuable piece (never your king): it's frozen for ${s.freezeTurns <= 1 ? "your next turn" : `your next ${countWords(s.freezeTurns)} turns`} and can't move. Then it thaws: you get ${s.fleeTurns <= 1 ? "one turn" : `${countWords(s.fleeTurns)} turns`} to move it off. After that move, its square burns whatever is on it, his own pieces too. A king on it is never burnt, and if burning would leave a position no game can have, the piece is spared. He only strikes a piece whose freeze leaves you a move and whose burning would be legal. Leaving the piece there counts as losing it when your move is scored, so saving it is never a mistake.
+- **Storm of Two Worlds** (ultimate, up to ${n(s.stormMax, "time")} a battle): when his meter is full, he warns you; on your next turn he drives both swords into the board and a storm of fire and ice circles it for ${n(s.stormTurns, "of your turns", "of your turns")}, Ice and Fire by turns (which comes first is random). **Ice:** every piece of yours is frozen but your king and ${countWords(s.iceFree)}, and one of those ${countWords(s.iceFree)} always has the engine's best move. **Fire:** ${s.fireMarks.join(" or ")} squares are marked; after your move, whatever stands on one burns, his pieces too (never a king, and never into a position no game can have). At most one of the marks is on a piece of yours, the piece of the engine's best move: move it and it's safe. Before each turn the engine checks the storm is fair: your best move loses nothing against your best without the storm, and a decent move costs you at most about a pawn. If a pick fails, he tries others, then settles for a milder one. While the storm lasts, your moves don't count toward fair play, and his Frostfire waits until ${n(s.stormRest, "turn")} after it.`;
+  },
 };
 
 /**
@@ -1004,7 +1024,8 @@ Met in Chess Town: up the stairs of his walk-up to the top floor, where up to ${
 
 function bossPowers(src: FaqSources): FaqSection {
   const p = src.powers;
-  const playable = src.roster.filter(isPlayable);
+  // (And the bosses unlocked by a win, the Stranger, once ready to meet.)
+  const playable = [...src.roster.filter(isPlayable), ...unlockBosses(src.roster)];
   // (Still to come: those without their art and powers. The Hidden Boss has his own block, after the rest.)
   const later = src.roster.filter((b) => b.kit === null || b.powers === null).map((b) => b.name);
   const finalBoss = crowdFinalBoss(src.roster);
@@ -1162,7 +1183,9 @@ function crates(src: FaqSources): FaqSection {
   const cTotal = sum(src.colors.map((c) => c.weight)) || 1;
   const colors = src.colors.map((c) => `| ${c.name} | ${pct(c.weight / cTotal)} |`).join("\n");
   const pTotal = sum(src.purity.map((b) => b.weight)) || 1;
-  const purity = src.purity.map((b) => `| ${num(b.low, 1)}% to ${num(b.high, 1)}% | ${pct(b.weight / pTotal, 3)} |`).join("\n");
+  // (Exactly 0% and exactly 100%, bands of one value each, Nov 27: shown as "1 in".)
+  // (Each chance exact: under 0.1% as "1 in N", purityOddsText; the review of #1007.)
+  const purity = src.purity.map((b) => `| ${b.low === b.high ? `exactly ${num(b.low, 1)}%` : `${num(b.low, 1)}% to ${num(b.high, 1)}%`} | ${purityOddsText(b.weight, pTotal)} |`).join("\n");
   const shiny = sum(src.purity.filter((b) => b.low >= 90).map((b) => b.weight)) / pTotal;
   // Boss tokens and boss crates (Nov 2): each boss crate's ride, the only item behind its Fischer Random.
   const bt = src.bossTokens;
@@ -1175,6 +1198,15 @@ function crates(src: FaqSources): FaqSection {
     .map((c) => `**${c.name}** holds ${itemDef(c.ride)?.name ?? c.ride} (${pct(fischerShare(c), 0)} of the time: the only item behind its Transcendent) and ${c.items.length - 1} Common to Epic items`)
     .join("; ");
   const n = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
+  // The Mythic Crate (Nov 27): each item's share of its one Transcendent spin, by tier, and its secret prize's.
+  const my = src.mythicCrate;
+  const myOdds = fischerOdds(my);
+  const myPrize = my.prize ? (myOdds.find((x) => x.item === my.prize!.item)?.weight ?? 0) / 100 : 0;
+  const myTier = (t: string) => {
+    const list = myOdds.filter((x) => x.item !== my.prize?.item && itemDef(x.item)?.tier === t);
+    return list.length ? `${n(list.length, `${name(t)} item`)}, ${pct(list[0]!.weight / 100, 1)} each` : "";
+  };
+  const mythicWords = [myTier("legendary"), myTier("mythic")].filter(Boolean).join("; ");
   return {
     id: "crates",
     title: "Crates and items",
@@ -1187,7 +1219,7 @@ Every item from a crate rolls three things, each on its own:
 
 1. **Its tier, which decides the item.** The strip lands on a tier's box, which opens to one of that tier's items, each as likely as the others. Or it lands on **Transcendent**, a second spin for the rarest items: ${fischerWords}.
 2. **Its color.**
-3. **Its purity:** 100% less a blemish (blotches over that share of its color). From 90% it's **shiny**.
+3. **Its purity:** 100% less a blemish (blotches over that share of its color). From 90% it's **shiny**. Exactly 100% and exactly 0% (blotched all over, one color a shade darker) are each ${purityOddsText(PURITY_EXACT)}.
 
 | Box | ${src.crates.map((c) => c.name).join(" | ")} |
 |${src.crates.map(() => "---|").join("")}---|
@@ -1206,6 +1238,8 @@ Some items take a second color (a present's ribbon, a suit's tie), rolled the sa
 ${purity}
 
 **Boss tokens and boss crates.** A boss battle, won or lost, counts once it reaches ${bt.moves} of your moves or ${bt.minutes} minutes. In any ${bt.windowHours} hours, your first counted battle always gives you a boss's token (one of the bosses you can meet, each as likely), and each one after that gives one ${pct(bt.chance, 0)} of the time, up to ${bt.cap}. Our server decides, never your device, and it times a solo battle itself (${bt.minutes} minutes from its start to its end). A boss's shop in the town sells its crate for ${n(bp.tokens, "token")} of that boss, or ${n(bp.withKey.tokens, "token")} and ${n(bp.withKey.keys, "crate key")}: ${bossCrates}, in the same boxes at the same odds as above. A crate you buy goes into your inventory (the Crates tab), where you open it like any crate, once.
+
+**The Mythic Crate.** The rarest crate opens with a crate key like the others, and every one is a Transcendent spin: ${mythicWords}${myPrize ? `; and its own prize, a Mythic item in no other crate, ${pct(myPrize, 1)}` : ""}. It's never a bonus crate, a daily reward or a level-up crate.
 
 **Bonus crates.** ${bonusOddsLine(src.crateBonus.chance)} The crates it can be: every series crate, retired ones too, and the crate of every boss out for everyone, each as likely. It goes into your inventory unopened, with a crate key when it opens with one (a boss crate doesn't). Our server rolls it with the item. A bonus crate opens like any crate, after your other crates of that kind, so you never lose a chance at one.
 

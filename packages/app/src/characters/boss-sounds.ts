@@ -20,6 +20,7 @@ import { dashSound } from "./dash-sounds.ts";
 import { zebraSound } from "./zebra-sounds.ts";
 import { chandySound } from "./chandy-sounds.ts";
 import { birdieSound } from "./birdie-sounds.ts";
+import { strangerSound } from "./stranger-sounds.ts";
 import { clawSound } from "../claw/sounds.ts";
 import { crateSound } from "../crate-open/sounds.ts";
 
@@ -52,6 +53,7 @@ const MAKERS = {
   zebra: zebraSound,
   chandy: chandySound,
   birdie: birdieSound,
+  stranger: strangerSound,
   // (Boingo's claw machine's, not a boss's: the same cache, worker and ahead-of-time making.)
   claw: clawSound,
   // (The crate opening's, Nov 24: the same cache, worker and ahead-of-time making.)

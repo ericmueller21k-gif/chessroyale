@@ -181,6 +181,28 @@ describe("Dash online: his \"Hang on\"", () => {
     expect(gag.round.deadline - gag.round.startsAt).toBe(plain.round.deadline - plain.round.startsAt);
     expect(gag.round.startsAt).toBeGreaterThanOrEqual(gag.landed);
   });
+
+  it("sends when its hold began with every message of his thinking (popOff.since), the same to a device back in the middle of it, so its gag runs from there, not from 0", () => {
+    const L = dashLobby("hangon");
+    L.crowdPlays();
+    L.toRound();
+    const before = L.now();
+    L.crowdPlays();
+    for (let i = 0; i < 100 && !L.last("p1", "bossRequest"); i++) L.advance(100);
+    const thinking = (id: string) => (L.inbox.get(id) ?? []).filter((m): m is Extract<Msg, { t: "boss" }> => m.t === "boss" && !!m.thinking && !!m.boss.powers?.dash?.popOff?.hangOn);
+    const since = thinking("p1")[0]!.boss.powers!.dash!.popOff!.since!;
+    expect(since).toBeGreaterThanOrEqual(before);
+    expect(since).toBeLessThanOrEqual(L.now());
+    for (const m of thinking("p1")) expect(m.boss.powers!.dash!.popOff!.since).toBe(since);
+    // (A phone back 5 s into it: its thinking message carries the same start.)
+    L.advance(5_000);
+    const token = L.last("p2", "welcome")!.token;
+    L.inbox.set("p2", []);
+    L.core.connect(token, "P2", "phone", false, 1500);
+    expect(thinking("p2").at(-1)?.boss.powers!.dash!.popOff!.since).toBe(since);
+    // (No start on any other turn's messages: the plain pop-off off, the next round's none.)
+    expect(L.toRound().boss?.powers?.dash?.popOff?.since).toBeUndefined();
+  });
 });
 
 /**

@@ -1,4 +1,4 @@
-import { BOSS_ROSTER, ENGINE_MAX_ELO, maiaTopRating, playableBosses, rosterWithout, type BossDef, type MaiaDraw } from "./boss.ts";
+import { BOSS_ROSTER, ENGINE_MAX_ELO, maiaTopRating, playableBosses, rosterWithout, unlockReady, type BossDef, type MaiaDraw } from "./boss.ts";
 import { mulberry32, shuffle } from "./rng.ts";
 import { BATTLE_TOWER, BOSS_BRAIN, type BossBrainSettings, type Settings } from "./settings.ts";
 
@@ -24,6 +24,8 @@ export interface TowerRules {
   lives: number;
   apart: readonly (readonly [string, string])[];
   maxBosses: number;
+  /** Floors that are one boss's alone (BATTLE_TOWER.bossFloors: the Stranger's), by floor. Left out: none. */
+  bossFloors?: Readonly<Record<number, string>>;
 }
 
 /** How many bosses floor `floor` has: the pattern looping (1, 2, 2, 3: floors 1, 5, 9 … one; 4, 8 … three). */
@@ -96,7 +98,41 @@ export type TowerDrawRows = readonly (readonly [number, number, number])[];
  * The bosses the tower deals from, in roster order: every playable boss (a complete character with powers, live for everyone:
  * never the hidden one, never one in the game for admins first) but those resting (`off`: the kill switches, rosterWithout).
  */
-export const towerPool = (off?: readonly string[], roster: readonly BossDef[] = BOSS_ROSTER): string[] => playableBosses(rosterWithout(off, roster)).map((b) => b.id);
+export const towerPool = (off?: readonly string[], roster: readonly BossDef[] = BOSS_ROSTER, opts: { unfinished?: boolean; admin?: boolean } = {}, s: Pick<TowerRules, "bossFloors"> = BATTLE_TOWER): string[] => {
+  const left = rosterWithout(off, roster);
+  // (And the bosses whose own floors these are, once ready to meet and not resting (unlockReady): never in a deck (deal), only on their
+  // floors. While one is in the game for admins first, only an admin's climb (`admin`, the server's read of the session) meets him; a
+  // test switch's server passes `unfinished`, so a test meets him as an admin does (and before his art).)
+  const own = new Set(Object.values(s.bossFloors ?? {}));
+  const floors = left.filter((b) => own.has(b.id) && !off?.includes(b.id) && unlockReady(b, !!opts.unfinished, !!opts.admin));
+  return [...playableBosses(left).map((b) => b.id), ...floors.map((b) => b.id)];
+};
+
+/** The boss floor `floor` is the one boss of (BATTLE_TOWER.bossFloors), when he's in `pool` (ready and not resting); else null. */
+export const floorBoss = (floor: number, pool: readonly string[], s: Pick<TowerRules, "bossFloors"> = BATTLE_TOWER): string | null => {
+  const id = s.bossFloors?.[floor];
+  return id && pool.includes(id) ? id : null;
+};
+
+/** Whether `id` is a boss of his own floors (BATTLE_TOWER.bossFloors): never dealt from a deck. */
+const ownFloors = (id: string, s: Pick<TowerRules, "bossFloors">) => Object.values(s.bossFloors ?? {}).includes(id);
+
+/** The first floor that can unlock `id` (his first own floor, BATTLE_TOWER.bossFloors: the Stranger's 10), or null: not a boss of his own floors. */
+export function unlockFloor(id: string, s: Pick<TowerRules, "bossFloors"> = BATTLE_TOWER): number | null {
+  const floors = Object.entries(s.bossFloors ?? {}).filter(([, b]) => b === id).map(([f]) => Number(f));
+  return floors.length ? Math.min(...floors) : null;
+}
+
+/**
+ * The bosses a floor WON unlocks (Eric, Nov 27: "you have to beat him to unlock him"): on a floor of a boss's own (BATTLE_TOWER.bossFloors:
+ * the Stranger's 10, 30, 50), him, only when he was on it (`bosses`, the floor as dealt: while he isn't ready or rests, his floor deals
+ * others, and beating them is not beating him). Never a floor lost with a life spent, nor one climbed past: the server writes what this
+ * names as a won floor's result is taken (server tower.ts, `boss_unlocks`; docs/decisions/2026-11-27-stranger-unlock-win.md).
+ */
+export function floorUnlocks(floor: number, bosses: readonly string[], s: Pick<TowerRules, "bossFloors"> = BATTLE_TOWER): string[] {
+  const id = s.bossFloors?.[floor];
+  return id && bosses.includes(id) ? [id] : [];
+}
 
 const apart = (a: string, b: string, s: TowerRules) => s.apart.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
 
@@ -199,7 +235,12 @@ function freshDeck(seed: number, n: number, pool: readonly string[], floor: numb
  * before any comes twice. A pool the kill
  * switches left too small for that: the floor before's bosses may come again, never an apart pair; still too small, fewer bosses.
  */
-function deal(run: Pick<TowerRun, "seed" | "deck" | "decks">, floor: number, before: readonly string[], pool: readonly string[], s: TowerRules): Pick<TowerRun, "deck" | "decks"> & { bosses: string[] } {
+function deal(run: Pick<TowerRun, "seed" | "deck" | "decks">, floor: number, before: readonly string[], all: readonly string[], s: TowerRules): Pick<TowerRun, "deck" | "decks"> & { bosses: string[] } {
+  // (A boss's own floor (BATTLE_TOWER.bossFloors, him ready and not resting): his alone, the deck kept for the next floor. He's never in a
+  // deck: the pool the decks deal from leaves him out.)
+  const own = floorBoss(floor, all, s);
+  if (own) return { bosses: [own], deck: run.deck.filter((b) => b !== own), decks: run.decks };
+  const pool = all.filter((b) => !ownFloors(b, s));
   const k = floorBossCount(floor, s);
   const bosses: string[] = [];
   let deck = take(run.deck.filter((b) => pool.includes(b)), k, bosses, before, s);
