@@ -17,7 +17,7 @@
 - Nov 9-25 · 50 v 50 and Squads get their own ranks (RP from placement + engine score vs the lobby; ladder for all rank modes; a ranked leaver's seat filled by a bot at their level) · PR 1 of 5 #993 (design docs/ideas/mode-ranks.md + pure math); PRs 2-5 next (sim; 50v50 recorded, full lane; Squads recorded, full lane; screens)
 - Nov 9-10 · Riders in the regular crates (5 non-boss riders, crate exclusives; the shopping cart) · NEVER BUILT · queued (item-builder)
 - Nov 10 · Auto chess: play against people (unranked, in match history) + a landing page (queue with a bot or search) · NEVER BUILT · ask Eric if still wanted (was parked "only on Eric's word")
-- Nov 12 · Rare items: a gold/diamond tier frame + tap to preview on a pawn (with the rider) · building (claude/rare-frames-preview, restarted 01:25)
+- Nov 12 · Rare items: a gold/diamond tier frame + tap to preview on a pawn (with the rider) · PR #995 (stills reviewed; CI)
 - Nov 13 · Hidden Boss in match history: his three forms, the beaten ones greyed · LIVE #990 b6206491 (main green)
 - Nov 25 · 1 v 1: rank emblem by every name in game + tap a rank for the ranks pop-up · LIVE #988 d699d71c (main green)
 - Nov 11 · Landing page: sound toggle · WAITING ON ERIC: the reel files have no audio; pick chiptune or orchestra (both sent Nov 26 23:40, from stills/reel-music; audio on design/trailer-music reel-music/), then mux + toggle
