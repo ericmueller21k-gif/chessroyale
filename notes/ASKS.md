@@ -26,3 +26,4 @@
 - Turf mockup (Nov 22) · beta bots 6 decisions (+ "expect more bots" note) · burst cheat detection build y/n (Nov 11) · Boss Battle select 2x vs bigger (Nov 12) · Boingo room revisions (Nov 12) · trailer v2 edits + Song C (Nov 11) · Settings cleanup look (Nov 25) · lossless music masters location (Nov 16) · Discord webhook (Nov 10) · payments: Access bypass, Stripe Tax, LLC details
 - Nov 26 · OK to merge #978 (ranked flake fix edits the vote-zone guard test; the guarded check unchanged)? · WAITING ON ERIC
 - Nov 26 · Battle Tower: bad players on floors 1-8/10 (a 1000 player breezes 1-6), no queen gifts but missed threats OK, then a felt climb, not too slow by 30 · building (brief tower-easy-floors)
+- Nov 27 · Ranks pop-up: a rough Elo range next to each rank ("Elo approximation") · in PR #988 (8702e79b, CI running)
