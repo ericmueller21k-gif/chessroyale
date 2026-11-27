@@ -1,6 +1,6 @@
 # Eric's asks: every one until it's live (RULES.md, Nov 26). Newest last. States: queued / building / waiting on Eric / merged / live.
 
-- Nov 22 · Chub & Chirp Turf (his prints on his squares, your logo on yours, the count, holds Legs/Fuse/Hop, Chirp's hop-around) · MERGED #1024 eb9893a (deploying)
+- Nov 22 · Chub & Chirp Turf (his prints on his squares, your logo on yours, the count, holds Legs/Fuse/Hop, Chirp's hop-around) · LIVE #1024 eb9893a; holds lowered to 32/36/40 in #1025 (Eric)
 - Nov 26 · Chandy: Dodge also on checkmate + its art · MERGED #973 #982
 - Nov 26 · Birdie room: longer crossing arms; ~50 birds at the bar · MERGED #974
 - Nov 26 · Chub & Chirp + Puddles: ult waits at most 3 times after its warning · MERGED #972
