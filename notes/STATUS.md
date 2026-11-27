@@ -2293,3 +2293,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 27 02:12: #990 live (main b6206491 green). #992 Stranger art (CI + review). #993 mode ranks PR 1 (CI).
 - Nov 27 02:15: #994 kit-side sampling opened (53798d39; PRs 1 in 4 pairs, main all; ~2 min per PR). Still building: stranger-rules, rare items, dash nits, puddles follow-ups, crate riders, banana suit.
 - Nov 27 02:18: #995 rare frames + preview opened (19a513c4). Remaining burst: stranger-rules, dash nits, puddles follow-ups, crate riders, banana suit.
+- Nov 27 02:22: #996 Dash nits opened (d2e97197). #992 Stranger art CI green; review: BLOCKER his "Too slow." = Hidden Boss line (voice by text), should-fix aura repaint (963 ms build), nits; fix round (high) started. Ask Eric: Stranger draws swords only for capture/check/strike/power, not every move (nit 6).
