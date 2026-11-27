@@ -207,7 +207,7 @@ describe("Turf: the hop-around", () => {
 
 describe("Turf: his holds", () => {
   it(`are worked out as his turn begins from his count: ${BOSS_POWERS.turfHolds.join(" / ")} squares; on for his turn and your turn after it`, async () => {
-    expect([0, 31, 32, 39, 40, 47, 48, 64].map((n) => holdsFor(n))).toEqual([0, 0, 1, 1, 2, 2, 3, 3]);
+    expect([0, 31, 32, 35, 36, 39, 40, 64].map((n) => holdsFor(n))).toEqual([0, 0, 1, 1, 2, 2, 3, 3]);
     const r = raid({ side: "w", patch: { bossPowerTest: "turf" } });
     expect(holdOn(r.boss, 1)).toBe(false);
     await crowd(r, "g1f3");
