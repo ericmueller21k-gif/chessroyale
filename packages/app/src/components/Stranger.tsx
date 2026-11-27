@@ -297,8 +297,8 @@ const hash = (i: number, k: number): number => {
 const ease = (u: number) => 1 - (1 - clamp01(u)) ** 2;
 const lerp = (a: number, b: number, u: number) => a + (b - a) * clamp01(u);
 
-/** The ring's canvas: its pixels (pixel art, scaled up), and how far past the board it reaches each side (a share of the board). */
-export const RING = { px: 168, margin: 0.12, swirl: 140, chaos: 70 } as const;
+/** The ring's canvas: its pixels (pixel art, scaled up), how far past the board it reaches each side (a share of the board), its particles. */
+export const RING = { px: 168, margin: 0.12, swirl: 340, chaos: 180, haze: 70 } as const;
 const FIRE = ["#6b1606", "#c2380f", "#ff6a1e", "#ffb040", "#fff0a0"];
 const ICE = ["#14305e", "#2a78c8", "#5fd3ff", "#b8f0ff", "#ffffff"];
 
@@ -308,15 +308,53 @@ const ICE = ["#14305e", "#2a78c8", "#5fd3ff", "#b8f0ff", "#ffffff"];
  * swirl, and eases back as he leaves; through its turns, steady.
  */
 export function stormLevel(scene: number | null, now: number): { u: number; chaos: number } {
-  if (scene === null) return { u: 0.72, chaos: 0 };
+  if (scene === null) return { u: 0.75, chaos: 0 };
   const t = now - scene;
   const S = STORM_SCENE;
-  const u = t < S.fireAt ? 0 : t < S.gripAt ? lerp(0.05, 0.45, (t - S.fireAt) / (S.gripAt - S.fireAt)) : t < S.fullAt ? lerp(0.45, 1, (t - S.gripAt) / (S.fullAt - S.gripAt)) : t < S.pullAt ? 1 : lerp(1, 0.72, (t - S.pullAt) / (S.homeAt - S.pullAt));
+  const u = t < S.fireAt ? 0 : t < S.gripAt ? lerp(0.1, 0.5, (t - S.fireAt) / (S.gripAt - S.fireAt)) : t < S.fullAt ? lerp(0.5, 1, (t - S.gripAt) / (S.fullAt - S.gripAt)) : t < S.pullAt ? 1 : lerp(1, 0.75, (t - S.pullAt) / (S.homeAt - S.pullAt));
   const chaos = t < S.gripAt ? 0 : t < S.fullAt ? ease((t - S.gripAt) / (S.fullAt - S.gripAt)) : t < S.pullAt ? 1 : 1 - ease((t - S.pullAt) / (S.leapAt - S.pullAt));
   return { u, chaos };
 }
 
-/** One frame of the ring: fire swirling one way round the board, ice the other, a rounded square's band from its edge squares outward. */
+/**
+ * The ring's particles, made once: each one's side (fire even, ice odd), its color, where it starts round the ring, its speed, its place
+ * across the band, its wobble and when it shows (`show`: drawn while the storm's strength is above it). Sorted by color, so a frame sets
+ * each color once.
+ */
+type Grain = { fire: boolean; color: string; th: number; w: number; band: number; wob: number; ph: number; show: number; big: boolean; haze: boolean };
+let grains: Grain[] | null = null;
+function grainsOf(): Grain[] {
+  if (grains) return grains;
+  const out: Grain[] = [];
+  const add = (i: number, kind: "swirl" | "chaos" | "haze") => {
+    const fire = i % 2 === 0;
+    const pal = fire ? FIRE : ICE;
+    const fast = kind === "chaos";
+    const dir = fire ? 1 : -1;
+    out.push({
+      fire,
+      color: kind === "haze" ? pal[1]! : pal[1 + Math.floor(hash(i, 6) * 4)]!,
+      th: hash(i, 2) * Math.PI * 2,
+      w: (fast ? 1.4 + 0.7 * hash(i, 1) : kind === "haze" ? 0.25 + 0.15 * hash(i, 1) : 0.45 + 0.4 * hash(i, 1)) * dir,
+      band: -0.04 + 0.18 * hash(i, 3),
+      wob: 3 + 5 * hash(i, 4),
+      ph: 6.28 * hash(i, 5),
+      show: kind === "chaos" ? hash(i, 8) + 1 : hash(i, 8),
+      big: hash(i, 7) > 0.6,
+      haze: kind === "haze",
+    });
+  };
+  for (let i = 0; i < RING.swirl; i++) add(i, "swirl");
+  for (let i = 0; i < RING.chaos; i++) add(i + 1000, "chaos");
+  for (let i = 0; i < RING.haze; i++) add(i + 2000, "haze");
+  grains = out.sort((a, b) => (a.color < b.color ? -1 : a.color > b.color ? 1 : 0));
+  return grains;
+}
+
+/**
+ * One frame of the ring: fire swirling one way round the board, ice the other, along a rounded square's band from its edge squares
+ * outward; a colored haze under it, the charge's fast wild layer over it, each grain with a short trail.
+ */
 function paintRing(g: CanvasRenderingContext2D, now: number, level: { u: number; chaos: number }): void {
   const W = RING.px;
   g.clearRect(0, 0, W, W);
@@ -324,26 +362,25 @@ function paintRing(g: CanvasRenderingContext2D, now: number, level: { u: number;
   const S = W / (1 + 2 * RING.margin);
   const c = W / 2;
   const sec = now / 1000;
-  const dot = (i: number, k: number, fast: boolean) => {
-    const fire = i % 2 === 0;
-    const pal = fire ? FIRE : ICE;
-    const dir = fire ? 1 : -1;
-    const w = (fast ? 1.5 + 0.6 * hash(i, 1) : 0.45 + 0.35 * hash(i, 1)) * dir;
-    const th = hash(i, 2) * Math.PI * 2 + w * sec - w * 0.045 * k;
-    const band = (-0.05 + 0.2 * hash(i, 3)) * (0.55 + 0.45 * level.u) + level.chaos * 0.035 * Math.sin(sec * (3 + 5 * hash(i, 4)) + 6.28 * hash(i, 5));
-    const cs = Math.cos(th);
-    const sn = Math.sin(th);
-    const r = 0.5 / (cs ** 4 + sn ** 4) ** 0.25 + band;
-    const x = Math.round(c + cs * r * S);
-    const y = Math.round(c + sn * r * S);
-    const lit = Math.min(4, Math.max(0, Math.floor(hash(i, 6) * 3 + 2 * Math.sin(sec * 7 + i) ** 2 - k)));
-    g.globalAlpha = (band < 0 ? 0.7 : 1) * (k ? 0.6 / k : 1);
-    g.fillStyle = pal[lit]!;
-    const size = k === 0 && hash(i, 7) > 0.7 ? 2 : 1;
-    g.fillRect(x, y, size, size);
-  };
-  for (let i = 0; i < RING.swirl; i++) if (hash(i, 8) < level.u) for (let k = 2; k >= 0; k--) dot(i, k, false);
-  for (let i = 0; i < RING.chaos; i++) if (hash(i + 1000, 8) < level.chaos) for (let k = 2; k >= 0; k--) dot(i + 1000, k, true);
+  const all = grainsOf();
+  for (const k of [3, 2, 1, 0]) {
+    let color = "";
+    for (const q of all) {
+      // (Haze: no trail. The charge's grains (show above 1) come in with its chaos.)
+      if ((q.haze && k > 0) || (q.show >= 1 ? q.show - 1 >= level.chaos : q.show >= level.u)) continue;
+      const th = q.th + q.w * (sec - 0.04 * k);
+      const band = q.band * (0.6 + 0.4 * level.u) + level.chaos * 0.04 * Math.sin(sec * q.wob + q.ph);
+      const cs = Math.cos(th);
+      const sn = Math.sin(th);
+      const r = 0.5 / (cs ** 4 + sn ** 4) ** 0.25 + band;
+      const size = q.haze ? 7 : k === 0 ? (q.big ? 3 : 2) : k === 1 ? 2 : 1;
+      const x = Math.round(c + cs * r * S - size / 2);
+      const y = Math.round(c + sn * r * S - size / 2);
+      if (q.color !== color) g.fillStyle = color = q.color;
+      g.globalAlpha = q.haze ? 0.16 : (band < 0 ? 0.55 : 1) * (k === 0 ? 1 : 0.55 / k);
+      g.fillRect(x, y, size, size);
+    }
+  }
   g.globalAlpha = 1;
 }
 

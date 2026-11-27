@@ -110,5 +110,12 @@ export const trainLine = (boss: { id?: string; powers?: { turn?: number; birdie?
 };
 const PIECE_NAMES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
 
+/** The Stranger's storm, a turn of it now (Nov 27): the dock's words through your turn, in place of "Your move." (short enough for 320 px). */
+export const STORM_LINES = { ice: "Ice: 2 pieces + king move.", fire: "Fire: marked squares burn!" } as const;
+export const stormLine = (boss: { id?: string; powers?: { turn?: number; stranger?: { pick?: { turn: number; kind: "fire" | "ice"; squares: readonly string[] } | null } | null } | null } | null | undefined): string | null => {
+  const pick = boss?.powers?.stranger?.pick;
+  return pick && pick.turn === boss?.powers?.turn && pick.squares.length ? STORM_LINES[pick.kind] : null;
+};
+
 /** The boss's last move went through a power (his only move): the dock's words, or null. */
 export const throughLine = (boss: BossLike | null | undefined): string | null => (boss?.lastMove?.through ? THROUGH[boss.lastMove.through] : null);
