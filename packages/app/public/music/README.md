@@ -68,3 +68,12 @@ ultimate's piece, "the crossing": 15.8 s), from `boss-music-stereo-192/` on bran
 keep its `marks`). His fall switches the battle to `birdie-ult` with the drop on the train's impact (`switchPlan`'s `dropAt`; `BIRDIE_ULT`
 in settings.ts, whose `introMs` a test keeps equal to `introSeconds`): the piece plays once a battle, then his theme loops as normal.
 Eric, Nov 23: "Going back to the Train version 4 song, that's going to be Birdie's song."
+
+## Nov 27: the Stranger's theme
+
+`stranger-loop`: one seamless loop, no intro (as Chandy's), 160 s, from `boss-music-stereo-192/` on branch `stills/trailer-v2` (commit
+`61f81d07a`, song `song_ap.py`, "Gothic hybrid v3"), re-encoded from its 192 kbps handoff to 128 kbps as above (same length, lined up with
+it at `pad`, 30 s and just before `pad + loopSeconds`). Keyed `stranger` (the roster id). Eric, Nov 27, to the music helper: "this Gothic
+hybrid v3, you can change it to the stranger, because that's what the boss is". Its opening (17 s of one voice over a low tone, no beat)
+is part of the loop, so every pass replays it. The first theme with sampled sound: its voice, strings, flute, oboe, violin and bell are
+played through the FluidR3_GM sound bank (Frank Wen, MIT license), credited in the FAQ and `/licenses/third-party.txt`.

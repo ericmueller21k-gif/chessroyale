@@ -1341,6 +1341,7 @@ function credits(src: FaqSources): FaqSection {
 - **The chess pieces**: drawn by Colin M.L. Burnett, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), under the BSD license ([license](/licenses/pieces.txt)). Alfil's elephant is drawn for HunChess on the bishop's base.
 - **Classic piece sounds** and their variations: [PyChess](https://github.com/pychess/pychess/tree/master/sounds) (GPL-3.0). The variations are made from PyChess's sounds by our own script ([license](/engine/COPYING.txt), [how each was made](/sounds/SOURCES.md), [their source](/sounds/pychess-sounds-source.tar.gz)). Like the engines, they're separate files the game plays, not part of its code.
 - **The Colosseum's crowd cheer**: [Free Crowd Cheering Sounds](https://opengameart.org/content/free-crowd-cheering-sounds) by Gregor Quendel, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), trimmed, layered and leveled by HunChess ([credits](/sounds/colosseum/CREDITS.md)).
+- **The Stranger's music**: its voice, strings, flute, oboe, violin and bell are played through the FluidR3_GM sound bank by Frank Wen, under the MIT license ([licenses](/licenses/third-party.txt)).
 - **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font License) ([licenses](/licenses/third-party.txt)). Its other sounds are free of rights (CC0), royalty free or the game's own.
 `,
   };
