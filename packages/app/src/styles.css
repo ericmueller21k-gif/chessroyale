@@ -28446,6 +28446,8 @@ body.mo-on .mm-scrim {
     top: auto;
     right: 6px;
     bottom: var(--side-lift, 0px);
+    /* (Stacked, one over the other, in the room between him and the board: a row of two reached back over his figure. Eric, Nov 27.) */
+    flex-direction: column-reverse;
   }
   /* (An empty slot's outline gray, not the bar's faint white: it shows on the page in light and dark mode alike.) */
   .boss-side > .dd-timers > .dd-slot.empty {
