@@ -174,9 +174,11 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
     def tail(k, secs=0.01):
         return np.minimum(1, (k - 1 - np.arange(k)) / (secs * sr))
 
-    def hiss(k, rate, hp=0.0):
+    more = np.random.default_rng(2711)  # the noise of the hits added in the third go: every older hit keeps its own
+
+    def hiss(k, rate, hp=0.0, gen=None):
         hold = max(1, int(sr / rate))
-        r = rng.uniform(-1, 1, k // hold + 2)
+        r = (rng if gen is None else gen).uniform(-1, 1, k // hold + 2)
         if hp:
             r = r[1:] - hp * r[:-1]
         return np.repeat(r, hold)[:k]
@@ -188,17 +190,17 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
         w = np.tanh(1.8 * np.sin(tau * np.cumsum(46 + 150 * np.exp(-t / 0.014)) / sr) * np.exp(-t / (0.038 if short else 0.12)))
         put(bus, b, w * tail(k) * vol)
 
-    def snare(b, vol=0.26, bus="snare"):
+    def snare(b, vol=0.26, bus="snare", gen=None):
         k = int(0.24 * sr)
         t = np.arange(k) / sr
         body = np.sin(tau * np.cumsum(175 + 60 * np.exp(-t / 0.012)) / sr) * np.exp(-t / 0.05)
         gate = np.minimum(1, np.maximum(0, (0.2 - t) / 0.03))
-        put(bus, b, (0.8 * body + 0.9 * hiss(k, 9000, 0.5) * np.exp(-t / 0.16)) * gate * vol, 0.05)
+        put(bus, b, (0.8 * body + 0.9 * hiss(k, 9000, 0.5, gen) * np.exp(-t / 0.16)) * gate * vol, 0.05)
 
-    def hat(b, vol=0.03, wide=False, bus="hats"):
+    def hat(b, vol=0.03, wide=False, bus="hats", gen=None):
         k = int((0.2 if wide else 0.05) * sr)
         t = np.arange(k) / sr
-        put(bus, b, hiss(k, 11000, 0.8) * np.exp(-t / (0.06 if wide else 0.014)) * tail(k, 0.004) * vol, 0.3)
+        put(bus, b, hiss(k, 11000, 0.8, gen) * np.exp(-t / (0.06 if wide else 0.014)) * tail(k, 0.004) * vol, 0.3)
 
     def tom(b, m, vol=0.4):
         k = int(0.3 * sr)
@@ -281,6 +283,26 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
         floor(INTRO, 48, 40, 0.12), floor(INTRO, 48, 47, 0.07)
 
     # ---- 0:17 the breakbeat: three rounds of the lament ----
+    def loop(b, fill=False, clean=0.0, hats=None, gen=None):
+        """Two bars of the breakbeat, on its own bus (filtered and crushed later). `clean`: its kicks doubled by the
+        band's kick, that loud; `hats`: clean hats on the off 8ths, their noise from that generator; `gen`: the
+        loop's own noise's (the first go's rounds keep the song's)."""
+        for i in BREAK_KICK:
+            kick(b + i / 4, 0.5, bus="brk")
+            if clean:
+                kick(b + i / 4, clean)
+        for i in BREAK_SNARE:
+            snare(b + i / 4, 0.3, bus="brk", gen=gen)
+        for i in BREAK_GHOST:
+            snare(b + i / 4, 0.09, bus="brk", gen=gen)
+        for i in range(0, 32, 2):
+            hat(b + i / 4, 0.05 if i % 4 == 0 else 0.03, wide=i == 30, bus="brk", gen=gen)
+            if hats is not None and i % 4 == 2:
+                hat(b + i / 4, 0.022, gen=hats)
+        if fill:
+            for i in range(4):
+                snare(b + 7 + i / 4, 0.12 + 0.05 * i, bus="brk", gen=gen)
+
     for r in range(3):
         for bar, (low, names) in enumerate(LAMENT):
             b = BREAK + 32 * r + 4 * bar
@@ -288,36 +310,28 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
             if men:
                 if r:
                     arp(b, pcs(names), 0.018 if r == 1 else 0.026)
-            else:  # the pattern from the first round, and forward in the three bars the men had
-                arp(b, pcs(names), (0.014, 0.026, 0.036)[r] * (1.25 if bar >= 5 else 1.0))
+            else:  # the pattern from the first round, and forward in the three bars of the answers
+                arp(b, pcs(names), (0.032, 0.04, 0.046)[r] * (1.25 if bar >= 5 else 1.0))
             if bar % 2 == 0:
-                fill = bar == 6
-                for i in BREAK_KICK:
-                    kick(b + i / 4, 0.5, bus="brk")
-                    if r == 2:
-                        kick(b + i / 4, 0.24)
-                for i in BREAK_SNARE:
-                    snare(b + i / 4, 0.3, bus="brk")
-                for i in BREAK_GHOST:
-                    snare(b + i / 4, 0.09, bus="brk")
-                for i in range(0, 32, 2):
-                    hat(b + i / 4, 0.05 if i % 4 == 0 else 0.03, wide=i == 30, bus="brk")
-                    if r == 2 and i % 4 == 2:
-                        hat(b + i / 4, 0.022)
-                if fill:
-                    for i in range(4):
-                        snare(b + 7 + i / 4, 0.12 + 0.05 * i, bus="brk")
+                if men:
+                    loop(b, bar == 6, 0.24 if r == 2 else 0.0, rng if r == 2 else None)
+                else:  # the third go: the clean kick under it from the start, the hats from the second round
+                    loop(b, bar == 6, 0.24, rng if r == 2 else more if r == 1 else None)
     x.crash(BREAK, 0.1, 0.5, bus="crash")
 
-    # ---- 0:51 the swell: drum hits, the pattern louder, a roll ----
+    # ---- 0:51 the swell: the breakbeat goes on (not in the first go's), drum hits, the pattern louder, a roll ----
     x.crash(SWELL, 0.14, 0.6, bus="crash")
     for bar, (low, names) in enumerate(SWELL_CH):
         b = SWELL + 4 * bar
         sub(b, 4, low if low >= 38 else low + 12, 0.22)
-        arp(b, pcs(names), (0.026 if men else 0.036) + 0.0012 * bar)
+        arp(b, pcs(names), (0.026 if men else 0.046) + 0.0012 * bar)
         for i in range(4):
             if i == 0 or (bar >= 8 and i == 2) or bar == 14:
-                boom(b + i, low if low >= 38 else low + 12, 0.8 + 0.02 * bar)
+                boom(b + i, low if low >= 38 else low + 12, (0.8 + 0.02 * bar) * (1.0 if men else 0.7))
+        if not men and bar % 2 == 0:
+            loop(b, False, 0.24, more, more)
+            if bar >= 8:  # and the band's snare under the loop's, softly, as the guitars come nearer
+                snare(b + 2, 0.08 + 0.006 * bar, gen=more), snare(b + 6, 0.08 + 0.006 * bar, gen=more)
     for i in range(16):
         snare(SWELL + 60 + i / 4, 0.05 + 0.014 * i)
         kick(SWELL + 60 + i / 4, 0.3, short=True)
@@ -403,8 +417,11 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
     b = SURGE + 31  # the last hit: D, everyone, and nothing after it but the echo
     chug(b, 50, 7, 0.5, 0.8), bass(b, 38, 0.5, 0.36), kick(b, 0.65), snare(b, 0.3), x.crash(b, 0.2, 0.9, bus="crash")
 
-    her = ([(INTRO + 8, ALONE)] + [(BREAK + 32 * r, text) for r, text in enumerate(ROUNDS)]
-           + [(SWELL, CLIMB_S), (CLIMAX, TUNE), (CLIMAX + 32, OVER), (SURGE, LAST_S)])
+    # Her line: where it starts, its notes, how far up they are moved, how loud (the one-voice sample's).
+    her = ([(INTRO + 8, ALONE, 0, 112)] + [(BREAK + 32 * r, text, 0, 106) for r, text in enumerate(ROUNDS)]
+           + [(SWELL, CLIMB_S, 0, 98), (CLIMAX, TUNE, 0, 124), (CLIMAX + 32, OVER, 0, 124), (SURGE, LAST_S, 0, 124)])
+    if not men:  # the three bars the men answered in: their lines, an octave up, on her voice
+        her += [(BREAK + 32 * r + 20, text, 12, 106) for r, text in enumerate(CHANTS)]
 
     # ---- the chips' mix ----
     if "brk" in x.buses:
@@ -421,7 +438,7 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
     x.buses["gtr"] = np.fft.irfft(np.fft.rfft(np.tanh(4.5 * pre / ref), axis=1) * cab, n=bus.shape[1], axis=1) * ref
     del bus, pre
     x.echo("lead", 0.75, 0.16, 0.07), x.echo("lead2", 0.75, 0.12, 0.05), x.echo("arp", 0.75, 0.3, 0.14)
-    levels = {"brk": 2.0 if men else 2.3, "kick": 0.58, "snare": 1.25, "hats": 4.0, "toms": 1.2, "timp": 0.55, "crash": 1.5, "sub": 0.62, "bass": 0.6,
+    levels = {"brk": 2.0 if men else 2.6, "kick": 0.58, "snare": 1.25, "hats": 4.0, "toms": 1.2, "timp": 0.55, "crash": 1.5, "sub": 0.62, "bass": 0.6,
               "gtr": 0.9, "lead": 1.2, "lead2": 1.1, "arp": 1.6}
     out = x.mixdown(levels, lowpass=9000, room=0.14, room_s=1.6)
 
@@ -493,21 +510,20 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
                 choir += part([(b, d - 0.1, m) for m in ((low, mid, *top) if men else top)], loud, joined=False, ahead=VOX if men else ONE)
                 bows += part([(b, d - 0.05, m) for m in (low, low + 7 if (low + 7) % 12 in {v % 12 for v in top} else mid, *top, top[-1] + 12)], loud, joined=False, ahead=BOW)
             t = b * S
-            peak = 127 if start != SWELL else 98 + 29 * bar / 15
+            peak = 127 if start != SWELL else (98 + 29 * bar / 15 if men else 76 + 30 * bar / 15)
             grow += [(max(0.0, t - VOX), 0.8 * peak), (t + 2 * S, peak), (t + 3.9 * S, 0.85 * peak)]
     if men:
         real("choir", choir, sampled.CHOIR_AAH, 0.3, tune=True, swell=sorted(grow), seed=6)
     else:
         real("pads", choir, sampled.SOLO_VOX, 0.18, swell=sorted(grow), wet=0.5, seed=6)
     # Her line: the choir's women, or the one-voice sample (quieter under the breakbeat, fuller over the band).
-    line = [note for start, text in her for note in notes(start, text)]
+    line = sorted((b, d, m + up) for start, text, up, _ in her for b, d, m in notes(start, text))
     if men:
         real("soprano", part(line, 118), sampled.CHOIR_AAH, 0.72, tune=True, swell=breath(line), bend=waver(line), wet=0.45, seed=7)
     else:
         made = []
-        for start, text in her:
-            loud = 112 if start < BREAK else 106 if start < SWELL else 112 if start < CLIMAX else 124
-            made += part(notes(start, text), loud, ahead=ONE)
+        for start, text, up, loud in her:
+            made += part([(b, d, m + up) for b, d, m in notes(start, text)], loud, ahead=ONE)
         real("soprano", made, sampled.SOLO_VOX, 0.45, swell=breath(line, ahead=ONE), wet=0.5, seed=7)
     # The strings: under the choir's chords, and the bridge's twelve bars (soft, then growing under the violin).
     real("strings", bows, sampled.STRINGS, 0.22, tune=True, swell=sorted(grow), wet=0.35, seed=8)
