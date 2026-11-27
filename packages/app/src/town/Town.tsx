@@ -33,7 +33,7 @@
  * docs/areas/town-square.md.
  */
 import { roomLoadSlice } from "./shops/load-slice.ts";
-import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, reportMs, setFps, setRec, summarize, timerStep, upName } from "./frame-report.ts";
+import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, reportMs, setFps, setRec, summarize, timerStep, upName, watchLongFrames } from "./frame-report.ts";
 import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
@@ -247,6 +247,28 @@ export function TownScreen({
   const loadBar = useRef<HTMLElement>(null);
   /** The street town can't run here (no WebGL 2), or didn't load even after a reload (startTown's `onFail`; gl-fail.ts): a plain message in its box. */
   const [broken, setBroken] = useState<TownBroken | null>(null);
+  // (Eric, Nov 27) The town's box squeezed narrower than TOWN_FEEL.narrowAspect on a computer: paused under a message until it's wider.
+  const [narrow, setNarrow] = useState(false);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const mouse = matchMedia("(hover: hover) and (pointer: fine)");
+    const check = () => {
+      const r = el.getBoundingClientRect();
+      setNarrow(mouse.matches && r.height > 0 && r.width / r.height < TOWN_FEEL.narrowAspect);
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    mouse.addEventListener("change", check);
+    return () => {
+      ro.disconnect();
+      mouse.removeEventListener("change", check);
+    };
+  }, []);
+  const narrowNow = useRef(false);
+  narrowNow.current = narrow;
+  useEffect(() => ctl.current?.squeeze(narrow), [narrow]);
   /** The step it's on, named under its title (Eric, Nov 14: "what happened to it showing what it's downloading?"): `LOAD_STEPS`. */
   const [loadStep, setLoadStep] = useState<LoadStep>("pictures");
   useLayoutEffect(() => {
@@ -989,6 +1011,8 @@ export function TownScreen({
       setBroken(why);
     });
     ctl.current = t;
+    // (Opened already squeezed: no frames until it's wider.)
+    t.squeeze(narrowNow.current);
     // Should the page have to load again (stale.ts): where you stand (for a challenge, where you stood as you called it, so it's called
     // again from there) and the room or challenge opening now, or the room you're in.
     setPlace(() => {
@@ -1349,6 +1373,13 @@ export function TownScreen({
                 Retry
               </button>
             )}
+          </div>
+        )}
+        {/* (Eric, Nov 27) Squeezed too narrow on a computer: the town waits under this, back the moment the window is wider. Over the world
+            and its buttons, the loading card's look. */}
+        {narrow && !broken && (
+          <div class="boss-loading town-loading town-narrow" role="alert">
+            <strong class="boss-loading-title">Make the window wider to keep playing</strong>
           </div>
         )}
         {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
@@ -1785,6 +1816,8 @@ function startTown(
   // are null checks.
   const rec = TOWN_ASKED.report ? new FrameRec(undefined, reportMs(TOWN_ASKED.reportS)) : null;
   setRec(rec);
+  // (Nov 27: the browser's long frames, what the page did in a stall, where it says.)
+  const unwatchLong = rec ? watchLongFrames(rec) : null;
   let recPill: ReturnType<typeof reportPill> | null = null;
   let recPanel: HTMLElement | null = null;
   if (rec) {
@@ -1828,6 +1861,8 @@ function startTown(
   let loading = painter.kind === "webgl";
   /** Inside a shop: the town waits as you left it (no frames, nothing moves) until you come out. */
   let away = false;
+  /** (Nov 27) The window squeezed too narrow on a computer: no frames under "Make the window wider" (TownScreen's `narrow`). */
+  let squeezed = false;
   /** A home's "Go in" sent you to its door (its index in HOMES; -1: none): you go in once you stand there. */
   let goingIn = -1;
   /** That walk is the town chat's "Go to the tower" (set with `goingIn`, so a walk elsewhere calls it off with it). */
@@ -2068,7 +2103,7 @@ function startTown(
   /** The frames start again. `gap`: after a pause (a hidden tab, a test's hold): the recorder and the pill start afresh. Back from a
    * room (`resume`) they don't: the room's frames led up to this one, and its time is seen. */
   const run = (gap = true) => {
-    if (raf || !alive || failed || document.hidden || held || away || loading) return;
+    if (raf || !alive || failed || document.hidden || held || away || loading || squeezed) return;
     if (gap) {
       rec?.pause();
       FPS?.restart();
@@ -2780,7 +2815,7 @@ function startTown(
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 } };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 }, tagsQueued: r.tagsQueued };
   };
   /** (Tests) A hash of every picture the loading screen kept, their pixels in order: a later visit's must be the first's. */
   const hookPictureSum = (each = false) => {
@@ -2953,8 +2988,10 @@ function startTown(
      * The server's list put in the town (here-net.ts): a card open on someone who left closes; someone in new clothes is dressed as
      * the bots are (their pictures made once, off the frame loop).
      */
-    others: (left: Person[], dressed: Person[]) => {
+    others: (left: Person[], dressed: Person[], came: Person[] = []) => {
       if (card?.kind === "person" && left.includes(town.people[card.i]!)) setCard(null);
+      // (Newcomers' tags made between frames, Nov 27: render.ts queueTags.)
+      r.queueTags(came);
       for (const p of dressed) {
         r.botArt.delete(p.id);
         r.riders.delete(p.id);
@@ -3046,6 +3083,15 @@ function startTown(
     /** A challenge started inside a home (Don Dough's): you come back to where you stand in the town now, at its door. */
     standHere: () => void (challengeStand = standOf(town.you.walker)),
     endChallenge,
+    /** (Nov 27) The window too narrow on a computer: the frames stop (`on`), or go on. */
+    squeeze: (on: boolean) => {
+      if (on === squeezed) return;
+      squeezed = on;
+      if (on) {
+        finger.stop();
+        halt();
+      } else run();
+    },
     /** Inside a shop the town waits (`away`: no frames); coming out, it goes on. */
     pause: () => {
       away = true;
@@ -3119,6 +3165,7 @@ function startTown(
       if (FPS === fps) setFps(null);
       recPill?.remove();
       recPanel?.remove();
+      unwatchLong?.();
       if (REC === rec) setRec(null);
       halt();
       ro.disconnect();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { F, FpsCount, FrameRec, MAX_FRAMES, NP, P, PART_NAMES, PART_SHORT, RUN_MS, browserOf, newRun, reportMs, quantile, refreshOf, setRec, summarize, timerStep, upName, whatOf, type RunData } from "../src/town/frame-report.ts";
+import { F, FpsCount, FrameRec, MAX_FRAMES, NP, NS, P, PART_NAMES, PART_SHORT, RUN_MS, STALL, SUM_NAMES, WAIT, browserOf, newRun, reportMs, quantile, refreshOf, setRec, summarize, timerStep, upName, whatOf, type RunData } from "../src/town/frame-report.ts";
 import { panelHtml } from "../src/town/frame-report-panel.ts";
 
 /** A run of frames: each [ms, flags, parts as { part: ms }, turn deg/s, uploads, pictures painted]. */
@@ -84,9 +84,11 @@ describe("the frame report's summary (/town?report, Nov 11)", () => {
     ]);
     const s = summarize(r);
     expect(s.worst.map((w) => w.ms)).toEqual([60, 40, 25, 20, 16, 16]);
-    expect(s.worst[0]).toMatchObject({ i: 3, at: 72, what: "gap", top: P.outside, topMs: 55 });
+    // (Nov 27: its biggest part the stall, its 55 ms outside less the 11.7 ms it waited for the 60 Hz screen's refresh after our 5.)
+    expect(s.worst[0]).toMatchObject({ i: 3, at: 72, what: "gap", top: STALL });
+    expect(s.worst[0]!.topMs).toBeCloseTo(55 - (1000 / 60 - 5), 3);
     // (Of our own parts, the outside part left out: the pictures painted, 20 in one frame.)
-    expect(s.top).toBe(P.outside);
+    expect(s.top).toBe(STALL);
     expect(s.ours).toBe(P.paint);
     expect(s.worst[1]).toMatchObject({ i: 1, at: 16, what: "turning 140°/s · 3 painted · 5 uploads", top: P.paint, topMs: 20 });
     expect(whatOf(r, 4)).toBe("walking · zoom · sight lines");
@@ -98,6 +100,51 @@ describe("the frame report's summary (/town?report, Nov 11)", () => {
   it("loading is pictures painted, sight lines or an atlas reset; a plain upload (a tag drawn again) isn't", () => {
     const s = summarize(runOf([[16, F.upload, {}, 0, 2], [16, F.load | F.upload, {}, 0, 1, 1], [16, F.load | F.sight], [16, F.load | F.reset]]));
     expect(s.segs[3]!.frames).toBe(3);
+  });
+
+  it("outside our code split (Nov 27): the wait for the screen's next refresh apart from the stalls past it", () => {
+    // (60 Hz: 16.7 ms frames with 6 ms ours, then one of 50 ms with 6 ms ours: a stall of two refreshes.)
+    const r = runOf([...Array(9).fill([1000 / 60, F.walk, { [P.ground]: 6, [P.outside]: 1000 / 60 - 6 }]), [50, F.walk | F.gap, { [P.ground]: 6, [P.outside]: 44 }]]);
+    const s = summarize(r);
+    expect(s.refresh).toBe(60);
+    const all = s.segs[0]!;
+    expect(all.avg).toHaveLength(NS);
+    expect(all.avg[WAIT]).toBeCloseTo(1000 / 60 - 6, 3);
+    expect(all.avg[STALL]).toBeCloseTo((50 - 1000 / 60) / 10, 3);
+    // (The wait is nobody's cost: never the most time, never a frame's biggest part.)
+    expect(s.top).toBe(P.ground);
+    expect(s.worst[0]!.top).toBe(STALL);
+    expect(s.worst[0]!.topMs).toBeCloseTo(50 - 1000 / 60, 3);
+    expect(s.worst[1]!.top).toBe(P.ground);
+    expect(SUM_NAMES[STALL]).toBe("Stalls outside our code");
+    expect(SUM_NAMES[WAIT]).toBe("Waiting for the screen");
+    // (The recorded parts are as before: the outside part whole.)
+    expect(r.part[9 * NP + P.outside]).toBe(44);
+  });
+
+  it("the browser's long frames in a run: counted only while recording, their other scripts and layout tallied, the frames' own callbacks left out (Nov 27)", () => {
+    let t = 0;
+    const rec = new FrameRec(() => t);
+    const lf = { startTime: 100, duration: 80, styleAndLayoutStart: 170, scripts: [{ invoker: "FrameRequestCallback", duration: 20 }, { invoker: "Response.json.then", duration: 30 }] };
+    rec.longFrame(lf);
+    expect(rec.run.long.n, "waiting: not counted").toBe(0);
+    for (const [now, walking] of [[0, true], [16.7, true], [33.4, true]] as const) {
+      t = now;
+      rec.begin(now);
+      rec.end(walking, 0, 0);
+    }
+    rec.longFrame({ ...lf, startTime: 20, styleAndLayoutStart: 90 });
+    rec.longFrame({ ...lf, startTime: -5 });
+    const L = rec.run.long;
+    expect([L.n, L.ms, L.scripts, L.layout]).toEqual([1, 80, 30, 10]);
+    expect([...L.by]).toEqual([["Response.json.then", 30]]);
+    rec.finish();
+    rec.longFrame({ ...lf, startTime: 500 });
+    expect(L.n, "after the run: not counted").toBe(1);
+    L.seen = true;
+    expect(summarize(rec.run).long).toMatchObject({ n: 1, scripts: 30, layout: 10, by: [["Response.json.then", 30]] });
+    rec.again();
+    expect([L.n, L.by.size]).toEqual([0, 0]);
   });
 
   it("an empty run says so (no frames: nothing to divide by)", () => {

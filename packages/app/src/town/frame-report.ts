@@ -84,6 +84,21 @@ export const PART_NAMES: readonly string[] = [
 /** The same, short (the worst frames' lines). */
 export const PART_SHORT: readonly string[] = ["Logic", "Camera", "Sky", "Ground", "Placing", "Buildings", "Props", "Bosses", "You", "Others", "Lights", "Labels", "Submit", "Chips", "Minimap", "Painting", "Sight", "Uploads", "Outside"];
 
+/**
+ * (Nov 27) The summary's parts: the recorded ones, but "outside our code" split in two. Eric's laptop, Nov 27: "Most time: Outside our
+ * code 14 of 20 ms" was mostly the wait for the screen's next refresh (our 6 ms done, the 60 Hz screen's 16.7 ms not yet up), told apart
+ * from real stalls only by the worst frames. Now: `STALL` (P.outside's place), the part of a frame past one refresh interval, the frames
+ * the screen showed nothing new (the browser's own work, the GPU, garbage collection, another task on the page); and `WAIT` (after it),
+ * the idle rest of a frame on time, nobody's cost. Worked out from each frame's time and its outside part at the summary, with the run's
+ * refresh: nothing more recorded a frame.
+ */
+export const STALL = P.outside;
+export const WAIT = NP;
+export const NS = NP + 1;
+export const SUM_NAMES: readonly string[] = [...PART_NAMES.slice(0, P.outside), "Stalls outside our code", "Waiting for the screen"];
+export const SUM_SHORT: readonly string[] = [...PART_SHORT.slice(0, P.outside), "Stall", "Waiting"];
+
+
 /** What was happening in a frame (bits). */
 export const F = { walk: 1, turn: 2, zoom: 4, load: 8, upload: 16, gap: 32, reset: 64, sight: 128, room: 256, goIn: 512, goOut: 1024 } as const;
 
@@ -119,10 +134,26 @@ export interface RunData {
   bakes: Uint16Array;
   /** (Nov 26) The run's uploads by what each picture is (`upName`: "glow", "tag", "bubble"…; a reason after it: "glow (redrawn)"). */
   upsBy: Map<string, number>;
+  /** (Nov 27) The browser's long animation frames in the run (`watchLongFrames`; where it has them): what the main thread did. */
+  long: LongFrames;
+}
+/**
+ * (Nov 27) The run's long animation frames as the browser times them (Chrome and Edge: PerformanceObserver "long-animation-frame", each
+ * frame over 50 ms): how many, the time their scripts other than a frame's own callbacks took (a request's answer, a timer, an input
+ * handler, the chat's), their style and layout, and the other scripts by what ran them, so a stall tells the page's own work from the
+ * GPU's or garbage collection's (neither is in them). `seen`: the browser reports them at all.
+ */
+export interface LongFrames {
+  seen: boolean;
+  n: number;
+  ms: number;
+  scripts: number;
+  layout: number;
+  by: Map<string, number>;
 }
 
 export function newRun(max = MAX_FRAMES): RunData {
-  return { n: 0, total: new Float32Array(max), part: new Float32Array(max * NP), flags: new Uint16Array(max), turn: new Float32Array(max), ups: new Uint16Array(max), bakes: new Uint16Array(max), upsBy: new Map() };
+  return { n: 0, total: new Float32Array(max), part: new Float32Array(max * NP), flags: new Uint16Array(max), turn: new Float32Array(max), ups: new Uint16Array(max), bakes: new Uint16Array(max), upsBy: new Map(), long: { seen: false, n: 0, ms: 0, scripts: 0, layout: 0, by: new Map() } };
 }
 
 /**
@@ -258,7 +289,26 @@ export class FrameRec {
   finish(): void {
     if (this.state === "done") return;
     this.state = "done";
+    this.endAt = this.frameNow;
     this.onDone?.();
+  }
+  private endAt = Infinity;
+  /**
+   * (Nov 27) One of the browser's long animation frames (`watchLongFrames`): counted if it falls in the run. Its scripts but the frames'
+   * own callbacks ("FrameRequestCallback": the town's or a room's frame, timed as our parts) are the page's other work.
+   */
+  longFrame(e: { startTime: number; duration: number; styleAndLayoutStart?: number; scripts?: readonly { invoker?: string; duration: number }[] }): void {
+    if (this.state === "wait" || e.startTime < this.startAt || e.startTime > this.endAt) return;
+    const L = this.run.long;
+    L.n++;
+    L.ms += e.duration;
+    if (e.styleAndLayoutStart && e.styleAndLayoutStart > e.startTime) L.layout += Math.max(0, Math.min(e.duration, e.startTime + e.duration - e.styleAndLayoutStart));
+    for (const x of e.scripts ?? []) {
+      const k = x.invoker || "script";
+      if (k === "FrameRequestCallback") continue;
+      L.scripts += x.duration;
+      if (L.by.has(k) || L.by.size < 24) L.by.set(k, (L.by.get(k) ?? 0) + x.duration);
+    }
   }
   /** The frames stop (a hidden tab, a test's hold): the next one starts afresh. (Not between the town and a room: that wait is seen.) */
   pause(): void {
@@ -268,6 +318,10 @@ export class FrameRec {
   again(): void {
     this.run.n = 0;
     this.run.upsBy.clear();
+    const L = this.run.long;
+    L.n = L.ms = L.scripts = L.layout = 0;
+    L.by.clear();
+    this.endAt = Infinity;
     this.sec = -1;
     this.state = "wait";
     this.prevNow = -1;
@@ -293,6 +347,18 @@ export function upName<T extends object>(src: T, name: string): T {
 export function setRec(r: FrameRec | null): void {
   REC = r;
   if (r) naming = true;
+}
+
+/** (Nov 27) The browser's long animation frames into `rec`'s runs, where it has them (Chrome, Edge); the returned function stops it. */
+export function watchLongFrames(rec: FrameRec): () => void {
+  const PO = globalThis.PerformanceObserver;
+  if (!PO || !PO.supportedEntryTypes?.includes("long-animation-frame")) return () => undefined;
+  rec.run.long.seen = true;
+  const o = new PO((list) => {
+    for (const e of list.getEntries()) rec.longFrame(e as unknown as Parameters<FrameRec["longFrame"]>[0]);
+  });
+  o.observe({ type: "long-animation-frame", buffered: false });
+  return () => o.disconnect();
 }
 
 /**
@@ -356,7 +422,7 @@ export interface Segment {
   frames: number;
   /** The median frames a second over these frames. */
   fps: number;
-  /** Per part: the mean and the worst (ms). */
+  /** Per part (the summary's NS: SUM_NAMES): the mean and the worst (ms). */
   avg: number[];
   max: number[];
   /** The mean frame time (ms). */
@@ -401,6 +467,8 @@ export interface Summary {
   uploadsBy: [string, number][];
   bakes: number;
   resets: number;
+  /** (Nov 27) The browser's long animation frames (null: it doesn't report them): count, ms, other scripts, style and layout, top scripts. */
+  long: { n: number; ms: number; scripts: number; layout: number; by: [string, number][] } | null;
 }
 
 const fpsOf = (ms: number) => (ms > 0 ? 1000 / ms : 0);
@@ -423,32 +491,51 @@ export function whatOf(r: RunData, i: number): string {
   return out.length ? out.join(" · ") : "standing";
 }
 
-function segment(r: RunData, name: string, keep: (i: number) => boolean): Segment {
-  const avg = new Array<number>(NP).fill(0);
-  const max = new Array<number>(NP).fill(0);
+function segment(r: RunData, parts: Float32Array, name: string, keep: (i: number) => boolean): Segment {
+  const avg = new Array<number>(NS).fill(0);
+  const max = new Array<number>(NS).fill(0);
   const times: number[] = [];
   let sum = 0;
   for (let i = 0; i < r.n; i++) {
     if (!keep(i)) continue;
     times.push(r.total[i]!);
     sum += r.total[i]!;
-    for (let k = 0; k < NP; k++) {
-      const v = r.part[i * NP + k]!;
+    for (let k = 0; k < NS; k++) {
+      const v = parts[i * NS + k]!;
       avg[k]! += v;
       if (v > max[k]!) max[k] = v;
     }
   }
   const n = times.length;
-  if (n) for (let k = 0; k < NP; k++) avg[k]! /= n;
+  if (n) for (let k = 0; k < NS; k++) avg[k]! /= n;
   times.sort((a, b) => a - b);
   return { name, frames: n, fps: n ? fpsOf(quantile(times, 0.5)) : 0, avg, max, mean: n ? sum / n : 0 };
 }
 
 const argmax = (xs: readonly number[], n = xs.length) => xs.reduce((b, x, i) => (i < n && x > xs[b]! ? i : b), 0);
 
+/**
+ * (Nov 27) Each frame's parts as the summary has them (NS a frame): the recorded ones, the outside part split into its stall (past one
+ * refresh interval of `refreshMs`) and its wait (the rest: the screen's next refresh not yet due when our work was done).
+ */
+export function splitParts(r: RunData, refreshMs: number): Float32Array {
+  const out = new Float32Array(r.n * NS);
+  for (let i = 0; i < r.n; i++) {
+    for (let k = 0; k < NP; k++) out[i * NS + k] = r.part[i * NP + k]!;
+    const outside = r.part[i * NP + P.outside]!;
+    const ours = r.total[i]! - outside;
+    const wait = Math.min(outside, Math.max(0, refreshMs - ours));
+    out[i * NS + STALL] = outside - wait;
+    out[i * NS + WAIT] = wait;
+  }
+  return out;
+}
+
 export function summarize(r: RunData): Summary {
   const n = r.n;
   const sorted = Array.from(r.total.subarray(0, n)).sort((a, b) => a - b);
+  const refresh = refreshOf(sorted);
+  const parts = splitParts(r, refresh ? 1000 / refresh : 1000 / 60);
   let secs = 0;
   let resets = 0;
   let uploads = 0;
@@ -466,12 +553,12 @@ export function summarize(r: RunData): Summary {
   const load = F.load;
   const town = (i: number) => !(r.flags[i]! & (F.room | F.goIn | F.goOut));
   const segs = [
-    segment(r, "All", () => true),
-    segment(r, "Walk", (i) => town(i) && !!(r.flags[i]! & F.walk) && !(r.flags[i]! & F.turn)),
-    segment(r, "Turn", (i) => town(i) && !!(r.flags[i]! & F.turn)),
-    segment(r, "Load", (i) => town(i) && !!(r.flags[i]! & load)),
-    segment(r, "Room", (i) => (r.flags[i]! & (F.room | F.goIn | F.goOut)) === F.room),
-    segment(r, "In/out", (i) => !!(r.flags[i]! & (F.goIn | F.goOut))),
+    segment(r, parts, "All", () => true),
+    segment(r, parts, "Walk", (i) => town(i) && !!(r.flags[i]! & F.walk) && !(r.flags[i]! & F.turn)),
+    segment(r, parts, "Turn", (i) => town(i) && !!(r.flags[i]! & F.turn)),
+    segment(r, parts, "Load", (i) => town(i) && !!(r.flags[i]! & load)),
+    segment(r, parts, "Room", (i) => (r.flags[i]! & (F.room | F.goIn | F.goOut)) === F.room),
+    segment(r, parts, "In/out", (i) => !!(r.flags[i]! & (F.goIn | F.goOut))),
   ];
   const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => r.total[b]! - r.total[a]! || a - b);
   const worst: Worst[] = [];
@@ -479,10 +566,12 @@ export function summarize(r: RunData): Summary {
   const startOf = new Float64Array(n);
   for (let i = 0; i < n; i++) ((startOf[i] = at), (at += r.total[i]!));
   for (const i of order.slice(0, 10)) {
-    const parts = Array.from(r.part.subarray(i * NP, i * NP + NP));
-    const top = argmax(parts);
-    worst.push({ i, ms: r.total[i]!, at: startOf[i]!, what: whatOf(r, i), top, topMs: parts[top]! });
+    const fp = Array.from(parts.subarray(i * NS, i * NS + NS));
+    // (Its biggest part, the wait for the screen left out: nobody's cost.)
+    const top = argmax(fp, WAIT);
+    worst.push({ i, ms: r.total[i]!, at: startOf[i]!, what: whatOf(r, i), top, topMs: fp[top]! });
   }
+  const L = r.long;
   return {
     frames: n,
     secs: secs / 1000,
@@ -492,11 +581,12 @@ export function summarize(r: RunData): Summary {
     p1: fpsOf(quantile(sorted, 0.99)),
     over20: n ? sorted.filter((x) => x > 20).length / n : 0,
     over33: n ? sorted.filter((x) => x > 33.4).length / n : 0,
-    refresh: refreshOf(sorted),
+    refresh,
     segs,
     worst,
-    top: n ? argmax(segs[0]!.avg) : -1,
-    topTurn: segs[2]!.frames ? argmax(segs[2]!.avg) : -1,
+    // (Where the most time went: the wait for the screen left out; of ours, the stalls too.)
+    top: n ? argmax(segs[0]!.avg, WAIT) : -1,
+    topTurn: segs[2]!.frames ? argmax(segs[2]!.avg, WAIT) : -1,
     ours: n ? argmax(segs[0]!.avg, P.outside) : -1,
     oursTurn: segs[2]!.frames ? argmax(segs[2]!.avg, P.outside) : -1,
     maxTurn,
@@ -504,6 +594,7 @@ export function summarize(r: RunData): Summary {
     uploadsBy: [...r.upsBy].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)),
     bakes,
     resets,
+    long: L.seen ? { n: L.n, ms: L.ms, scripts: L.scripts, layout: L.layout, by: [...L.by].sort((a, b) => b[1] - a[1]).slice(0, 4) } : null,
   };
 }
 
