@@ -324,6 +324,15 @@ describe("Turf: his holds", () => {
     c.applyBossMove("f8b4");
     expect(c.extraMoveDue()).toBe(false);
     expect(turfOf(c).double?.state).toBe("skipped");
+    // (Nor while the Carrot Patch race is on: a free second move could pull his winning carrot. Review of #1024.)
+    const q = raid({ side: "w" });
+    await crowd(q, "g1f3");
+    setHolds(q, 3);
+    const qb = q.boss!;
+    q.state = { ...q.state, boss: { ...qb, powers: { ...qb.powers!, carrots: { at: qb.crowdMoves, squares: ["a4", "h4", "a5", "h5", "c4"], pulls: [], crowdMoves: 0, bossMoves: 0 } } } };
+    q.applyBossMove("g8f6");
+    expect(q.extraMoveDue()).toBe(false);
+    expect(turfOf(q).double?.state).toBe("skipped");
   });
 });
 

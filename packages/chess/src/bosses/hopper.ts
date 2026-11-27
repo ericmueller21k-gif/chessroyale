@@ -801,7 +801,9 @@ export const turfBattle = {
     const boss = b.state.boss!;
     if (!holdOn(boss, 3) || boss.result || carrotBattle.won(boss) || b.finalGameOver()) return;
     const passed = passTurn(boardOf(b).fen);
-    const state = passed && extraMoveCandidates(passed).length ? ("due" as const) : ("skipped" as const);
+    // (Never during the Carrot Patch race: a free second move could pull his fifth carrot, and a race it ended would spin a turn late.
+    // Review of #1024.)
+    const state = passed && !raceOn(boss.powers?.carrots) && extraMoveCandidates(passed).length ? ("due" as const) : ("skipped" as const);
     setPowers(b, (p) => ({ ...p, turf: { ...p.turf!, double: { at: boss.crowdMoves, state } } }));
   },
 };
