@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import {
   BOSS_CRATES,
   CRATES,
+  MYTHIC_CRATE,
   FISCHER,
   XP,
   everyLevel,
@@ -63,7 +64,7 @@ import {
 } from "@chessroyale/core";
 import { account, deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, pickBossCrate, setPawnColor, type OpenForce, type Opened } from "../account.ts";
 import { TokenArt } from "../components/TokenArt.tsx";
-import { Avatar, BetaCrateArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, TranscendentArt, WinterCrateArt } from "../components/Items.tsx";
+import { Avatar, BetaCrateArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, MythicCrateArt, PresentArt, SupplyBoxArt, TranscendentArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
@@ -111,6 +112,8 @@ const CRATE_LOOKS: Record<CrateLook, { Crate: () => JSX.Element; Box: (p: { colo
   winter: { Crate: WinterCrateArt, Box: PresentArt, box: "present", boxes: "Presents", lid: 0.46 },
   beta: { Crate: BetaCrateArt, Box: SupplyBoxArt, box: "supply box", boxes: "Supply boxes", lid: 0.36 },
   hunchess: { Crate: HunchessCrateArt, Box: HunchessBoxArt, box: "box", boxes: "Boxes", lid: 0.38 },
+  // (The Mythic Crate, Nov 27: every opening a Transcendent spin, so no tier's box shows; its Box is the HunChess crate's.)
+  mythic: { Crate: MythicCrateArt, Box: HunchessBoxArt, box: "box", boxes: "Transcendent", lid: 0.38 },
 };
 
 /**
@@ -214,7 +217,7 @@ export function CratesPanel() {
   const picks = locker?.bossPicks ?? 0;
   const pickRow = <BossPickRow picks={picks} onOpen={() => setPicking(true)} />;
   const readyWelcome = welcomeShown.filter((r) => r.state === "ready");
-  const heldSeries = CRATES.filter((c) => heldOf(locker, c) > 0);
+  const heldSeries = [...CRATES, MYTHIC_CRATE].filter((c) => heldOf(locker, c) > 0);
   const boostCrates = locker?.boostCrates ?? 0;
   const boostRow = <BoostCrateRow held={boostCrates} onOpen={() => setBoostOpen(true)} />;
   const nothingReady = !readyWelcome.length && !heldSeries.length && !heldBoss.length && !picks && !boostCrates;
@@ -270,6 +273,8 @@ export function CratesPanel() {
         {picks === 0 && pickRow}
         {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
         {moreBoss.map(bossRow)}
+        {/* (The Mythic Crate, Nov 27: with "Show unowned" while you hold none, as the boss crates: its page shows its odds.) */}
+        {showUnowned && heldOf(locker, MYTHIC_CRATE) === 0 && seriesRow(MYTHIC_CRATE)}
         {!showUnowned && <p class="small muted no-boss-crates">{heldBoss.length ? MORE_BOSS_CRATES_LINE : NO_BOSS_CRATES_LINE}</p>}
         <p class="small muted crates-how">
           Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward, and an opening sometimes gives a bonus crate (with its key if it needs one). A daily quest
@@ -544,7 +549,7 @@ function AdminGrants() {
       </div>
       <div class="admin-grants-row">
         <select aria-label="Crate" value={crate} onChange={(e) => setCrate((e.target as HTMLSelectElement).value)}>
-          {[...CRATES, ...BOSS_CRATES].map((c) => (
+          {[...CRATES, MYTHIC_CRATE, ...BOSS_CRATES].map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
             </option>
@@ -644,7 +649,9 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
       </div>
       <h3 class="ff-title">{look.boxes}</h3>
       <p class="small muted">
-        The crate holds a {look.box} for each tier, in its color. A {look.box} opens to one of its tier's items, each as likely as the others.
+        {liveStrip(crate).every((x) => x.tier === FISCHER)
+          ? "Every one opens to a Transcendent spin: a Legendary or Mythic item."
+          : `The crate holds a ${look.box} for each tier, in its color. A ${look.box} opens to one of its tier's items, each as likely as the others.`}
       </p>
       <div class="odds-list">
         {liveStrip(crate).map(({ tier }) => {
