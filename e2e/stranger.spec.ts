@@ -5,7 +5,7 @@ import { localSql, openBossRaid, submitMove, test } from "./helpers.ts";
 /**
  * The Stranger (Eric, Nov 27; docs/decisions/2026-11-27-stranger-rules.md), on a phone: his Frostfire strike (your piece frozen for your
  * next turn, thawed the turn after, then its square burns what's left on it), his locked card in the Boss Battle picker (a tap shows him
- * and how to unlock him, every way to play greyed), and the unlock once Battle Tower floor 10, his, is won (the server's best). Before his
+ * and how to unlock him, every way to play greyed), and the unlock once Battle Tower floor 10, his, is won (the server's record of it). Before his
  * art lands he's met with `?wip=1` (placeholders); the server's TEST_SWITCHES deals his floor the same way.
  */
 
@@ -106,13 +106,13 @@ test("his locked card: a tap shows him and how to unlock him, every way to play 
       const start = await post("/api/tower/floor/start", {});
       const end = await post("/api/tower/floor/finish", { fight: start.fight.id, outcome: "won" });
       const state = await (await fetch("/api/tower", { credentials: "same-origin" })).json();
-      return { floor: start.floor as number, bosses: start.bosses as string[], best: end.best as number, next: state.runs.solo as { floor: number; bosses: string[] } | null };
+      return { floor: start.floor as number, bosses: start.bosses as string[], best: end.best as number, next: state.runs.solo as { floor: number; bosses: string[] } | null, unlocked: state.unlocked as string[] };
     });
   const nine = await climb();
-  expect([nine.floor, nine.best]).toEqual([9, 9]);
+  expect([nine.floor, nine.best, nine.unlocked]).toEqual([9, 9, []]);
   expect(nine.next).toMatchObject({ floor: 10, bosses: ["stranger"] });
   const ten = await climb();
-  expect([ten.floor, ten.bosses, ten.best]).toEqual([10, ["stranger"], 10]);
+  expect([ten.floor, ten.bosses, ten.best, ten.unlocked]).toEqual([10, ["stranger"], 10, ["stranger"]]);
   // Back on the picker: his card unlocked, named as any other; a tap picks him, START's ways to play open.
   await page.reload();
   await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
