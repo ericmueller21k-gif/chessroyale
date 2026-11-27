@@ -1019,6 +1019,15 @@ sometimes it'll bite us if you're not 100% sure."
 - The held voices are 0.7 dB up with it, so the beat over them is +1.6 to +4.0 where the third go had +2.3 to +5.0
   (1:06: +1.9, was +2.6). Told him; if the beat feels covered again, both voices come down by that much.
 - The game's file is still the third go. This one replaces it only if he says so.
+- His answer: "there's literally no difference. I can't hear the actual woman's voice at all. So maybe just you got
+  to bring it up more. I should be hearing both of them like nicely playing together." Two voices on the same notes
+  melt into one tone when one is 6 dB under: the quieter only colors the louder. So the second try has them equal
+  (the choir within 1 dB of the one-voice sample in every section), each 3 dB under where the one voice was alone,
+  so the pair is as loud as it was (the held voices within 0.3 dB of the third go; the beat over them as it was:
+  1:06 +2.9). Sent with a clip of the opening where the choir is 3 dB over the other voice, the pair still as loud.
+- **Lesson:** "50%" for a doubling voice is his guess, not a spec: a voice doubling another on the same notes has
+  to be about as loud as it to be heard as a second voice. When a layer is added, keep the pair's level where the
+  single voice was, or the balance under it moves.
 
 ## Sheet music: the town's first piano solo (Nov 26)
 

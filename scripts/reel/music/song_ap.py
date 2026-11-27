@@ -177,9 +177,11 @@ def voicings(chords, shift=0, top=(64, 67, 71), mid=59, floor=99):
 def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
     """The song (stereo, at the mix's own level). `voice`: "vox", the Stranger's theme as the game has it (her line
     and the chords on the bank's one-voice sample, no men); "both", that with the choir's women alongside it, note
-    for note, at half its level; or "choir", the first go's recorded choir, men and all. `parts`: a dict to fill
+    for note, as loud as it is (each 3 dB under where the one voice is alone, so the pair is as loud as it was and
+    the beat stays where it was against them); or "choir", the first go's recorded choir, men and all. `parts`: a dict to fill
     with each recorded part as mixed, by name (for measuring)."""
     men, both = voice == "choir", voice == "both"
+    pair = 10 ** (-3 / 20) if both else 1.0
     x = Mix(SECS, BEATS, os=2, seed=1127)
     put, sr = x.put, x.sr
     rng = np.random.default_rng(1127)
@@ -531,9 +533,9 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
     if men:
         real("choir", choir, sampled.CHOIR_AAH, 0.3, tune=True, swell=sorted(grow), seed=6)
     else:
-        real("pads", choir, sampled.SOLO_VOX, 0.18, swell=sorted(grow), wet=0.5, seed=6)
-        if both:  # the choir's women on the same three notes, 6 dB under them
-            real("women-pads", women, sampled.CHOIR_AAH, 0.13, tune=True, swell=sorted(grow), seed=15)
+        real("pads", choir, sampled.SOLO_VOX, 0.18 * pair, swell=sorted(grow), wet=0.5, seed=6)
+        if both:  # the choir's women on the same three notes, as loud as them
+            real("women-pads", women, sampled.CHOIR_AAH, 0.26 * pair, tune=True, swell=sorted(grow), seed=15)
     # Her line: the choir's women, or the one-voice sample (quieter under the breakbeat, fuller over the band).
     line = sorted((b, d, m + up) for start, text, up, _ in her for b, d, m in notes(start, text))
     if men:
@@ -542,12 +544,12 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
         made = []
         for start, text, up, loud in her:
             made += part([(b, d, m + up) for b, d, m in notes(start, text)], loud, ahead=ONE)
-        real("soprano", made, sampled.SOLO_VOX, 0.45, swell=breath(line, ahead=ONE), wet=0.5, seed=7)
-        if both:  # and on her line, the answers too, 6 dB under her
+        real("soprano", made, sampled.SOLO_VOX, 0.45 * pair, swell=breath(line, ahead=ONE), wet=0.5, seed=7)
+        if both:  # and on her line, the answers too, as loud as her
             made = []
             for start, text, up, loud in her:
                 made += part([(b, d, m + up) for b, d, m in notes(start, text)], loud)
-            real("women", made, sampled.CHOIR_AAH, 0.27, tune=True, swell=breath(line), bend=waver(line), wet=0.45, seed=14)
+            real("women", made, sampled.CHOIR_AAH, 0.58 * pair, tune=True, swell=breath(line), bend=waver(line), wet=0.45, seed=14)
     # The strings: under the choir's chords, and the bridge's twelve bars (soft, then growing under the violin).
     real("strings", bows, sampled.STRINGS, 0.22, tune=True, swell=sorted(grow), wet=0.35, seed=8)
     bows, quiet = [], []
