@@ -229,6 +229,9 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   `shownAbove` (the top tiers' count). `LEFT_OUT` (banned, under review, the engine pool, test accounts; residents count) is left out of the list, the count and every place, the top tiers'
   too. The rows and count are kept `LADDER.cacheSeconds` (60) in each Worker instance (a `Map`, as `topPlace`); `ladderFor` puts your fresh row in your copy, so a left-out player's answer is an honest player's in that spot. Someone newly banned, pooled or
   in review stays in the kept list (and `topPlace`) up to that minute. 50 v 50 and Squads: no ladder yet (404). No seasons are stored: "Season 1" is all.
+- **Mode ranks (50 v 50, Squads; designed Nov 27, not recorded yet):** a rank each on these tiers, from placement and engine score
+  against the lobby (Squads: placement alone); [docs/ideas/mode-ranks.md](../ideas/mode-ranks.md). Only the pure math is in (core
+  `mode-ranks.ts`, `MODE_RANKS`); the stored data, the ladder's other modes and the screens are its PRs 3-5.
 - **The emblems** (Eric's set, approved Oct 28: a chess piece in a cut-gem badge; d5 plain, d4 studs, d3 wings, d2 a
   crest, d1 a gem crown and a wide glow; Pearlescent and Transcendent 2 s loops):
   - **The drawing** is `packages/app/src/characters/rank-set.ts` (as drawn on `claude/boss-art`, a8d5aa57; only its
@@ -310,6 +313,7 @@ entry says the same.
 | What | Where |
 | --- | --- |
 | The vote's rule, Glicko-1, the ladder, rank points, placements, pairing (pure); coins: `packages/core/src/play-coins.ts` (`PLAY_COINS`) | `packages/core/src/ranked.ts`; numbers `RANKED_1V1` |
+| The mode ranks' math (50 v 50, Squads: the field's Glicko-1, pair results, RP, placements, seeding, the leaver's bot) | `packages/core/src/mode-ranks.ts`; numbers `MODE_RANKS` |
 | The game's rules and the protocol (pure, shared with the app) | `packages/chess/src/duel/` (`@chessroyale/chess/duel`) |
 | The game's room (pure) and object | `packages/server/src/duel-room.ts`, `duel-do.ts` (binding `DUELS`, migration v6) |
 | Ranks and games in D1; the schema, a guest's merge, the profile's read | `packages/server/src/ranked.ts`, `ranked-schema.ts` |
