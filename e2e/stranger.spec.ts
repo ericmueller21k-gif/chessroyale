@@ -5,8 +5,9 @@ import { localSql, openBossRaid, submitMove, test } from "./helpers.ts";
 /**
  * The Stranger (Eric, Nov 27; docs/decisions/2026-11-27-stranger-rules.md), on a phone: his Frostfire strike (your piece frozen for your
  * next turn, thawed the turn after, then its square burns what's left on it), his locked card in the Boss Battle picker (a tap shows him
- * and how to unlock him, every way to play greyed), and the unlock once Battle Tower floor 10, his, is won (the server's record of it). While
- * he's admins first, `?wip=1` shows a player what an admin sees; the server's TEST_SWITCHES deals his floor to anyone's climb.
+ * and how to unlock him, every way to play greyed), the unlock once Battle Tower floor 10, his, is won (the server's record of it), and his
+ * Storm of Two Worlds (docs/decisions/2026-11-27-stranger-storm.md: its opening scene, then Ice and Fire turns). Live since his storm;
+ * `?wip=1` stays on the links (a test switch, harmless now).
  */
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase?.kind ?? "none").catch(() => "none");
@@ -72,6 +73,103 @@ test("his Frostfire on a phone: your piece frozen a turn (no move of it, its ice
   expect(t.burn?.square).toBe(st.square);
   if (left && left.type !== "k" && t.burn?.piece === kind) expect(new Chess(t.fen).get(st.square as any)?.color ?? null).not.toBe("w");
   await expect(page.locator(`.pw-frostfire[data-square="${st.square}"]`)).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his figure whole on screen), the ring, an Ice turn and a Fire turn, the burn", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // (Every frame from the start, recorded in the page: the scene's own element and his figure's box, the ring, the dock's words.)
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.__storm = { scene: [] as number[], outside: [] as string[], ring: 0, burn: 0, docks: [] as string[], wide: [] as number[] };
+    const look = () => {
+      const fig = document.querySelector(".pm-storm .sg-fig");
+      if (document.querySelector(".pm-storm")) w.__storm.scene.push(Date.now());
+      if (fig) {
+        // (His drawing's box, its frame's transparent margins aside: whole on screen at every frame.)
+        const r = fig.getBoundingClientRect();
+        if (r.left + r.width * 0.25 < -1 || r.right - r.width * 0.25 > innerWidth + 1 || r.top + r.height * 0.1 < -1 || r.bottom > innerHeight + 1) w.__storm.outside.push(`${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.right)},${Math.round(r.bottom)}`);
+      }
+      if (document.querySelector(".sg-storm")) {
+        w.__storm.ring++;
+        // (Its ring past the screen's edge is cut, never scrolled to: the review of #1009, S1.)
+        const sw = document.documentElement.scrollWidth;
+        if (sw > innerWidth && !w.__storm.wide.includes(sw)) w.__storm.wide.push(sw);
+      }
+      // (The fire turn's burn, drawn as his thinking begins.)
+      if (document.querySelector(".pm-storm-burn .pw-burns")) w.__storm.burn++;
+      // (The storm's words in the dock: each one whole, never cut short.)
+      for (const el of document.querySelectorAll<HTMLElement>(".boss-dock .dock-line, .boss-dock .through-note")) {
+        const dock = `${el.textContent?.trim() ?? ""}${el.scrollWidth > el.clientWidth + 1 ? ` [cut] ${el.scrollWidth}/${el.clientWidth}` : ""}`;
+        if (/Ice:|Fire:|marks burnt|storm swirls|spared/.test(dock) && !w.__storm.docks.includes(dock)) w.__storm.docks.push(dock);
+      }
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  // (A narrow phone, 360 px: the dock's words measured at their tightest.)
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=stranger&wip=1&power=storm`);
+  await openBossRaid(page);
+  await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+  await expect.poll(() => phase(page), { timeout: 45_000 }).toBe("play");
+  expect(await page.evaluate(() => (window as any).match.boss.id)).toBe("stranger");
+  type Pick = { turn: number; kind: "fire" | "ice"; squares: string[]; free?: string[] } | null;
+  const pickNow = () => page.evaluate(() => {
+    const p = (window as any).match?.boss?.powers;
+    const pk = p?.stranger?.pick;
+    return (pk && pk.turn === p.turn ? pk : null) as Pick;
+  });
+  // The warning as turn 2 begins, the storm as turn 3 does (the test switch): your moves until its turns have both kinds.
+  const kinds = new Set<string>();
+  let burnt = false;
+  for (let i = 0; i < 8 && kinds.size < 2; i++) {
+    const t = await yourTurn(page, 90_000);
+    const pick = await pickNow();
+    if (pick?.kind === "ice") {
+      kinds.add("ice");
+      // Only your king's moves and the free pieces': every other piece of yours frozen, its ice on the board.
+      expect(pick.squares.length).toBeGreaterThan(0);
+      expect((t.allowed ?? []).every((m) => pick.free!.includes(m.slice(0, 2)) || new Chess(t.fen).get(m.slice(0, 2) as any)?.type === "k")).toBe(true);
+      for (const sq of pick.squares) await expect(page.locator(`.pw-ice[data-square="${sq}"]`)).toHaveCount(1);
+      await moveBut(page, t, null);
+    } else if (pick?.kind === "fire") {
+      kinds.add("fire");
+      for (const sq of pick.squares) await expect(page.locator(`.pw-storm-fire[data-square="${sq}"]`)).toHaveCount(1);
+      // A marked piece of yours left where it stands: the burn takes it as your move lands. None: a move onto a mark.
+      const chess = new Chess(t.fen);
+      const mine = pick.squares.filter((sq) => chess.get(sq as any)?.color === "w" && chess.get(sq as any)?.type !== "k");
+      const legal = chess.moves({ verbose: true }).map((m) => ({ uci: m.from + m.to + (m.promotion ?? ""), from: m.from, to: m.to, piece: m.piece }));
+      const ok = legal.filter((m) => !t.allowed || t.allowed.includes(m.uci));
+      const move = mine.length ? ok.find((m) => !pick.squares.includes(m.from) && !pick.squares.includes(m.to)) : ok.find((m) => pick.squares.includes(m.to) && m.piece !== "k");
+      const target = mine[0] ?? move?.to;
+      await submitMove(page, (move ?? ok[0])!.uci, t.fen);
+      const after = await yourTurn(page, 90_000);
+      const sc = await page.evaluate(() => (window as any).match.boss.powers.stranger?.scorch ?? null);
+      expect(sc?.at).toBe(pick.turn);
+      const b = sc.burnt.find((x: { square: string }) => x.square === target);
+      if (move && target && b?.piece && !b.spared) {
+        expect(new Chess(after.fen).get(target as any)?.color ?? null).not.toBe("w");
+        burnt = true;
+      }
+    } else await moveBut(page, t, null);
+  }
+  expect([...kinds].sort()).toEqual(["fire", "ice"]);
+  expect(burnt, "a marked piece of yours burnt").toBe(true);
+  const rec = await page.evaluate(() => (window as any).__storm as { scene: number[]; outside: string[]; ring: number; burn: number; docks: string[]; wide: number[] });
+  expect(rec.wide, "no sideways scroll while the storm's ring shows").toEqual([]);
+  expect(rec.burn, "the burn drawn as his thinking began").toBeGreaterThan(5);
+  // (Both kinds' words seen, after his name as each turn began and through your turn.)
+  expect(rec.docks.length).toBeGreaterThanOrEqual(4);
+  expect(rec.docks.filter((d) => d.includes("[cut]"))).toEqual([]);
+  // The scene: 10 to 12 s from his leap (its banner's second before it), every frame of him whole on screen.
+  const ms = rec.scene.at(-1)! - rec.scene[0]!;
+  expect(ms).toBeGreaterThan(10_500);
+  expect(ms).toBeLessThan(13_500);
+  expect(rec.outside).toEqual([]);
+  expect(rec.ring).toBeGreaterThan(60);
   expect(errors).toEqual([]);
 });
 

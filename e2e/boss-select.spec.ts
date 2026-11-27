@@ -1,7 +1,12 @@
 import { expect, type Page } from "@playwright/test";
 import { adminFirstBosses, playableBosses, unlockBosses } from "@chessroyale/core";
 import { asAdmin, named, openBossRaid, openSoloBoss, test } from "./helpers.ts";
-import { SAY_AT, SAY_AT_DEFAULT } from "../packages/app/src/characters/boss-select.ts";
+import { SAY_AT, SAY_AT_DEFAULT, rowSizes } from "../packages/app/src/characters/boss-select.ts";
+/** A guest's tiles, counted from the roster: the bosses you can meet, each boss unlocked by a win (his card: the Stranger, Nov 27), the
+ * Hidden Boss's tile and "?". (Hard numbers here broke when he went live: 16 then 17.) */
+const GUEST_TILES = playableBosses().length + unlockBosses().length + 2;
+/** A computer's two rows (the first the longer: BossSelect's `--bs-two`), a phone's rows of six. */
+const twoRows = (n: number) => [Math.ceil(n / 2), Math.floor(n / 2)];
 
 /**
  * The Boss raid screen as an old-school character select (Eric, Oct 16; docs/decisions/2026-10-16-boss-character-select.md):
@@ -36,15 +41,16 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await page.goto("/?mode=raid");
   await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
-  // Fourteen bosses you can meet (Folio the last), the Hidden Boss's tile, then "?".
-  await expect(tiles).toHaveCount(16);
+  // The bosses you can meet (Folio the last), the Stranger's card, the Hidden Boss's tile, then "?".
+  await expect(tiles).toHaveCount(GUEST_TILES);
   await expect(tiles.last()).toHaveAccessibleName("Random boss");
   await expect(tiles.nth(9)).toHaveAccessibleName("Smudgy");
   await expect(tiles.nth(10)).toHaveAccessibleName("Moo & Moon");
   await expect(tiles.nth(11)).toHaveAccessibleName("Puddles");
   await expect(tiles.nth(12)).toHaveAccessibleName("Babur");
   await expect(tiles.nth(13)).toHaveAccessibleName("Folio");
-  await expect(tiles.nth(14)).toHaveAccessibleName("Locked boss");
+  await expect(tiles.nth(14)).toHaveAccessibleName(/^Locked boss: The Stranger\./);
+  await expect(tiles.nth(15)).toHaveAccessibleName("Locked boss");
 
   // Boingo: his idle on the stage, his name and strength, his pie's splat once, one of his lines in his bubble.
   await tile(page, "Boingo the Clown").click();
@@ -246,7 +252,7 @@ test("a resting boss has no tile, and a pick of it reads as a random boss", asyn
   await page.addInitScript(() => localStorage.setItem("brc.bossId", "clown"));
   await page.goto("/?mode=raid");
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
-  await expect(tiles).toHaveCount(15);
+  await expect(tiles).toHaveCount(GUEST_TILES - 1);
   await expect(tile(page, "Boingo the Clown")).toHaveCount(0);
   await expect(tile(page, "Random boss")).toHaveAttribute("aria-checked", "true");
   await expect(page.locator(".bs-name")).toHaveText("Random boss");
@@ -418,20 +424,20 @@ test("on a computer the pawn and the picked boss stand bigger on the stage, as t
 });
 
 for (const scheme of ["light", "dark"] as const) {
-  test(`the grid, ${scheme}: square slanted tiles all the same size with a small gap, six to a row on a phone (a short row centered), two rows of eight across a computer's column (Eric, Nov 2), edge to edge, bigger than before, 44 px targets, each filled by its boss's figure, nothing sideways`, async ({ page }) => {
+  test(`the grid, ${scheme}: square slanted tiles all the same size with a small gap, six to a row on a phone (a short row centered), two rows across a computer's column (Eric, Nov 2), edge to edge, bigger than before, 44 px targets, each filled by its boss's figure, nothing sideways`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     for (const [w, h] of SIZES()) {
       const at = `${scheme} ${w}x${h}`;
       await page.setViewportSize({ width: w!, height: h! });
       await page.goto("/?mode=raid");
       await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
-      await expect(page.locator(".bs-tile")).toHaveCount(16);
+      await expect(page.locator(".bs-tile")).toHaveCount(GUEST_TILES);
       await page.evaluate(() => document.fonts.ready);
       const g = await page.evaluate(measureGrid);
 
-      // Six to a row on a phone: 6, 6 and 4, the "?" in the last (sixteen tiles). On a computer's wide column, two rows of eight
-      // (Eric, Nov 2; docs/decisions/2026-11-02-boss-select-rows.md); the narrower window keeps six a row (Nov 12).
-      expect(g.rows.map((r) => r.tiles.length), at).toEqual(desktop() && w! >= 1280 ? [8, 8] : [6, 6, 4]);
+      // Six to a row on a phone, the "?" in the last. On a computer's wide column, two rows, the first the longer (Eric, Nov 2: two
+      // rows of eight with sixteen tiles; docs/decisions/2026-11-02-boss-select-rows.md); the narrower window keeps six a row (Nov 12).
+      expect(g.rows.map((r) => r.tiles.length), at).toEqual(desktop() && w! >= 1280 ? twoRows(GUEST_TILES) : rowSizes(GUEST_TILES, 6));
       const tiles = g.rows.flatMap((r) => r.tiles);
       const t0 = tiles[0]!;
 
@@ -512,10 +518,12 @@ for (const scheme of ["light", "dark"] as const) {
         expect(a.x, `${at} ${t.name}: figure to the left edge`).toBeLessThanOrEqual(t.inner.x + 0.5);
         expect(a.r, `${at} ${t.name}: figure to the right edge`).toBeGreaterThanOrEqual(t.inner.r - 0.5);
         expect(a.b, `${at} ${t.name}: figure on past the foot`).toBeGreaterThanOrEqual(t.inner.b - 0.5);
-        if (t.name !== "Locked boss") fills.add(t.fill);
+        // (A locked card is dark, the Hidden Boss's and a boss's still to win alike: its color shows once won.)
+        if (t.name.startsWith("Locked boss")) expect(t.fill, `${at} ${t.name}: dark while locked`).toBe("none");
+        else fills.add(t.fill);
       }
-      // A color of its own for each boss with a character (the Hidden Boss's is dark, "?" plain): fourteen, no two the same.
-      expect(fills.size, `${at}: a color each`).toBe(14);
+      // A color of its own for each boss you can meet, no two the same (counted from the roster, as GUEST_TILES is).
+      expect(fills.size, `${at}: a color each`).toBe(playableBosses().length);
 
       // Nothing spills past a tile's shape: the gaps are empty, art and all (on either side of each slanted edge, and between the rows).
       const gap = gaps[0]!;
@@ -539,7 +547,7 @@ test("every tile can be tapped, in its middle and either side of a gap; a press 
     const at = `${w}x${h}`;
     await page.setViewportSize({ width: w!, height: h! });
     await page.goto("/?mode=raid");
-    await expect(page.locator(".bs-tile")).toHaveCount(16);
+    await expect(page.locator(".bs-tile")).toHaveCount(GUEST_TILES);
     const g = await page.evaluate(measureGrid);
     const slant = g.rows[0]!.tiles[0]!.slant;
     const names = g.rows.flatMap((r) => r.tiles.map((t) => t.name));
@@ -642,18 +650,18 @@ test("on a computer the tiles go in two rows across the middle column, and START
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
   await openSoloBoss(page);
-  // Two rows of eight (the first eight tiles the first row): the rows fill the column with the same 10 px buffer as a phone's, and START is in the window.
-  expect(await tileLines(page)).toEqual([8, 8]);
+  // Two rows, the first the longer: the rows fill the column with the same 10 px buffer as a phone's, and START is in the window.
+  expect(await tileLines(page)).toEqual(twoRows(GUEST_TILES));
   const column = (await page.locator(".rd-page").boundingBox())!;
-  const rowEnd = (await page.locator(".bs-tile").nth(7).boundingBox())!;
+  const rowEnd = (await page.locator(".bs-tile").nth(twoRows(GUEST_TILES)[0]! - 1).boundingBox())!;
   const buffer = rowEnd.x + rowEnd.width - (column.x + column.width);
   expect(buffer, "right buffer").toBeGreaterThanOrEqual(-12);
   expect(buffer, "right buffer").toBeLessThanOrEqual(-8);
   const start = (await page.locator(".bs-start").boundingBox())!;
   expect(start.y + start.height, "START in the window at 1280 x 800").toBeLessThanOrEqual(800);
-  // A narrower window: six a row (Nov 12, Eric: six a row; was five), the sixteen as 6, 6 and 4.
+  // A narrower window: six a row (Nov 12, Eric: six a row; was five).
   await page.setViewportSize({ width: 1100, height: 800 });
-  expect(await tileLines(page)).toEqual([6, 6, 4]);
+  expect(await tileLines(page)).toEqual(rowSizes(GUEST_TILES, 6));
 });
 
 test("home's Boss Battle card: a still portrait that moves on to the next boss you can meet, never the Hidden Boss, the card never changing size", async ({ page }) => {

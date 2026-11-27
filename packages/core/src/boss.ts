@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze" | "sawswap" | "pawnbounce" | "train" | "fall" | "frostfire" | "strangerult";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze" | "sawswap" | "pawnbounce" | "train" | "fall" | "frostfire" | "storm";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -103,7 +103,7 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * Birdie's ?power=train brings his train's warning as every crowd turn begins from the second (no cooldown); ?power=fall brings his
  * fall at the start of his turn after the crowd's second move (the warning's train first, if it rides then).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap", "pawnbounce", "train", "fall", "frostfire", "strangerult"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap", "pawnbounce", "train", "fall", "frostfire", "storm"];
 /**
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
  * fake move a few seconds into the first move it can come on), his lying-down clock tap from the first move (`clocktap`) and his
@@ -293,11 +293,10 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "birdie", name: "Birdie", icon: "🐦", kit: "Birdie", offset: -250, powers: { passive: "train", ultimate: "fall" } },
   // The Stranger (working id "stranger"; Eric, Nov 27; his rules: bosses/stranger.ts; docs/decisions/2026-11-27-stranger-rules.md): his
   // Frostfire strike every few of his turns (the crowd's most valuable piece but the king frozen for your next turn, thawed the turn
-  // after, your one chance to move it off; then the tile burns whatever is on it, never a king); his ultimate is Eric's, still to come
-  // (`strangerult`: a placeholder that never fires). Unlocked by beating him on a Battle Tower floor (`unlock`: BATTLE_TOWER.bossFloors,
-  // 10, 30 and 50, his alone); no building in town. Admins first (BOSS_ADMIN_FIRST) until Eric's ult lands: for anyone else his floors
-  // deal as any other and his card isn't shown (unlockReady); a test server (TEST_SWITCHES, `?wip=1`) meets him as an admin does.
-  { id: "stranger", name: "The Stranger", icon: "⚔️", kit: "Stranger", offset: -250, powers: { passive: "frostfire", ultimate: "strangerult" }, unlock: "tower" },
+  // after, your one chance to move it off; then the tile burns whatever is on it, never a king); his ultimate, the Storm of Two Worlds
+  // (Eric, Nov 27; `storm`, up to twice a battle): three of your turns, Ice and Fire by turns, the engine leaving you a good move each.
+  // Unlocked by beating him on a Battle Tower floor (`unlock`: BATTLE_TOWER.bossFloors, 10, 30 and 50, his alone); no building in town.
+  { id: "stranger", name: "The Stranger", icon: "⚔️", kit: "Stranger", offset: -250, powers: { passive: "frostfire", ultimate: "storm" }, unlock: "tower" },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -949,7 +948,20 @@ export interface StrangerState {
   next: number;
   strike: { turn: number; square: string; piece: string; frozenUntil: number; burnAt: number } | null;
   burn?: { at: number; square: string; piece?: string; side?: "w" | "b"; spared?: true } | null;
+  /** His Storm of Two Worlds under way: its first crowd turn (its turns `at` to `at + stormTurns - 1`) and the kind it began with. */
+  storm?: { at: number; first: StormKind } | null;
+  /**
+   * The storm's pick for crowd turn `turn`, made with his move before it (the engine's, checked: stormCheck): `squares`, the crowd's
+   * pieces frozen (ice) or the squares marked (fire); `free`, the ice's free pieces (the king's never frozen either); `mild`, the
+   * fairness check's milder pick; `calm`, no answer (no engine): nothing frozen or marked that turn.
+   */
+  pick?: { turn: number; kind: StormKind; squares: string[]; free?: string[]; mild?: true; calm?: true } | null;
+  /** A fire turn's burn, after crowd move `at`: each marked square's outcome (`piece`, `side` burnt; `spared`; neither: empty). */
+  scorch?: { at: number; burnt: { square: string; piece?: string; side?: "w" | "b"; spared?: true }[] } | null;
 }
+
+/** A turn of the Stranger's storm: Fire (marked squares burn after your move) or Ice (all your pieces but the king and two frozen). */
+export type StormKind = "fire" | "ice";
 
 export interface MooState {
   moves: number;
@@ -1936,6 +1948,13 @@ export type PowerEventKind =
   // any, `fizzled` [the square] when the piece there was spared: a king, or a loss no game can have).
   | "frostfire"
   | "frostfireBurn"
+  // His Storm of Two Worlds (Nov 27): its opening scene as its first turn begins (`storm`); each of its turns as it begins, after his
+  // move (`stormIce`: `squares` the pieces frozen; `stormFire`: `squares` the marked squares); a fire turn's burn as your move lands,
+  // the start of his turn (`stormBurn`: `squares` the marks, `fizzled` those that spared a piece).
+  | "storm"
+  | "stormIce"
+  | "stormFire"
+  | "stormBurn"
   // His finisher (Nov 27, Eric: "he jumps down and does either like a flame strike ... or a literal strike with a sword"): as his move
   // that takes a piece of yours that isn't a pawn is about to show (`square` the piece, `shape` its kind, `pick` which finisher, from
   // the seed, `move` the held move itself: his piece takes the square as the finisher kills it; Eric, Nov 27), while he still thinks; the

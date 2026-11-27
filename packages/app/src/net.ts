@@ -40,7 +40,9 @@ import {
   waterAnswer,
   hoopsAnswer,
   creaseAnswer,
+  stormAnswer,
   type CreaseAsk,
+  type StormAsk,
   type HoopsAsk,
   applyMove,
   type BalloonAsk,
@@ -977,7 +979,7 @@ export class NetMatch implements GameView {
         if (m.water) return void this.hostPick(m.key, async (engines) => (await waterAnswer(engines, m.fen, m.water!, !!m.waterAny)).answer);
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null, !!m.check, !!m.share, m.lock ?? null);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null, !!m.check, !!m.share, m.lock ?? null, m.storm ?? null);
       case "recluseCutscene":
         return this.phase2.onCutscene(m.at, m.until);
       case "phase2":
@@ -1103,10 +1105,11 @@ export class NetMatch implements GameView {
    * move, then the cast on the position after it (hoopsAnswer: its blocks go with the move as `hoops`). `balloon` (his
    * balloon is due at the end of this turn): where it lands after the move and the cast goes with it (landFrom, outside
    * the hoops), the same whether it will pop or not. `crease` (Folio's Crease is wanted with this move): its line on the
-   * position after the move goes with it (creaseAnswer). `check` (BOSS_CHECK): this device checks the host's move, so a phone
+   * position after the move goes with it (creaseAnswer). `storm` (a turn of the Stranger's storm comes after this move): its pick on the
+   * position after the move goes with it (stormAnswer). `check` (BOSS_CHECK): this device checks the host's move, so a phone
    * doesn't download Maia for it. `share`: the bridge band's share, drawn by the lobby (Stockfish's move, no brain).
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null, crease: CreaseAsk | null = null, draw: number | null = null, check = false, share = false, lock: string[] | null = null) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null, crease: CreaseAsk | null = null, draw: number | null = null, check = false, share = false, lock: string[] | null = null, storm: StormAsk | null = null) {
     try {
       const engines = await this.engines();
       const [engine] = engines;
@@ -1137,7 +1140,9 @@ export class NetMatch implements GameView {
       const lines = beam && !funhouse ? await beamLines(engine!, fen, move, beam) : null;
       const end = (balloon || hoops) && !funhouse ? await (async () => hoopsAnswer(engines, applyMove(fen, move), hoops, balloon))().catch(() => null) : null;
       const line = crease && !funhouse ? await (async () => creaseAnswer(engines, applyMove(fen, move), crease))().catch(() => "") : "";
-      this.send({ t: "bossMove", key, move, ...(lines ? { beam: lines } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}), ...(line ? { crease: line } : {}), ...(brain && !funhouse ? { by } : {}) });
+      // (The Stranger's storm: its next turn's pick on the position after his move, on this device's engines.)
+      const gust = storm && !funhouse ? await (async () => stormAnswer(engines, applyMove(fen, move), storm))().catch(() => "") : "";
+      this.send({ t: "bossMove", key, move, ...(lines ? { beam: lines } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}), ...(line ? { crease: line } : {}), ...(gust ? { storm: gust } : {}), ...(brain && !funhouse ? { by } : {}) });
       this.emit();
     } catch {
       // No engine here: the server asks someone else, or plays a random move.

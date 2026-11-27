@@ -22,6 +22,7 @@
  */
 import { lazyAnimsTogether, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import type { SoundName } from "../sound.ts";
+import { STORM_SCENE } from "@chessroyale/chess";
 
 const lazyAnim = lazyAnimsTogether();
 
@@ -988,6 +989,50 @@ export const POSES = {
     mouth: "flat",
     head: [-1, 0],
   },
+  // His storm's opening scene (Eric, Nov 27: "takes both of his swords out, and slams them both into the chessboard"): both raised high,
+  // their points down; the fire sword driven into the board, then the ice sword (planted: a blade stops at the ground line); his hands on
+  // both hilts, down on a knee, as the storm charges.
+  raiseDown: {
+    ...REST,
+    armF: [[40, 50], [32, 36]],
+    armI: [[88, 50], [96, 36]],
+    swordF: held([32, 36], 160),
+    swordI: held([96, 36], 200),
+    eyes: "narrow",
+    mouth: "grit",
+  },
+  plantF: {
+    ...REST,
+    armF: [[46, 74], [52, 92]],
+    armI: [[88, 50], [96, 36]],
+    swordF: held([52, 92], 178),
+    swordI: held([96, 36], 200),
+    eyes: "narrow",
+    mouth: "grit",
+    head: [0, 1],
+    kneel: 0.4,
+  },
+  plantBoth: {
+    ...REST,
+    armF: [[46, 76], [52, 92]],
+    armI: [[82, 76], [76, 92]],
+    swordF: held([52, 92], 178),
+    swordI: held([76, 92], -178),
+    eyes: "narrow",
+    mouth: "grit",
+    head: [0, 1],
+    kneel: 0.7,
+  },
+  grip: {
+    ...REST,
+    armF: [[46, 74], [52, 90]],
+    armI: [[82, 74], [76, 90]],
+    swordF: held([52, 90], 178),
+    swordI: held([76, 90], -178),
+    eyes: "wide",
+    mouth: "open",
+    kneel: 0.7,
+  },
   // Won: one sword raised (fire), the other held low, a smirk.
   triumph: {
     ...REST,
@@ -1214,6 +1259,30 @@ const finFrames: Record<"flame" | "ice" | "cut" | "frostfire", () => Frame[]> = 
   frostfire: () => [...drawFrames(), F("aimTips", 0, { ms: 200, cue: "shout", aura: 2 }), ...castFrames().slice(1), ...hold("ready", 700), ...sheatheFrames()],
 };
 
+/**
+ * His storm's opening scene, by its beats (STORM_SCENE, ms from his leap; components/Stranger.tsx plays each from its start): `stormPlant`
+ * from his landing (STRANGER_HOP.ms): the draw, both raised points down, the fire sword slammed in at fireAt (`slam`), the ice sword at
+ * iceAt (`slam`), held there; `stormCharge` from gripAt, looping: his grip on both hilts, his aura flared, shaking harder as it builds;
+ * `stormPull` from pullAt: both pulled out, then sheathed.
+ */
+const stormPlantFrames = (): Frame[] => {
+  const start = STRANGER_HOP.ms;
+  const drawn = drawFrames();
+  const drawMs = drawn.reduce((t, f) => t + f.ms, 0);
+  const slam = 90;
+  return [
+    ...drawn,
+    F("raiseDown", 0, { ms: Math.max(100, STORM_SCENE.fireAt - start - drawMs), cue: "shout", aura: 2 }),
+    F("plantF", 1, { ms: slam, cue: "slam", aura: 2, shake: [0, 2] }),
+    ...hold("plantF", STORM_SCENE.iceAt - STORM_SCENE.fireAt - slam),
+    F("plantBoth", 2, { ms: slam, cue: "slam", aura: 2, shake: [0, 2] }),
+    ...hold("plantBoth", STORM_SCENE.gripAt - STORM_SCENE.iceAt - slam),
+  ];
+};
+const SHAKES: readonly (readonly [number, number])[] = [[1, 0], [-1, 1], [1, -1], [-1, 0]];
+const stormChargeLoop = (): Anim => ({ loop: true, frames: [0, 1, 2, 3].map((i) => F({ ...POSES.grip, bob: i % 2 }, i, { ms: 110, aura: 2, shake: SHAKES[i]! })) });
+const stormPullFrames = (): Frame[] => [F("pull", 0, { ms: 160, cue: "draw", aura: 2 }), F("ready", 1, { ms: 200, aura: 2 }), ...sheatheFrames()];
+
 export const STRANGER_ANIMS: Record<string, Anim> = {
   idle: lazyAnim(idle),
   // Thinking: his idle, his eyes narrowed.
@@ -1245,6 +1314,10 @@ export const STRANGER_ANIMS: Record<string, Anim> = {
   fin_ice: lazyAnim(() => ({ loop: false, frames: finFrames.ice() })),
   fin_cut: lazyAnim(() => ({ loop: false, frames: finFrames.cut() })),
   fin_frostfire: lazyAnim(() => ({ loop: false, frames: finFrames.frostfire() })),
+  // His storm's opening scene on the board (by its beats: stormPlantFrames).
+  stormPlant: lazyAnim(() => ({ loop: false, frames: stormPlantFrames() })),
+  stormCharge: lazyAnim(stormChargeLoop),
+  stormPull: lazyAnim(() => ({ loop: false, frames: stormPullFrames() })),
   // From his rest: draw, the twin-tip cast, sheathe (his power's wind-up, wired by his rules).
   castFull: lazyAnim(() => ({ loop: false, frames: [...drawFrames(), ...castFrames(), ...sheatheFrames()] })),
   hit: lazyAnim(() => ({
@@ -1321,4 +1394,6 @@ export const STRANGER_SOUNDS: Record<string, SoundName> = {
   freeze: "strangerFreeze",
   burn: "strangerBurn",
   shatter: "strangerShatter",
+  // (His swords slammed into the board, the storm's opening: his own landing's thud.)
+  slam: "strangerKneel",
 };

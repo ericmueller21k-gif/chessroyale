@@ -140,6 +140,8 @@ import {
   chandyBattle,
   CHANDY_FX,
   strangerBattle,
+  stormAnswer,
+  type StormAsk,
   dodgeWon,
   mateHeld,
   trainSquare,
@@ -1521,13 +1523,16 @@ export class MatchRunner {
     const hoops = this.hoopsAsk();
     // (Folio's Crease, wanted with this move: its line on the position after it, on this device's engines, as the host's.)
     const crease = this.creaseAsk();
+    // (The Stranger's storm: its next turn's pick on the position after this move, on this device's engines, as the host's.)
+    const storm = this.stormAsk();
     const move = await ordinary();
     const end = balloon || hoops ? await this.tigerTurnEnd(fen, move, hoops, balloon, engine) : {};
     const line = crease ? await creasePick(this.opts.engines.length ? this.opts.engines : [engine], applyMove(fen, move), crease).catch(() => null) : null;
+    const gust = storm ? await stormAnswer(this.opts.engines.length ? this.opts.engines : [engine], applyMove(fen, move), storm).catch(() => "") : null;
     // (A moment that plays with his move known, before it shows: a taught capture's lock, Chandy's. Solo shows it and waits; the sims don't.)
     const holdMs = this.bossMoveMoment(move);
     if (holdMs && beforeShow) await beforeShow(holdMs);
-    this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...end, ...(crease ? { crease: line?.line ?? null, creaseLoss: line?.loss ?? null } : {}) });
+    this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...end, ...(crease ? { crease: line?.line ?? null, creaseLoss: line?.loss ?? null } : {}), ...(storm ? { storm: gust } : {}) });
     return move;
   }
 
@@ -1676,6 +1681,11 @@ export class MatchRunner {
   /** Folio's Crease is wanted with the boss's move now: what the host's engines need to pick its line after it, or null. */
   creaseAsk(): CreaseAsk | null {
     return folioBattle.creaseAsk(this.battle);
+  }
+
+  /** The Stranger's storm turn comes next: what the host's engines need to pick it after his move now (stormPick), or null. */
+  stormAsk(): StormAsk | null {
+    return strangerBattle.stormAsk(this.battle);
   }
 
   /**
