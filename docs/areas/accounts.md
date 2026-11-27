@@ -150,6 +150,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 - **Names** pass the server's name filter (slurs and hate: [chat.md](chat.md), "Moderation"): a profile can't take
   such a name, and a lobby or Squads seat asked for with one is "Player N". A moderator can reset a name and icon from
   the player's page on fair play's review page. A lobby seat takes its account's name as the player joins.
+  **"HunChess" in a name is staff's only** (Eric, Nov 27; `isReservedName`, read as the filter reads names): a non-admin's
+  profile change to it is refused, a new guest under it is "Player", a non-admin's lobby seat under it is "Player N". Admins keep it.
 - **Download my data and Delete account** (Settings → ACCOUNT, for guests too;
   [docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md](../decisions/2026-10-15-delete-my-account-and-download-my-data.md)):
   - **The download:** GET `/api/me/data` answers a JSON file of everything kept about the account (every store's rows,

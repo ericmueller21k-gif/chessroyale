@@ -279,10 +279,23 @@ export function chatRefusal(text: string): string | null {
  * The name a device asks to sit under in a lobby or a Squads party: spaces tidied, at most 16 characters, else
  * `fallback` ("Player N") when it's empty or the filter refuses it.
  */
-export function seatName(name: unknown, fallback: string): string {
+export function seatName(name: unknown, fallback: string, admin = true): string {
   const typed = (typeof name === "string" ? name : "").replace(/\s+/g, " ").trim().slice(0, 16);
-  return typed && !isBlockedText(typed) ? typed : fallback;
+  // (`admin` false: a device-typed name from someone known not to be staff, so "HunChess" in it is refused too: isReservedName.)
+  return typed && !isBlockedText(typed) && (admin || !isReservedName(typed)) ? typed : fallback;
 }
+
+/**
+ * A name only HunChess staff may use (Eric, Nov 27: "hunchess is not allowed in your name anywhere, only I can have that or an admin
+ * tagged account"): "HunChess" anywhere in it, read as the filter reads names (case, accents, look-alikes, leetspeak, spaces and
+ * symbols folded: "Hun Chess", "hunch3ss", "HUN_CHESS" all count).
+ */
+export function isReservedName(text: string): boolean {
+  if (typeof text !== "string" || !text) return false;
+  return letters(base(text.slice(0, MAX))).includes("hunchess");
+}
+/** What a profile hears when it asks for a name only HunChess staff may use. */
+export const NAME_RESERVED = "Only HunChess staff can use HunChess in a name. Pick another one.";
 
 /** What a profile hears when the name it asked for is refused. */
 export const NAME_NOT_ALLOWED = "That name isn't allowed. Pick another one.";

@@ -267,6 +267,15 @@ describe("account API", () => {
     expect((await call(env, "/api/me", { cookie: me.cookie })).body.user.pawn).toBe("black");
   });
 
+  it("HunChess in a name is staff's only (Eric, Nov 27): a guest made with it is Player; a player's PATCH to it is a 400; an admin's goes", async () => {
+    const env = { DB: memoryD1(), ADMIN_EMAILS: "boss@example.com" };
+    expect((await call(env, "/api/me?name=Hun%20Chess")).body.user.name).toBe("Player");
+    const me = await call(env, "/api/me?name=Painter");
+    const bad = await call(env, "/api/me", { method: "PATCH", body: JSON.stringify({ name: "HunChess" }), cookie: me.cookie });
+    expect(bad.res.status).toBe(400);
+    expect((await call(env, "/api/me", { cookie: me.cookie })).body.user.name).toBe("Painter");
+  });
+
   describe("POST /api/results: a solo game's XP (review of #569, Nov 9)", () => {
     const T = Date.UTC(2026, 10, 9, 12, 0);
     afterEach(() => {
