@@ -23,3 +23,9 @@ and Edge's own efficiency mode on battery (say how to tell from the report, e.g.
    busy) so the next report tells them apart. Keep it cheap.
 4. `@perf` town specs before/after (`npx playwright test --grep @perf --project phone`). Decision note (short), the area page.
 `.pr-body.md` (lane: targeted; changed checks), `.done`. Read rules-common.md first. Commits end only with the Claude-Session line.
+
+**Eric (~08:20): "its not the residents lol, if thats the case the game is dead, imagine 50+ users on".** The bar: the town stays smooth
+with 50+ other players present (moving, chatting). Whatever the gaps turn out to be, prove that bar: a town perf check (`@perf`, in the
+existing town perf spec) with 50+ simulated others sending presence and chat at a busy rate, its frame budget the same as today's.
+If presence or chat handling costs anything per message on the main thread, that's ours to fix (batching, no per-message allocation or
+re-render), not a reason.
