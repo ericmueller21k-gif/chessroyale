@@ -1262,8 +1262,12 @@ export const BOSS_KITS: Record<string, BossKit> = {
 export const ART_KITS: Readonly<Record<string, BossKit>> = {
   // The Stranger (docs/decisions/2026-11-27-stranger-art.md): the fire-and-ice swordsman, his swords on his back at rest, drawn for a
   // capture, a check or his strike (draw, the double slash, sheathe) and for his power (draw, the twin-tip cast, sheathe). His sounds are
-  // his own (stranger-sounds.ts); his lines are placeholders for Eric. His bar's fit (barScale...) is measured when he joins the roster.
+  // his own (stranger-sounds.ts); his lines are placeholders for Eric.
   Stranger: {
+    // (His phone bar's fit, measured with packages/app/test/bar-fit.ts's barFit over his rest frames; re-measure with scripts/bar-fit.ts
+    // once he's in the roster.)
+    barScale: 0.79,
+    barShift: 1,
     ch: STRANGER,
     anims: {
       entrance: "nod",

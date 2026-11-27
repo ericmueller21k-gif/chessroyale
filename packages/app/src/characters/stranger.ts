@@ -683,6 +683,8 @@ function paintFigure(c: Cv, p: StrangerPose, phase: number): void {
     if (h === "back") return;
     const sw = cvs();
     paintSword(sw, kind, h.at, h.deg, phase);
+    // (A blade never goes under the ground: a sword planted in it stops at the ground line.)
+    for (let y = GROUND; y < STRANGER_H; y++) sw[y]!.fill(".");
     lay(c, sw);
   };
   // (A sword held pointing down sits under its arm; one held up sits over it.)
@@ -801,10 +803,10 @@ export const POSES = {
   },
   ready: {
     ...REST,
-    armF: [[42, 70], [38, 82]],
-    armI: [[86, 70], [90, 82]],
-    swordF: held([38, 82], -150),
-    swordI: held([90, 82], 150),
+    armF: [[43, 70], [41, 83]],
+    armI: [[85, 70], [87, 83]],
+    swordF: held([41, 83], -168),
+    swordI: held([87, 83], 168),
     mouth: "smirk",
   },
   // The double slash: both raised high and back, then down across in an X (his arms crossed), then the follow-through.
@@ -852,7 +854,18 @@ export const POSES = {
   // Rattled: his eyes wide, a hand at his brow.
   rattled: { ...REST, armF: [[44, 64], [56, 42]], eyes: "wide", mouth: "open", head: [-1, 0] },
   // Beaten: down on one knee, his head bowed.
-  kneel: { ...REST, armF: [[46, 80], [52, 92]], armI: [[84, 80], [80, 94]], eyes: "shut", mouth: "flat", head: [0, 2], kneel: 1 },
+  // (Both swords planted in the ground before him, his hands on their hilts: he leans on them.)
+  kneel: {
+    ...REST,
+    armF: [[46, 80], [50, 90]],
+    armI: [[82, 80], [78, 90]],
+    swordF: held([50, 90], 176),
+    swordI: held([78, 90], -176),
+    eyes: "shut",
+    mouth: "flat",
+    head: [0, 2],
+    kneel: 1,
+  },
   // Won: one sword raised (fire), the other held low, a smirk.
   triumph: {
     ...REST,
@@ -1000,7 +1013,7 @@ export const STRANGER_ANIMS: Record<string, Anim> = {
     loop: false,
     frames: [
       F("flinch", 0, { ms: 160, cue: "fall", aura: 0.5 }),
-      F({ ...POSES.kneel, kneel: 0.5, eyes: "shut", head: [0, 1] }, 1, { ms: 160, aura: 0.5 }),
+      F({ ...POSES.kneel, kneel: 0.5, eyes: "shut", head: [0, 1], swordF: "back", swordI: "back", armF: ARMS.hangF, armI: ARMS.hangI }, 1, { ms: 160, aura: 0.5 }),
       F(POSES.kneel, 2, { ms: 300, cue: "kneel", aura: 0, shake: [0, 1] }),
       F(POSES.kneel, 3, { ms: 400, aura: 0 }),
     ],

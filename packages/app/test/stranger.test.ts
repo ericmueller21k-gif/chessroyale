@@ -38,7 +38,7 @@ describe("the Stranger's art", () => {
   });
 
   it("keeps his swords on his back at rest and draws them for every move (Eric: 'keeps them put away most of the time')", () => {
-    for (const p of [POSES.rest, POSES.flinch, POSES.rattled, POSES.kneel]) expect([p.swordF, p.swordI]).toEqual(["back", "back"]);
+    for (const p of [POSES.rest, POSES.flinch, POSES.rattled]) expect([p.swordF, p.swordI]).toEqual(["back", "back"]);
     for (const name of ["strike", "castFull"]) {
       const a = STRANGER.anims[name]!;
       // (Drawn at the start, home again at the end.)
