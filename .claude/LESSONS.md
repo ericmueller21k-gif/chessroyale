@@ -475,3 +475,9 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A passive's test switch (`?power=<passive>`) makes its condition certain from its start, whatever the engine plays: a fixed start
     position where needed (BALLOON_TEST_MOVES, REPAINT_TEST_MOVES), proved over every reply in a unit test. A crowd line in the smoke
     that bets on the engine's choice (SMOKE_FIRST) is a patch, not the fix.
+
+- **The town that never went away** (Nov 27, [story](../docs/history/lessons.md#the-town-that-never-went-away-nov-27-2026)):
+  - A screen's test hooks go on and off together (`setHooks`, window-hooks.ts); a hook taken off by hand is one forgotten.
+  - No JSX at module level: Preact writes each vnode's place into it, so a constant vnode keeps the last screen it showed in alive.
+  - A screen that holds big pictures lets go of its refs as it closes; a heavy flow (a battle and back) gets a memory number on a
+    slowed phone (`e2e/mem-probe.js`, the tower's @perf test), and a leak is found by its retaining path, not by guessing.
