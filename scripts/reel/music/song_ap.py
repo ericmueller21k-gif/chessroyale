@@ -1,7 +1,7 @@
 """Song AP (Eric, Nov 27): a gothic one, and the first hybrid: a loop of 2:40. A console's chips for the band (drums,
-bass, guitars, the lead) and real recorded voices and instruments on top (a choir, strings, a flute, an oboe, a
-violin, a bell), played from this file's notes through a sampled sound bank (sampled.py: FluidSynth and
-FluidR3_GM, MIT license). Every other song here is computed sample by sample; this one says so because it isn't.
+bass, guitars, the lead, a fast pattern) and, on top, voices and instruments played from this file's notes through a
+sampled sound bank (sampled.py: FluidSynth and FluidR3_GM, MIT license): a voice, strings, a flute, an oboe, a
+violin, a bell. Every other song here is computed sample by sample; this one says so because it isn't.
 
 Eric: "trying to work with Gemini to help me come up with a song, but have you produce it ... our normal time length
 ... 2 minutes, 45 seconds ... Let's try to like do a hybrid approach here where we use chiptune, but we can add in
@@ -14,30 +14,38 @@ What is used and what isn't. The plan carries the reference's own tempo, key and
 for the soprano that may be the reference's too, so by the standing rule (SOUNDS.md: a write-up made from another
 track gives a style, never its chords, riffs or tune) they are not used: not D harmonic minor, not its two chord
 loops or its eight-chord climax, not its named notes. Used, the style's means: 168 beats a minute, felt at half that
-until the guitars come; a men's choir on a low drone and a woman's voice alone over it; a filtered breakbeat with
-the voice and the men trading; a swell of choir and strings; distorted guitars in muted 16ths over a kick on every
-16th; a lead guitar's tune; the voice and choir over the full band, the guitars running in thirds while she holds;
-a quiet stretch for flute, oboe and strings; a violin climbing into the last, biggest part; a long stone echo on
-everything recorded. Written here: E minor with its seventh raised; a lament (a chord a bar over a bass sinking by
-half steps from E to B, dipping to A sharp and back) under the tune, the guitars' theme and the climax; a turn round
-the circle of fifths that ends on F, the flat second, for the swell; a bridge that turns from G major to G minor;
-the last part a minor third up, in G minor, its last chord falling back to E minor at the loop. The tune's mark is a
-leap up a minor sixth to a held note.
+until the guitars come; a low drone and a woman's voice alone over it; a filtered breakbeat under the voice; a swell
+of voices and strings; distorted guitars in muted 16ths over a kick on every 16th; a lead guitar's tune; the voice
+over the full band, the guitars running in thirds while she holds; a quiet stretch for flute, oboe and strings; a
+violin climbing into the last, biggest part; a long stone echo on everything recorded. Written here: E minor with
+its seventh raised; a lament (a chord a bar over a bass sinking by half steps from E to B, dipping to A sharp and
+back) under the tune, the guitars' theme and the climax; a turn round the circle of fifths that ends on F, the flat
+second, for the swell; a bridge that turns from G major to G minor; the last part a minor third up, in G minor, its
+last chord falling back to E minor at the loop. The tune's mark is a leap up a minor sixth to a held note.
 
-  0:00  the men's drone (E and B), one bell; from 0:03 the woman's voice alone over it
-  0:17  the breakbeat, filtered and crushed, a throbbing low bass; the voice sings five bars of the tune, the men
-        chant three; three times, a fast chip pattern coming in under the second
-  0:51  the swell: the choir and strings a chord a bar, the voice climbing to a high C held two bars, drum hits
+The first go had the bank's recorded choir: the men on a drone and in chants answering her, the choir's women with
+her line, the full choir's chords. Eric, having also heard the opening with her line on the bank's one-voice sample
+("clip 2"): "I think we use that instrument, pull out the male humming entire from the whole song, replace the
+normal humming with like the clip 2 version ... we're going to revert all to chiptune here ... We might end up
+going back ... 45 to 46 seconds in ... this chiptune beat in the background, and it's really good, but it's getting
+drowned out by the whatever's playing on top of it ... bring that up a bit and then bring down the hymning". So, the
+second go (the default): her line and the chords' upper three notes on the one-voice sample ("Solo Vox"), her line
+3 to 4 dB lower under the breakbeat; no men anywhere (a low held tone where their drone was; the beat and the fast
+pattern alone in the three bars they chanted, the pattern a step forward there); the pattern from the first round
+of the breakbeat, 4 dB up; the breakbeat 1 dB up. The strings, flute, oboe, violin and bell are still the bank's.
+`choir` as the second argument plays the first go's voices (to go back).
+
+  0:00  a low held tone (E and B), one bell; from 0:03 the voice alone
+  0:17  the breakbeat, filtered and crushed, a throbbing low bass, a fast chip pattern; the voice sings five bars of
+        the tune, the beat and the pattern answer for three; three times, the pattern louder each time
+  0:51  the swell: the voice's chords and strings a chord a bar, her line climbing to a high C held two bars, drum hits
   1:14  the guitars: muted 16ths on low E, a kick on every 16th
   1:26  the lead guitar with the tune; the second time, two guitars in harmony
-  1:49  the voice and the full choir over the band; two guitars run in thirds under her long notes
+  1:49  the voice and its chords over the band; two guitars run in thirds under her long notes
   2:11  everything stops: a flute and an oboe over soft strings, G major turning to G minor
   2:23  a violin climbs in 16ths; a drum fill
-  2:29  the last part, a minor third up: the guitars' tune, the voice and choir over it; the last chord rings into
-        the drone
-  python3 song_ap.py <out.wav> [choir|solo] [chip]
-`solo`: the woman's line on the bank's one-voice sample, not its choir's women. `chip`: every voice crushed a little
-(12 kHz, 7 bits) and her line doubled by a soft square wave, his "more chiptune like" layer.
+  2:29  the last part, a minor third up: the guitars' tune, the voice over it; the last chord rings into the loop
+  python3 song_ap.py <out.wav> [choir]
 """
 import itertools
 import sys
@@ -152,9 +160,11 @@ def voicings(chords, shift=0, top=(64, 67, 71), mid=59, floor=99):
     return out
 
 
-def render(voice: str = "choir", chip: bool = False, parts: dict | None = None) -> np.ndarray:
-    """The song (stereo, at the mix's own level). `parts`: a dict to fill with each recorded part as mixed, by name
-    (for measuring)."""
+def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
+    """The song (stereo, at the mix's own level). `voice`: "vox", the second go (her line and the chords on the bank's
+    one-voice sample, no men), or "choir", the first go's recorded choir, men and all. `parts`: a dict to fill with
+    each recorded part as mixed, by name (for measuring)."""
+    men = voice == "choir"
     x = Mix(SECS, BEATS, os=2, seed=1127)
     put, sr = x.put, x.sr
     rng = np.random.default_rng(1127)
@@ -260,17 +270,26 @@ def render(voice: str = "choir", chip: bool = False, parts: dict | None = None) 
         """The lead guitar (the overdriven lead); it slides up into a long note."""
         put("lead2" if second else "lead", b, x.drive(m, d, vol, glide=-1.5 if d >= 2 else 0.0, attack=0.03 if d < 0.5 else 0.06), 0.3 if second else -0.2)
 
-    def sung(b, d, m, vol=0.05):
-        """Her line on a soft square wave too (only in the `chip` version)."""
-        put("vox", b, x.pulse(m, d, 0.25, vol, vib=0.006, attack=0.04, decay=0.3, sustain=0.75, release=0.06))
+    def floor(b, d, m, vol=0.1):
+        """A low held tone, fading in and out: the floor under her voice where the men's drone was."""
+        k = x.k(d)
+        t = np.arange(k) / sr
+        ph = tau * x.hz(m) * t
+        put("sub", b, (np.sin(ph) + 0.3 * np.sin(2 * ph) + 0.12 * np.sin(3 * ph)) * np.minimum(1, t / 1.5) * tail(k, 2.5) * vol)
+
+    if not men:
+        floor(INTRO, 48, 40, 0.12), floor(INTRO, 48, 47, 0.07)
 
     # ---- 0:17 the breakbeat: three rounds of the lament ----
     for r in range(3):
         for bar, (low, names) in enumerate(LAMENT):
             b = BREAK + 32 * r + 4 * bar
             sub(b, 4, low, 0.3)
-            if r:
-                arp(b, pcs(names), 0.018 if r == 1 else 0.026)
+            if men:
+                if r:
+                    arp(b, pcs(names), 0.018 if r == 1 else 0.026)
+            else:  # the pattern from the first round, and forward in the three bars the men had
+                arp(b, pcs(names), (0.014, 0.026, 0.036)[r] * (1.25 if bar >= 5 else 1.0))
             if bar % 2 == 0:
                 fill = bar == 6
                 for i in BREAK_KICK:
@@ -295,7 +314,7 @@ def render(voice: str = "choir", chip: bool = False, parts: dict | None = None) 
     for bar, (low, names) in enumerate(SWELL_CH):
         b = SWELL + 4 * bar
         sub(b, 4, low if low >= 38 else low + 12, 0.22)
-        arp(b, pcs(names), 0.026 + 0.0012 * bar)
+        arp(b, pcs(names), (0.026 if men else 0.036) + 0.0012 * bar)
         for i in range(4):
             if i == 0 or (bar >= 8 and i == 2) or bar == 14:
                 boom(b + i, low if low >= 38 else low + 12, 0.8 + 0.02 * bar)
@@ -384,13 +403,8 @@ def render(voice: str = "choir", chip: bool = False, parts: dict | None = None) 
     b = SURGE + 31  # the last hit: D, everyone, and nothing after it but the echo
     chug(b, 50, 7, 0.5, 0.8), bass(b, 38, 0.5, 0.36), kick(b, 0.65), snare(b, 0.3), x.crash(b, 0.2, 0.9, bus="crash")
 
-    # ---- her line doubled on a square wave (the `chip` version) ----
     her = ([(INTRO + 8, ALONE)] + [(BREAK + 32 * r, text) for r, text in enumerate(ROUNDS)]
            + [(SWELL, CLIMB_S), (CLIMAX, TUNE), (CLIMAX + 32, OVER), (SURGE, LAST_S)])
-    if chip:
-        for start, text in her:
-            for b, d, m in notes(start, text):
-                sung(b, d, m)
 
     # ---- the chips' mix ----
     if "brk" in x.buses:
@@ -407,14 +421,14 @@ def render(voice: str = "choir", chip: bool = False, parts: dict | None = None) 
     x.buses["gtr"] = np.fft.irfft(np.fft.rfft(np.tanh(4.5 * pre / ref), axis=1) * cab, n=bus.shape[1], axis=1) * ref
     del bus, pre
     x.echo("lead", 0.75, 0.16, 0.07), x.echo("lead2", 0.75, 0.12, 0.05), x.echo("arp", 0.75, 0.3, 0.14)
-    levels = {"brk": 2.0, "kick": 0.58, "snare": 1.25, "hats": 4.0, "toms": 1.2, "timp": 0.55, "crash": 1.5, "sub": 0.62, "bass": 0.6,
-              "gtr": 0.9, "lead": 1.2, "lead2": 1.1, "arp": 1.6, "vox": 1.0}
+    levels = {"brk": 2.0 if men else 2.3, "kick": 0.58, "snare": 1.25, "hats": 4.0, "toms": 1.2, "timp": 0.55, "crash": 1.5, "sub": 0.62, "bass": 0.6,
+              "gtr": 0.9, "lead": 1.2, "lead2": 1.1, "arp": 1.6}
     out = x.mixdown(levels, lowpass=9000, room=0.14, room_s=1.6)
 
     # ---- the recorded parts: each one's notes in seconds, played through the bank, panned, in the stone hall ----
     # The bank's players speak late (measured in the mix, the time to half level: the choir 110 to 230 ms, the oboe
     # 140, the strings 50), so each part starts that much ahead of the beat.
-    VOX, BOW, REED, WIND = 0.09, 0.05, 0.08, 0.03
+    VOX, BOW, REED, WIND, ONE = 0.09, 0.05, 0.08, 0.03, 0.04
 
     def part(line, loud=100, joined=True, ahead=VOX):
         """(beat, beats, note) -> the bank's (seconds, seconds, note, loudness): a note that runs into the next one
@@ -454,38 +468,47 @@ def render(voice: str = "choir", chip: bool = False, parts: dict | None = None) 
         got[name] = got.get(name, 0) + level * sampled.hall(st, echo, wet, seed)
 
     got = {}
-    # The men's drone and the bell.
-    real("drone", [(0.0, 48 * S, 40, 96), (0.0, 48 * S, 47, 92), (16 * S, 32 * S, 52, 80)], sampled.VOICE_OOH, 1.15,
-         swell=[(0.0, 84), (24 * S, 122), (44 * S, 100), (48 * S, 80)], seed=3)
     real("bell", [(0.0, 5.0, 52, 96)], sampled.CHURCH_BELL, 0.5, bank=8, wet=0.5, seed=4)
-    # The men's chants: the line, and the basses an octave under it; the last one with tenors a fifth over its long notes.
-    chant = []
-    for r, text in enumerate(CHANTS):
-        line = notes(BREAK + 32 * r + 20, text)
-        chant += part(line, 118, joined=False) + part([(b, d, m - 12) for b, d, m in line], 112, joined=False)
-        if r == 2:
-            chant += part([(b, d, m + 7) for b, d, m in line if d >= 2], 96, joined=False)
-    real("chant", chant, sampled.CHOIR_AAH, 0.75, tune=True, seed=5)
-    # The choir's chords: the swell (growing), the climax, the last part.
+    if men:
+        # The men's drone; their chants: the line, the basses an octave under it, the last one with tenors a fifth
+        # over its long notes.
+        real("drone", [(0.0, 48 * S, 40, 96), (0.0, 48 * S, 47, 92), (16 * S, 32 * S, 52, 80)], sampled.VOICE_OOH, 1.15,
+             swell=[(0.0, 84), (24 * S, 122), (44 * S, 100), (48 * S, 80)], seed=3)
+        chant = []
+        for r, text in enumerate(CHANTS):
+            line = notes(BREAK + 32 * r + 20, text)
+            chant += part(line, 118, joined=False) + part([(b, d, m - 12) for b, d, m in line], 112, joined=False)
+            if r == 2:
+                chant += part([(b, d, m + 7) for b, d, m in line if d >= 2], 96, joined=False)
+        real("chant", chant, sampled.CHOIR_AAH, 0.75, tune=True, seed=5)
+    # The chords over the swell (growing), the climax and the last part: the choir's five voices, or (no men) the
+    # upper three on the one-voice sample; and the strings under them.
     choir, bows, grow = [], [], []
-    for start, chords, shift, loud, floor in ((SWELL, SWELL_CH, 0, 112, 43), (CLIMAX, LAMENT * 2, 0, 118, 99), (SURGE, LAMENT, 3, 124, 99)):
-        for bar, (low, mid, top) in enumerate(voicings(chords, shift, floor=floor)):
+    for start, chords, shift, loud, low_from in ((SWELL, SWELL_CH, 0, 112, 43), (CLIMAX, LAMENT * 2, 0, 118, 99), (SURGE, LAMENT, 3, 124, 99)):
+        for bar, (low, mid, top) in enumerate(voicings(chords, shift, floor=low_from)):
             b, d = start + 4 * bar, (3.5 if start == SURGE and bar == 7 else 4)
             hold = start == SWELL and bar == 13  # the F chord is held over its second bar
             if not hold:
                 d = 8 if start == SWELL and bar == 12 else d
-                choir += part([(b, d - 0.1, m) for m in (low, mid, *top)], loud, joined=False)
+                choir += part([(b, d - 0.1, m) for m in ((low, mid, *top) if men else top)], loud, joined=False, ahead=VOX if men else ONE)
                 bows += part([(b, d - 0.05, m) for m in (low, low + 7 if (low + 7) % 12 in {v % 12 for v in top} else mid, *top, top[-1] + 12)], loud, joined=False, ahead=BOW)
             t = b * S
             peak = 127 if start != SWELL else 98 + 29 * bar / 15
             grow += [(max(0.0, t - VOX), 0.8 * peak), (t + 2 * S, peak), (t + 3.9 * S, 0.85 * peak)]
-    real("choir", choir, sampled.CHOIR_AAH, 0.3, tune=True, swell=sorted(grow), seed=6)
-    # Her line.
-    line = [note for start, text in her for note in notes(start, text)]
-    if voice == "solo":
-        real("soprano", part(line, 112), sampled.SOLO_VOX, 0.45, swell=breath(line), wet=0.5, seed=7)
+    if men:
+        real("choir", choir, sampled.CHOIR_AAH, 0.3, tune=True, swell=sorted(grow), seed=6)
     else:
+        real("pads", choir, sampled.SOLO_VOX, 0.18, swell=sorted(grow), wet=0.5, seed=6)
+    # Her line: the choir's women, or the one-voice sample (quieter under the breakbeat, fuller over the band).
+    line = [note for start, text in her for note in notes(start, text)]
+    if men:
         real("soprano", part(line, 118), sampled.CHOIR_AAH, 0.72, tune=True, swell=breath(line), bend=waver(line), wet=0.45, seed=7)
+    else:
+        made = []
+        for start, text in her:
+            loud = 112 if start < BREAK else 106 if start < SWELL else 112 if start < CLIMAX else 124
+            made += part(notes(start, text), loud, ahead=ONE)
+        real("soprano", made, sampled.SOLO_VOX, 0.45, swell=breath(line, ahead=ONE), wet=0.5, seed=7)
     # The strings: under the choir's chords, and the bridge's twelve bars (soft, then growing under the violin).
     real("strings", bows, sampled.STRINGS, 0.22, tune=True, swell=sorted(grow), wet=0.35, seed=8)
     bows, quiet = [], []
@@ -503,20 +526,15 @@ def render(voice: str = "choir", chip: bool = False, parts: dict | None = None) 
     real("violin", part(line, 127, ahead=0.02), sampled.VIOLIN, 1.0, pan=-0.1, tune=True, wet=0.4, seed=12, bend=waver(line, 0.18, 6.0),
          swell=[(CLIMB * S, 100), ((CLIMB + 12) * S, 124), ((CLIMB + 14) * S, 127)])
 
-    voices = sum(got[name] for name in ("drone", "chant", "choir", "soprano"))
-    if chip:  # the voices through a cheap sampler: 12 kHz, 7 bits
-        voices = np.repeat(voices[:, ::4], 4, axis=1)[:, :size]
-        q = np.abs(voices).max() / 2**6
-        voices = np.round(voices / q) * q
     if parts is not None:
         parts.update(got)
         parts["chips"] = out
-    return out + voices + sum(got[name] for name in got if name not in ("drone", "chant", "choir", "soprano"))
+    return out + sum(got.values())
 
 
-def main(out: str, voice: str = "choir", chip: bool = False) -> None:
-    write_wav(out, render(voice, chip))
+def main(out: str, voice: str = "vox") -> None:
+    write_wav(out, render(voice))
 
 
-if __name__ == "__main__":  # song_ap.py <out.wav> [choir|solo] [chip]
-    main(sys.argv[1], "solo" if "solo" in sys.argv[2:] else "choir", "chip" in sys.argv[2:])
+if __name__ == "__main__":  # song_ap.py <out.wav> [choir]
+    main(sys.argv[1], "choir" if "choir" in sys.argv[2:] else "vox")

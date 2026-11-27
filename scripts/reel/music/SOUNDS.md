@@ -877,7 +877,7 @@ together on top of it. So not to worry. We'll leave the hollow as is."
 - **Lesson:** twice, bars written to sit inside a finished song he likes came out as "thrown in" or not musical. A
   song he has passed is finished; a longer one is a new song to write whole, not an insert.
 
-## The gothic hybrid (Nov 27, song_ap.py): chips and recorded voices; first go sent, no verdict yet
+## The gothic hybrid (Nov 27, song_ap.py): chips and sampled voices; second go sent, no verdict yet
 
 Eric, with a write-up made with another assistant ("Full Song Deconstruction & IP-Free Master Blueprint": a timeline
 of a reference track, then a plan for one like it): "trying to work with Gemini to help me come up with a song, but
@@ -919,7 +919,38 @@ then ... take that real human humming and then ... add some layer on top of it t
   voice at 12 kHz and 7 bits, her line doubled by a soft square wave).
 - To watch in his answer: whether the bank's choir sounds real enough to him at all; the riff sits 0.6 dB under the
   swell's end (it should feel like a step up); the men's chant has no consonants, so its repeated notes may blur.
-- If he likes the recorded choir: the Hidden Boss's hymn (above) could be sung by it in place of the computed men.
+- (Overtaken by his answer below: he did not take to the recorded choir.)
+
+**Second go (Nov 27).** Eric, on the first go and its clips: "what I'd really like to see is this number 2 here, this
+clip 2. I think we use that instrument, pull out the male humming entire from the whole song, replace the normal
+humming with like the clip 2 version ... we're going to revert all to chiptune here because I don't even know if
+it's chiptune, but I don't think it is, but whatever that sound is that's playing at the beginning, or like using
+clip 2 instead is good. We might end up going back, but I want to do this ... 45 to 46 seconds in the long version
+... this chiptune beat in the background, and it's really good, but it's getting drowned out by the whatever's
+playing on top of it ... bring that up a bit and then bring down the hymning ... if any of that's unclear, let me
+know before you start building."
+- Built on this reading, each call told to him with the file (he had offered to be asked; the calls were small and
+  a wrong one costs a render):
+  - Her line, whole song: the bank's one-voice sample ("Solo Vox", clip 2's), at clip 2's level, 1 dB lower under
+    the breakbeat, 2 dB up over the band.
+  - The men out everywhere: no drone (a low held chip tone, E and B, in its place: a tune with nothing under it
+    doesn't say what key it is in), no chants (the beat and the pattern alone for those three bars, the pattern a
+    step forward there), no men's notes in the chords.
+  - "The normal humming": the choir's chords in the swell, the climax and the last part are the upper three notes on
+    the same one-voice sample, 3 dB under where the choir was.
+  - The "chiptune beat" at 0:45: the fast pulse-wave pattern and the crushed breakbeat. The pattern is 3.6 dB up
+    there (and now starts in the first round, very soft); the breakbeat 1.2 dB up; her line 3.8 dB down. The gap
+    between her and the pattern at 0:45 went from 11.6 dB to 4.2.
+  - Left as they were, and said so: the bank's strings, flute, oboe, violin and bell (he spoke only of the
+    humming). If "revert all to chiptune" meant those too, they go to chip voices next.
+- `python3 song_ap.py out.wav choir` still makes the first go's voices ("We might end up going back"). The `chip`
+  layer (clip 3) is out of the code: not chosen.
+- Measured on the master (-16.0 LUFS, peak -1.1): intro -24.5, break -21.5 to -20.4, swell -21.1 to -18.9, riff
+  -18.4 (now a step up from the swell), lead -17.4 and -16.9, climax -16.2, bridge -21.9, the violin -19.7, the
+  last part -15.3.
+- **Lessons:** between a real recorded choir and one soft looped voice sample he chose the sample: "real" was not
+  the point, the sound was. A chip pattern he likes must not sit 11 dB under a voice: 4 to 5 dB is the most. Send
+  the alternatives with the first go: he picked from them in one answer.
 
 ## Sheet music: the town's first piano solo (Nov 26)
 
