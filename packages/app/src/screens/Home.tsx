@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { WelcomeNotice } from "../components/WelcomeNotice.tsx";
-import { CROWD_PARTY_MAX, BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, canPick, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
+import { CROWD_PARTY_MAX, BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, canPick, menuBosses, unlockBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { bossAloneElo, chosenDifficulty, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
@@ -94,8 +94,18 @@ let pickedBoss: string | null = null;
  * for a random pick, is likely to pick its moves with Maia at that difficulty). The town's challenge (Pokémon-gym style) too.
  */
 export function prefetchBossAlone(pick: string, rating: number | null, difficulty: BossDifficultyId = chosenDifficulty()) {
-  const bosses = menuBosses({ admin: isAdmin(), raid: false }).filter((b) => !isPaused(`boss:${b.id}`) && (pick === RANDOM || b.id === pick));
+  const bosses = aloneBosses().filter((b) => !isPaused(`boss:${b.id}`) && (pick === RANDOM || b.id === pick));
   if (maiaLikely(bosses.map((b) => bossAloneElo(rating, b, difficulty)))) prefetchMaia();
+}
+
+/**
+ * Boss alone's bosses: the boss menu's, then each boss unlocked by a win once it's yours (the Stranger, Eric Nov 27: "Beat him in the
+ * tower"; the review of #1000: his own Boss alone menu was empty, since `menuBosses` holds no boss unlocked by a win).
+ */
+export function aloneBosses() {
+  const list = menuBosses({ admin: isAdmin(), raid: false });
+  const won = unlockBosses(undefined, unlockTest()).filter((b) => unlockedNow().includes(b.id) && !list.some((m) => m.id === b.id));
+  return [...list, ...won];
 }
 
 export function rememberBossPick(id: string) {
@@ -177,7 +187,9 @@ export function BossMenu({
   // (Admins, Boss alone: the bosses hidden from players too, after the rest: the Hidden Boss, for testing.)
   // (Not the bosses resting: kill switches, status.ts.)
   useServerStatus();
-  const bosses = menuBosses({ admin: isAdmin(), raid: false }).filter((b) => !isPaused(`boss:${b.id}`) && (only === undefined || b.id === only));
+  // (Redrawn as the server's unlocks come in: a boss unlocked by a win joins the list.)
+  useUnlocks();
+  const bosses = aloneBosses().filter((b) => !isPaused(`boss:${b.id}`) && (only === undefined || b.id === only));
   // Maia's files are fetched ahead when it may play: Boss alone below Stockfish's strengths. (A raid you make fetches
   // them as you make it: Play with friends.)
   const picked = useRef<HTMLButtonElement>(null);
