@@ -1030,7 +1030,10 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   (one figure painted per pose, swords on his back at rest; `strike` = draw, double slash, sheathe; `castFull` = draw, twin-tip cast,
   sheathe; locked look `looks.locked`), `stranger-sounds.ts`, `stranger-lines.ts` (placeholders), his square's fire and ice in
   `effects/stranger.ts` (`EFFECTS.strangerSquare`: strike, frozen, ignite, burn, burnOut). His kit waits in `ART_KITS.Stranger` until his
-  rules put him in the roster; `test/stranger.test.ts`.
+  rules put him in the roster; `test/stranger.test.ts`. His hair is drawn strand by strand (`paintBackHair`, the front locks in
+  `paintHead`: single-pixel strands, light and shadow by turns), long and wide behind him, under the hilts on his back. His aura grows
+  from the figure's own part (two levels), so it never paints him twice. His lines are his alone: his voice's sound is keyed by a
+  line's words.
 
 - **Chandy** (Nov 16; art docs/decisions/2026-11-16-chandy-art.md, rules 2026-11-16-chandy-rules.md): rules `bosses/chandy.ts`
   (and `chandyBattle`: the meter, the queen lock's shot, Dodge's rounds), server `server/src/bosses/chandy.ts` (Dodge's timer and
