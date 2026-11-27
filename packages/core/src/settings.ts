@@ -4818,8 +4818,8 @@ export const OUTFIT = {
 /**
  * The Welcome Crates (Eric, Nov 6: "you get it for completing 5 games in any mode or any boss … Limit one per account"; then "the
  * first one you get after 5 games, the next one you get after 25"; docs/decisions/2026-11-06-welcome-crate.md): a signed-in account
- * earns one at each of `milestones` finished games, each once ever (a result reached: win, loss or draw; never one abandoned, aborted
- * or never started). The server counts and grants them (server/welcome.ts); the prize is welcome.ts in core.
+ * gets the first on its first visit and the second at 25 finished games (Nov 27), each once ever (a game finished: a result reached,
+ * win, loss or draw; never one abandoned, aborted or never started). The server counts and grants them (server/welcome.ts); the prize is welcome.ts in core.
  */
 export const WELCOME_GIFT = {
   /**

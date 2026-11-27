@@ -62,7 +62,7 @@ export const stripTarget = (width: number, land: number) => land * TILE_STEP + T
 
 /**
  * The strip's clicks: the moments (ms from the spin's first frame) a tile edge crosses the center line, for a window `width` px wide
- * landing on tile `land`, its spin starting `pullPx` back (the pull-back's, CRATE_OPEN.pullPx: silent, no edge crossed on the way).
+ * landing on tile `land`, its spin starting `pullPx` back (the pull-back's, CRATE_OPEN.pullPx: silent; an edge it carries over and back makes no click).
  * Worked out ahead, so the sound is laid on the audio clock instead of a frame loop.
  */
 export function clickTimes(spinMs: number, width: number, land: number, pullPx = 0): number[] {

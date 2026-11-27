@@ -44,7 +44,7 @@ export const TUTORIAL_ANYWHERE_SLIDE = {
   body: "HunChess runs right from the website, on both computer and phone. No download needed. You can also add it to your home screen.",
 };
 
-/** The Welcome Crates' goals (5 games, then 25): the crates slide shows both, as the Crates tab does. */
+/** The Welcome Crates' stored keys (the first given on your first visit, the second at 25 games): the crates slide shows both, as the Crates tab does. */
 export const TUTORIAL_CRATE_GOALS: readonly number[] = WELCOME_GIFT.milestones;
 
 export interface TutorialCrateBar {
