@@ -100,7 +100,7 @@ export async function grantWelcomeCrate(sql: Sql, userId: string, now: number): 
 
 /** What the app hears about the Welcome Crates (the locker's `welcome`). */
 export interface WelcomeState {
-  /** Finished games so far (for "Finish 25 games for your second Welcome Crate: 7/25"). */
+  /** Finished games so far (the second Welcome Crate's meter, toward 25). */
   games: number;
   /** The next milestone not earned yet (5, then 25), or null once both are. */
   next: number | null;
