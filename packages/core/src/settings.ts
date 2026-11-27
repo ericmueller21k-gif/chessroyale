@@ -1930,7 +1930,9 @@ export const BOSS_POWERS = {
    */
   turfHopEvery: 4,
   turfHops: 3,
-  turfHolds: [32, 40, 48] as readonly number[],
+  // (Eric, Nov 27: 48 was never reached in the sim (his best 42), "lower it to 40": Double hop at 40, Short fuse at 36 so the three
+  // stay stepped. Was 32 / 40 / 48.)
+  turfHolds: [32, 36, 40] as readonly number[],
   turfLegsMaxLoss: 0.25,
   turfLegsNodes: 30_000,
   turfFuseCut: 1 / 3,
