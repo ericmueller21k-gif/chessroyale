@@ -197,9 +197,9 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const landNext = useRef(false);
 
   const propPieces = useMemo(() => readPieces(fen), [fen]);
-  // (With premoves waiting, each piece moved ahead stands on its new square.)
+  // (With premoves waiting, each piece moved ahead stands on its new square; unless the screen holds them on theirs.)
   const base = local.current?.pieces ?? propPieces;
-  const shown = queue.length ? premovePieces(base, queue) : base;
+  const shown = queue.length && !premove?.hold ? premovePieces(base, queue) : base;
   const shownLast = local.current ? local.current.last : lastMove ? ([lastMove.slice(0, 2), lastMove.slice(2, 4)] as [string, string]) : null;
   const turnColor = sideToMove(fen);
   const canAct = !!interactive && !small && !local.current;
