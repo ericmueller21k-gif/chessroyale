@@ -15,7 +15,7 @@ const subs = new Set<() => void>();
 /** What's known now. */
 export const unlockedNow = (): readonly string[] => known;
 
-/** A test link's `?wip=1` (a test switch): a boss unlocked by a win is met before his art lands, with placeholders. */
+/** A test link's `?wip=1` (a test switch): a boss unlocked by a win is met as an admin meets him (admins first; before his art, with placeholders). */
 export const unlockTest = (): boolean => testParams().get("wip") === "1";
 
 /** Asks the server again (as the picker opens). */

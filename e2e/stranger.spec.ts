@@ -5,8 +5,8 @@ import { localSql, openBossRaid, submitMove, test } from "./helpers.ts";
 /**
  * The Stranger (Eric, Nov 27; docs/decisions/2026-11-27-stranger-rules.md), on a phone: his Frostfire strike (your piece frozen for your
  * next turn, thawed the turn after, then its square burns what's left on it), his locked card in the Boss Battle picker (a tap shows him
- * and how to unlock him, every way to play greyed), and the unlock once Battle Tower floor 10, his, is won (the server's record of it). Before his
- * art lands he's met with `?wip=1` (placeholders); the server's TEST_SWITCHES deals his floor the same way.
+ * and how to unlock him, every way to play greyed), and the unlock once Battle Tower floor 10, his, is won (the server's record of it). While
+ * he's admins first, `?wip=1` shows a player what an admin sees; the server's TEST_SWITCHES deals his floor to anyone's climb.
  */
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase?.kind ?? "none").catch(() => "none");
