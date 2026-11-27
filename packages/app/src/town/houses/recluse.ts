@@ -88,6 +88,8 @@ const FE = { x0: 74, x1: 134 } as const;
 
 /** The top of an upper floor's windows (`k` 0: the top floor). */
 const winTop = (k: number) => FLOOR0 + k * FLOOR_H + 11;
+/** Its chip and large-map face (x, y, side): nobody is out front, so the top floor's lit window (the child's, the second bay) round its middle. */
+export const HOUSE_RECLUSE_CHIP = [BAYS[1] - 22, Math.round(winTop(0) + WIN_H / 2) - 22, 44] as const;
 
 function brick(c: Cv, x0: number, y0: number, x1: number, y1: number): void {
   for (let y = y0; y < y1; y++)
