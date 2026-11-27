@@ -49,6 +49,7 @@ export function RanksSheet({ rank, who, onClose }: { rank: RankView; who: string
     <Sheet id="rk-title" title="Ranks" onClose={onClose} class="rk-sheet">
       <p class="rk-line">
         Each division is {RANKED_1V1.pointsPerDivision} RP. The top two are the top {RANKED_1V1.topTiers.map((t) => t.top).sort((a, b) => b - a).join(" and top ")} players from {RANKED_1V1.topFloor} RP.
+        Each rank's Elo is a rough approximation.
       </p>
       <ol class="rk-list" ref={list}>
         {rankSteps()
@@ -58,7 +59,10 @@ export function RanksSheet({ rank, who, onClose }: { rank: RankView; who: string
             return (
               <li key={r.emblem} class={`rk-row${on ? " on" : ""}`} style={{ "--rank": r.color }} aria-current={on ? "true" : undefined}>
                 <RankEmblem id={r.emblem} />
-                <span class="rk-name">{r.title}</span>
+                <span class="rk-title">
+                  <span class="rk-name">{r.title}</span>
+                  <span class="rk-elo">≈ {r.elo.to === null ? `${r.elo.from}+` : `${r.elo.from}–${r.elo.to}`} Elo</span>
+                </span>
                 {tag(on)}
                 <span class="rk-from">{r.top ? `Top ${r.top} · ` : ""}{r.from} RP</span>
               </li>
@@ -66,7 +70,9 @@ export function RanksSheet({ rank, who, onClose }: { rank: RankView; who: string
           })}
         <li class={`rk-row rk-placing${placing ? " on" : ""}`} aria-current={placing ? "true" : undefined}>
           <RankEmblem id={null} />
-          <span class="rk-name">Placement</span>
+          <span class="rk-title">
+            <span class="rk-name">Placement</span>
+          </span>
           {tag(placing)}
           <span class="rk-from">First {RANKED_1V1.placements.games} games</span>
         </li>

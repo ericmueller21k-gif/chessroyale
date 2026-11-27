@@ -185,16 +185,28 @@ export interface RankStep {
   from: number;
   /** A top tier's place among the highest ladders (500, 100); null below. */
   top: number | null;
+  /**
+   * A rough Elo for the rank (Eric, Nov 27: "a conversion range next to each... ELO approximation... it just helps to kind of get a
+   * rough idea"): the ladder's rating (ladderRating, the scale the hidden rating pulls the ladder to) at the rank's start and at the
+   * next one's, to the nearest 10; `to` null for a top tier (its floor and up).
+   */
+  elo: { from: number; to: number | null };
 }
+
+/** A ladder's rating to the nearest 10, for the Ranks list's rough Elo. */
+const roughElo = (ladder: number, s: Settings) => Math.round(ladderRating(ladder, s) / 10) * 10;
 
 /** Every rank, lowest first: each tier's divisions 5 → 1, then the top tiers (the widest `top` first). */
 export function rankSteps(s: Settings = RANKED_1V1): RankStep[] {
   const out: RankStep[] = [];
   s.tiers.forEach((t, i) => {
     for (let d = s.divisions; d >= 1; d--)
-      out.push({ title: divisionTitle({ tier: t.name, division: d }), emblem: emblemId(t.name, d), color: t.color, from: (i * s.divisions + (s.divisions - d)) * s.pointsPerDivision, top: null });
+    {
+      const from = (i * s.divisions + (s.divisions - d)) * s.pointsPerDivision;
+      out.push({ title: divisionTitle({ tier: t.name, division: d }), emblem: emblemId(t.name, d), color: t.color, from, top: null, elo: { from: roughElo(from, s), to: roughElo(from + s.pointsPerDivision, s) } });
+    }
   });
-  for (const t of [...s.topTiers].sort((a, b) => b.top - a.top)) out.push({ title: t.name, emblem: emblemId(t.name, null), color: t.color, from: s.topFloor, top: t.top });
+  for (const t of [...s.topTiers].sort((a, b) => b.top - a.top)) out.push({ title: t.name, emblem: emblemId(t.name, null), color: t.color, from: s.topFloor, top: t.top, elo: { from: roughElo(s.topFloor, s), to: null } });
   return out;
 }
 

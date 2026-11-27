@@ -21725,8 +21725,22 @@ button.sq-tiny {
   border-color: var(--rank, var(--fd-sub));
   background: color-mix(in srgb, var(--rank, var(--fd-sub)) 16%, var(--fd-panel));
 }
-.rk-name {
+.rk-title {
   flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+/* (Each rank's rough Elo under its name: a second line, so the row's width is unchanged; Eric, Nov 27.) */
+.rk-elo {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fd-sub);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rk-name {
   min-width: 0;
   font-weight: 800;
   white-space: nowrap;

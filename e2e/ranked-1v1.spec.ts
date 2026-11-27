@@ -565,7 +565,10 @@ test("ranks in the game (Eric, Nov 25: \"the emblem next to everyone... click on
   await expect(sheet.locator(".rk-row").last()).toContainText("Placement");
   const marked = sheet.locator('.rk-row[aria-current="true"]');
   await expect(marked).toHaveCount(1);
-  await expect(marked).toContainText(/Gold III\s*Bo Ranks\s*960 RP/);
+  await expect(marked).toContainText(/Gold III\s*≈ 1350–1390 Elo\s*Bo Ranks\s*960 RP/);
+  // (Eric, Nov 27: a rough Elo by every rank; the top tiers from their floor.)
+  await expect(sheet.locator(".rk-row").first()).toContainText("≈ 2400+ Elo");
+  await expect(sheet).toContainText("Each rank's Elo is a rough approximation.");
   // (Only the list scrolls to it: the title and ✕ stay in view.)
   await expect(marked).toBeInViewport({ ratio: 1 });
   await expect(sheet.getByRole("heading", { name: "Ranks" })).toBeInViewport({ ratio: 1 });
