@@ -1,5 +1,5 @@
 import { expect, type Browser, type Page } from "@playwright/test";
-import { createLobbyFromHome, joinFromInvite, named, switchesOff, test } from "./helpers.ts";
+import { createLobbyFromHome, joinFromInvite, named, settled, switchesOff, test } from "./helpers.ts";
 import { DEMO_ID, MOCKUP_LOOK, demoProfile, rankAt, routeProfile, skyIcon } from "./public-profile-data.ts";
 import { rankView } from "@chessroyale/core";
 
@@ -444,13 +444,14 @@ test("every mode's row in Recent Matches: a raid, 50 v 50, Squads", { tag: "@pho
 test("the Hidden Boss's rows: his three forms' faces, the ones beaten grayed, the same room whatever the count; the full list too (Eric, Nov 13)", async ({ page }) => {
   const at = (h: number) => Date.now() - h * 3_600_000;
   const his = { mode: "boss", online: true, placement: 1, players: 4, team: "w", survived: true, bestMove: null, bossElo: null, bossId: "recluse", ranked: false };
-  // Won (3), lost to the man (1), and two rows from before the count was kept: a win (all three) and a loss (none known).
+  // Won (3), lost to the man (1), and two rows from before the count was kept: a win (all three) and a loss (none known). The other
+  // row a solo game's, its list title one line at 360 too, so the list's one height below is his strip's doing, not a long title's.
   const recent = [
     { ...his, won: true, formsBeaten: 3, playedAt: at(1) },
     { ...his, won: false, formsBeaten: 1, playedAt: at(2) },
     { ...his, won: true, playedAt: at(3) },
     { ...his, won: false, playedAt: at(4) },
-    { ...demoProfile().recent[0]!, playedAt: at(5) },
+    { ...demoProfile().recent[0]!, online: false, playedAt: at(5) },
   ];
   await openDemo(page, demoProfile({ recent, ranked1v1: { ...demoProfile().ranked1v1, recent: [] } }));
   await loaded(page);
@@ -502,6 +503,17 @@ test("the Hidden Boss's rows: his three forms' faces, the ones beaten grayed, th
   const gray = await list.evaluateAll((els) => els.map((e) => [e.querySelectorAll(".rf-face").length, e.querySelectorAll(".rf-face.beaten").length]));
   expect(gray).toEqual([[3, 3], [3, 1], [3, 3], [3, 0], [0, 0]]);
   await expect(list.nth(1).locator(".rf-forms")).toHaveAttribute("aria-label", "1 of 3 forms beaten");
+  // (His name alone, as on the card: his fights are never ranked, so no "unranked".)
+  await expect(list.locator(".fd-match-text strong")).toHaveText(["Hidden Boss", "Hidden Boss", "Hidden Boss", "Hidden Boss", "Boss Battle · Ginger 1500 · solo"]);
+  // (Nothing shifts here either: every row one height, his strip beside a title kept to its line, on a phone at 390 and 360 and at a
+  // computer's sizes. The review of #990: the strip's 26 px faces wrapped his title on a phone, his rows taller than the others.)
+  for (const vp of isComputer() ? sizes() : [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
+    await page.setViewportSize(vp);
+    await page.evaluate(() => document.fonts.ready);
+    const rowsH = await settled(page, () => list.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height * 10) / 10)));
+    const where = `${vp.width} × ${vp.height}: ${rowsH.join(", ")}`;
+    for (const h of rowsH) expect(Math.abs(h - rowsH[4]!), where).toBeLessThan(0.5);
+  }
 });
 
 test("View all: the full list of matches and each worn item's details open in sheets; with nothing, they're greyed", { tag: "@phone-only" }, async ({ page }) => {

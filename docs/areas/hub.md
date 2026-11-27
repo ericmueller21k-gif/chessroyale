@@ -259,7 +259,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     Squads menu, "Season 1": the 1v1 emblem, tier and division, RP, peak rank, win rate, W / L, win streak; "Placement 2/5",
     "Unranked", "Banned" and "Coming soon" in the same room), **Recent Matches** (the last five games in any mode, a ranked 1 v 1's
     RP change; "View all" opens today's list; a Hidden Boss fight's row, titled "Hidden Boss", shows his three forms' faces in the RP's place,
-    the beaten ones grayed: `RecluseForms` in `ProfileParts.tsx`, `recluseFormsShown`, the final form's face `FINAL_FORM` in portraits.gen.ts) and **Equipped Cosmetics** (one row of compact tiles, three or four, each a picture, name, "<Slot> · <colors>" and a rarity pill; "View all" opens each
+    the beaten ones grayed: `RecluseForms` in `ProfileParts.tsx`, `recluseFormsShown`, the final form's face `FINAL_FORM` in portraits.gen.ts; View all's rows the same, "Hidden Boss" with no "unranked", 20 px faces, one line at 360) and **Equipped Cosmetics** (one row of compact tiles, three or four, each a picture, name, "<Slot> · <colors>" and a rarity pill; "View all" opens each
     item's purity and Shiny). One column on a phone; from 744 px wide two (header, Ranked beside Recent, Cosmetics). Nothing private: no
     email, sign-in method, age, the hidden 1 v 1 rating or fair-play details; the icon is public since Oct 28. Its words are in
     `public-profile.ts` (tested), its styles `public-profile.css`. **Every size and space is Eric's mockup's, measured from the image**

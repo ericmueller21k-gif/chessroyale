@@ -117,14 +117,17 @@ export function Recent({ p, mark, bare }: { p: PublicProfile; mark?: number; /**
         const boss = r.mode === "boss";
         const place = boss ? (r.won === true ? "Won" : r.won === false ? "Lost" : r.survived === false ? "Out" : r.survived === true ? "Draw" : nth(r.placement)) : nth(r.placement);
         const gold = boss ? r.won === true : r.placement === 1;
-        // (A Crowd match with no team: everyone moves, a choice until Oct 15, 2026. Older records keep saying so.)
+        const forms = recluseFormsShown(r);
+        // (A Crowd match with no team: everyone moves, a choice until Oct 15, 2026. Older records keep saying so. His fight: his name
+        // alone, as the card has it, and no "unranked" (his fights never are), so the line stays one beside his forms on a 360 phone.)
         const mode =
           r.mode === "crowd"
             ? `Crowd · ${r.team ? "50 v 50" : "everyone moves"}`
-            : boss
-              ? `Boss Battle · ${r.bossElo ? `${bossInfo(r.bossElo, r.bossId).name} ${r.bossElo}` : "a boss"}`
-              : `Classic · ${r.players} players`;
-        const forms = recluseFormsShown(r);
+            : forms !== null
+              ? bossInfo(r.bossElo ?? 0, r.bossId).name
+              : boss
+                ? `Boss Battle · ${r.bossElo ? `${bossInfo(r.bossElo, r.bossId).name} ${r.bossElo}` : "a boss"}`
+                : `Classic · ${r.players} players`;
         return (
           <div
             key={`${r.playedAt}-${i}`}
@@ -136,7 +139,7 @@ export function Recent({ p, mark, bare }: { p: PublicProfile; mark?: number; /**
             <span class="fd-match-text">
               <strong>
                 {mode}
-                {r.online ? (r.ranked === false ? " · unranked" : "") : " · solo"}
+                {r.online ? (r.ranked === false && forms === null ? " · unranked" : "") : " · solo"}
               </strong>
               <span>{[r.bestMove ? `Best move ${r.bestMove}` : null, when(r.playedAt)].filter(Boolean).join(" · ")}</span>
             </span>
