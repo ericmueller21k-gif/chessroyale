@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { MYTHIC_CRATE, PURITY_BANDS, SHOP, bossCrateOf, discountLabel, shopPrice } from "@chessroyale/core";
+import { CRATE_OPEN, MYTHIC_CRATE, PURITY_BANDS, SHOP, bossCrateOf, discountLabel, shopPrice } from "@chessroyale/core";
 import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, tapInTown, test, townTapPoint, wearItem, townReady } from "./helpers.ts";
 
 /**
@@ -2112,8 +2112,34 @@ test("a crate page (Nov 27): Open sits under the crate, its box's width; a tap o
   await page.keyboard.press("Escape");
   await expect(ask).toHaveCount(0);
   // Open from the pop-up starts the opening, as the button does.
+  // (Its start, Nov 27, Eric: "like a rubber band style where the slot of items looks like it's pulled back slightly before going full
+  // speed": every frame from the tap, the sharp strip's place and the blurred copy's opacity. Still and sharp first, while the answer
+  // comes; then pulled back, up to CRATE_OPEN.pullPx the other way, never blurred; then the spin, blurred, at full speed.)
+  await page.evaluate(() => {
+    const out: [number, number][] = [];
+    (window as unknown as { __strip: typeof out }).__strip = out;
+    const tick = () => {
+      const sharp = document.querySelector(".cox-track.sharp");
+      const blur = document.querySelector(".cox-track.blur");
+      if (sharp && blur) out.push([new DOMMatrix(getComputedStyle(sharp).transform).m41, Number(getComputedStyle(blur).opacity)]);
+      if (out.length < 600) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   await art.click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.locator(".cox-reel")).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __strip: [number, number][] }).__strip.some(([x]) => x < -200)), { timeout: 15_000 }).toBe(true);
+  const strip = await page.evaluate(() => (window as unknown as { __strip: [number, number][] }).__strip);
+  const moved = strip.findIndex(([x]) => x !== 0);
+  const spin = strip.findIndex(([, blur]) => blur > 0);
+  expect(moved, "frames of the still strip first").toBeGreaterThan(0);
+  expect(strip.slice(0, moved).every(([, blur]) => blur === 0), "the still strip is sharp").toBe(true);
+  const pulled = strip.slice(moved, spin);
+  expect(pulled.length, "frames of the pull-back").toBeGreaterThan(3);
+  expect(pulled.every(([x]) => x > 0 && x <= CRATE_OPEN.pullPx + 0.01), `pulled back: ${pulled.map(([x]) => x.toFixed(1))}`).toBe(true);
+  expect(Math.max(...pulled.map(([x]) => x))).toBeGreaterThan(CRATE_OPEN.pullPx * 0.8);
+  // (Then the spin, blurred: forward at full speed, well past where it started within a few frames.)
+  expect(strip.slice(spin, spin + 6).some(([x]) => x < -40), "the spin at full speed").toBe(true);
   expect(errors).toEqual([]);
 });

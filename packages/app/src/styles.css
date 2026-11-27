@@ -9173,6 +9173,24 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
     animation: ia-puff 7s ease-out infinite;
   }
 }
+/* The Gift-Wrap Tube's twist (Eric, Nov 27: "like a barber shop pole"): its stripes scroll up it, one cell (TUBE_TWIST: two turns, 27.6
+   units) every 3 s, on a loop with no seam. Wherever it's drawn, not only under `.ia-live` (like the shine); one transform, never with
+   reduced motion. Not in the crate strip (review of #1012, S1): at strip speed it can't be seen, and a Fischer spin can draw a
+   dozen tubes in each track (the blurred one under a filter); the reveal card still twists. gift-tube.test.ts checks the distance
+   against TUBE_TWIST. */
+@media (prefers-reduced-motion: no-preference) {
+  .ia-twist {
+    animation: ia-twist 3s linear infinite;
+  }
+  .cox-track .ia-twist {
+    animation: none;
+  }
+}
+@keyframes ia-twist {
+  to {
+    transform: translateY(-27.6px);
+  }
+}
 @keyframes ia-flicker {
   0%,
   56%,
@@ -26796,7 +26814,8 @@ body.mo-on .mm-scrim {
   box-shadow: inset 0 0 0 1px #f2c14e;
 }
 /* A locked Welcome Crate: greyed a little, with its padlock over the crate (shown, not hidden: its page still opens). */
-.welcome-crate-row.locked {
+.welcome-crate-row.locked,
+.welcome-crate-hero.locked {
   opacity: 0.7;
 }
 .welcome-crate-hero .crate-hero-art {

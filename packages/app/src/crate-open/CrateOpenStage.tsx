@@ -204,7 +204,7 @@ export function CrateStage({
         const start = (document.timeline.currentTime as number) + lead;
         for (const a of all) a.startTime = start;
         hooks.__crateAnims = all;
-        stopSound = playCrateCues(cues(b.T, clickTimes(b.T.spinMs, b.width, land), ending === "none" ? "transcendent" : tier), lead);
+        stopSound = playCrateCues(cues(b.T, clickTimes(b.T.spinMs, b.width, land, reduced ? 0 : b.T.pullPx), ending === "none" ? "transcendent" : tier), lead);
         if (onStop) timers.push(setTimeout(onStop, lead + b.T.bannerAt));
         if (ending !== "none" && onCard) timers.push(setTimeout(onCard, lead + b.T.cardAt + b.T.cardMs));
       });
@@ -356,29 +356,37 @@ function animator(out: Animation[]): At {
   return (el, kf, start, dur, o = {}) => void out.push(el.animate(kf, { delay: start, duration: dur, fill: "both", easing: "linear", ...o }));
 }
 
-/** The strip: its travel (a cubic ease-out, an overshoot settling back), the blurred copy fading, the line, the winner lifting. */
+/**
+ * The strip: the pull-back (Nov 27: eased `T.pullPx` against the spin's way over `T.pullMs`, the rubber band drawn), its travel from
+ * there (a cubic ease-out: let go at full speed; an overshoot settling back), the blurred copy fading, the line, the winner lifting.
+ */
 function buildStrip(root: HTMLElement, T: Timeline, land: number, width: number, reduced: boolean): Animation[] {
   const $ = (s: string) => root.querySelector(s) as HTMLElement;
   const out: Animation[] = [];
   const at = animator(out);
   const peak = stripTarget(width, land) + OVERSHOOT;
+  const pull = reduced ? 0 : T.pullPx;
   const kf: Keyframe[] = [];
-  const total = T.spinMs + T.settleMs;
-  for (let i = 0; i <= 60; i++) {
+  const total = T.stop;
+  const smooth = (v: number) => v * v * (3 - 2 * v);
+  kf.push({ transform: "translate3d(0px,0,0)", offset: 0 });
+  // (The pull-back, eased in and out: the strip still until it moves, back `pull` px; with reduced motion it just waits.)
+  if (T.pullMs > 0) for (let i = 1; i <= 8; i++) kf.push({ transform: `translate3d(${(pull * smooth(i / 8)).toFixed(2)}px,0,0)`, offset: ((i / 8) * T.spinAt) / total });
+  for (let i = 1; i <= 60; i++) {
     const u = i / 60;
-    kf.push({ transform: `translate3d(${-peak * stripEase(u)}px,0,0)`, offset: (u * T.spinMs) / total });
+    kf.push({ transform: `translate3d(${(pull - (peak + pull) * stripEase(u)).toFixed(2)}px,0,0)`, offset: (T.spinAt + u * T.spinMs) / total });
   }
   // (The settle: back onto the stop, eased.)
   for (let i = 1; i <= 6; i++) {
     const v = i / 6;
-    const e = v * v * (3 - 2 * v);
-    kf.push({ transform: `translate3d(${-(peak - OVERSHOOT * e)}px,0,0)`, offset: (T.spinMs + v * T.settleMs) / total });
+    kf.push({ transform: `translate3d(${-(peak - OVERSHOOT * smooth(v))}px,0,0)`, offset: (T.spinAt + T.spinMs + v * T.settleMs) / total });
   }
   for (const tr of root.querySelectorAll(".cox-track")) at(tr, kf, 0, total);
-  // The blurred copy over it, fading as it slows (gone by 45% of the spin), the sharp one under it always.
-  if (!reduced) at($(".cox-track.blur"), [{ opacity: 0.95 }, { opacity: 0.95, offset: 0.12 }, { opacity: 0 }], 0, T.spinMs * 0.45);
+  // The blurred copy over it from the spin's first frame (not the still strip's or the pull-back's: only `forwards`), fading as it
+  // slows (gone by 45% of the spin), the sharp one under it always.
+  if (!reduced) at($(".cox-track.blur"), [{ opacity: 0.95 }, { opacity: 0.95, offset: 0.12 }, { opacity: 0 }], T.spinAt, T.spinMs * 0.45, { fill: "forwards" });
   // The line glows harder while it's fast; it flares at the stop.
-  at($(".cox-line"), [{ opacity: 0.85 }, { opacity: 1 }], 0, T.spinMs);
+  at($(".cox-line"), [{ opacity: 0.85 }, { opacity: 1 }], T.spinAt, T.spinMs);
   at($(".cox-line-flare"), [{ opacity: 0, transform: "scaleY(0.6)" }, { opacity: 1, transform: "scaleY(1.15)", offset: 0.25 }, { opacity: 0, transform: "scaleY(1)" }], T.stop - 40, 420);
   // The winner lifts, the others dim round it.
   at($(".cox-track.sharp .cox-win"), [{ transform: "none" }, { transform: "translateY(-7px) scale(1.12)" }], T.stop - 60, 200, { easing: "cubic-bezier(.2,1.6,.4,1)" });

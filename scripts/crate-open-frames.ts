@@ -45,7 +45,7 @@ async function seekRun(scale: number) {
 if (arg("stills") === "1") {
   const { page, at } = await seekRun(2);
   const beats: [string, number][] = [
-    ["1-spin", T.spinMs * 0.3],
+    ["1-spin", T.spinAt + T.spinMs * 0.3],
     ["2-stop", T.stop + 40],
     ["3-shake", T.burstAt - 60],
     ["4-burst", T.burstAt + 90],

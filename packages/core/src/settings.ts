@@ -4102,6 +4102,14 @@ export const CRATE_OPEN = {
    * 3 s makes the whole thing long." One number, so Eric can change it.
    */
   spinMs: 4000,
+  /**
+   * The pull-back before a crate's strip spins (Eric, Nov 27: "like a rubber band style where the slot of items looks like it's pulled
+   * back slightly before going full speed into the normal shuffle spin"): the strip, drawn and still, eases `pullPx` against the
+   * spin's direction over `pullMs`, then lets go at full speed. Before the first strip only (the one an Open tap starts); every beat
+   * after it keeps its timing from the spin's first frame.
+   */
+  pullMs: 280,
+  pullPx: 16,
 } as const;
 
 /**
@@ -4814,7 +4822,15 @@ export const OUTFIT = {
  * or never started). The server counts and grants them (server/welcome.ts); the prize is welcome.ts in core.
  */
 export const WELCOME_GIFT = {
+  /**
+   * Each Welcome Crate's stored key (`welcome_crates.milestone`) and the finished games it needs: the second at 25. The first (5)
+   * is given on the account's first visit since Nov 27 (`firstOnVisit`; Eric: "a golden ride beta crate is given when you open the
+   * game for the first time"): 5 stays its key, so crates earned before are unchanged.
+   */
   milestones: [5, 25],
+  firstOnVisit: true,
+  /** The level from which a Welcome Crate opens (Eric, Nov 27: "it's only openable after level 5 is reached"); the server refuses below. */
+  openLevel: 5,
   /**
    * A solo game counts toward them only with XP.minMoves of your own moves (as its XP) and at least this many seconds of the server's
    * time (POST /api/xp/solo/start, then its result): its result is the device's word, and empty posts earned crates (the outside

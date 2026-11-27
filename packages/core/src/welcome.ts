@@ -1,16 +1,19 @@
 import { adminFirst } from "./boss.ts";
 import { BOSS_CRATES, FISCHER, HUNCHESS_RIDES, isHunchess, itemDef, type CrateDef, type CrateRoll, type ItemDef } from "./crates.ts";
 import type { Rng } from "./rng.ts";
-import { WELCOME_GIFT } from "./settings.ts";
+import { WELCOME_GIFT, XP } from "./settings.ts";
+import { levelOf } from "./xp.ts";
 
 /**
  * The HunChess Welcome Crate (Eric, Nov 6; docs/decisions/2026-11-06-welcome-crate.md): "you get it for completing 5 games in any
  * mode or any boss. It contains a special HunChess-colored random rider, with a HunChess-theme gold and black crate. Never
  * tradeable. Purity isn't listed for these. Limit one per account."
  *
- *   - Two of them (Eric: "the first one you get after 5 games, the next one you get after 25"): each earned once per account, ever,
- *     by the server (server/welcome.ts: a stored row keyed by the account and the milestone, checked and set in one statement), at
- *     WELCOME_GIFT.milestones finished games. Never in CRATES (the Crates tab can't open one free) nor BOSS_CRATES.
+ *   - Two of them (Eric: "the first one you get after 5 games, the next one you get after 25"; Nov 27: the first "given when you open
+ *     the game for the first time", both "only openable after level 5"): each given once per account, ever, by the server
+ *     (server/welcome.ts: a stored row keyed by the account and the milestone, 5 or 25, checked and set in one statement), the first on
+ *     a signed-in account's first visit and the second at 25 finished games (`welcomeGamesNeeded`). Never in CRATES (the Crates tab
+ *     can't open one free) nor BOSS_CRATES.
  *   - Its prize: one of every ride's HunChess colorway (HUNCHESS_RIDES in crates.ts), each as likely, rolled by the server; the second
  *     never gives the ride the first gave (while another is left). Not an admins-first boss's ride (`welcomeRide`, Nov 23).
  *   - Never tradeable, never listable (`tradeable`, every path that would move an item between accounts asks it), and no purity
@@ -26,14 +29,12 @@ export const WELCOME_TEXT = {
   thanks: "Thank you for being an early tester!",
   notTradeable: "Not tradeable",
   earned: "You earned a Welcome Crate!",
-  /**
-   * The progress hint toward the next crate: "Finish 5 games to earn your Welcome Crate: 3/5", then "Finish 25 games for your second
-   * Welcome Crate: 7/25".
-   */
-  progress: (games: number, milestone: number = WELCOME_GIFT.milestones[0]) =>
-    milestone === WELCOME_GIFT.milestones[0]
-      ? `Finish ${milestone} games to earn your Welcome Crate: ${Math.min(games, milestone)}/${milestone}`
-      : `Finish ${milestone} games for your second Welcome Crate: ${Math.min(games, milestone)}/${milestone}`,
+  /** The first's notice (Nov 27: given on the first visit). */
+  waiting: "A Welcome Crate is waiting in your inventory",
+  /** Until WELCOME_GIFT.openLevel: on its row and page, beside the padlock. */
+  locked: `Reach level ${WELCOME_GIFT.openLevel} to open`,
+  /** The server's refusal of an open below WELCOME_GIFT.openLevel. */
+  tooLow: `Reach level ${WELCOME_GIFT.openLevel} to open your Welcome Crate.`,
 } as const;
 
 /**
@@ -84,6 +85,17 @@ export function rollWelcome(rng: Rng, won: readonly string[] = []): CrateRoll {
     seed,
   };
 }
+
+/**
+ * The finished games a Welcome Crate needs (Eric, Nov 27): none for the first (given on the account's first visit), its milestone for
+ * the second (25). Each stays keyed by its milestone (5, 25).
+ */
+export const welcomeGamesNeeded = (milestone: number): number => (WELCOME_GIFT.firstOnVisit && milestone === WELCOME_GIFT.milestones[0] ? 0 : milestone);
+
+/** The XP from which a Welcome Crate opens (WELCOME_GIFT.openLevel: level 5 is 4 levels of XP.perLevel). */
+export const WELCOME_OPEN_XP = (WELCOME_GIFT.openLevel - 1) * XP.perLevel;
+/** Whether an account with this XP may open a Welcome Crate (level WELCOME_GIFT.openLevel or more; the server's check is its own). */
+export const welcomeOpens = (xp: number): boolean => levelOf(xp) >= WELCOME_GIFT.openLevel;
 
 /** The next Welcome Crate milestone an account hasn't earned (5, then 25), or null once it has both. */
 export const nextWelcomeMilestone = (earned: readonly number[]): number | null => WELCOME_GIFT.milestones.find((m) => !earned.includes(m)) ?? null;

@@ -15,6 +15,23 @@ describe("the crate opening", () => {
     expect(beam.burstAt).toBeLessThan(T.burstAt);
   });
 
+  it("the pull-back first (Eric, Nov 27: a rubber band): CRATE_OPEN.pullMs before the spin, silent; the second strip has none; every beat after the spin as before", () => {
+    expect([T.pullMs, T.spinAt, T.pullPx]).toEqual([CRATE_OPEN.pullMs, CRATE_OPEN.pullMs, CRATE_OPEN.pullPx]);
+    expect(CRATE_OPEN.pullPx).toBeGreaterThan(0);
+    expect(CRATE_OPEN.pullPx).toBeLessThanOrEqual(24);
+    const none = timeline(undefined, true, false);
+    expect(none.spinAt).toBe(0);
+    for (const k of ["stop", "dropAt", "landAt", "burstAt", "riseAt", "cardAt", "bannerAt"] as const) expect(T[k] - T.spinAt).toBe(none[k]);
+    expect(timeline(undefined, false).pullMs).toBe(0);
+    const all = cues(T, clicks, "rare");
+    expect(Math.min(...all.map((c) => c.at))).toBe(T.spinAt);
+    // Starting back, the strip has further to go: each edge a little later, the last still in the spin.
+    const pulled = clickTimes(T.spinMs, 360, STRIPS.crate.land, CRATE_OPEN.pullPx);
+    expect(pulled).toHaveLength(clicks.length);
+    pulled.forEach((ms, i) => expect(ms).toBeGreaterThan(clicks[i]!));
+    expect(pulled.at(-1)!).toBeLessThanOrEqual(T.spinMs);
+  });
+
   it("clicks at every tile edge, slower and slower, the last late in the spin (the near-edge creep), none after the overshoot", () => {
     expect(clicks.length).toBeGreaterThan(30);
     for (let i = 1; i < clicks.length; i++) expect(clicks[i]! - clicks[i - 1]!).toBeGreaterThan(0);
