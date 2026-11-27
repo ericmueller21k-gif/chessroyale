@@ -32,6 +32,7 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
   dough: ["doughDrop"],
   lockon: ["lockOn"],
   train: ["trainSignal"],
+  frostfire: ["frostfire"],
 };
 
 // (A boss in the game for admins first, Timber and Dash, is checked too: the test plays as an admin.)

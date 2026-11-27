@@ -461,6 +461,17 @@
       ],
       "specs": ["e2e/birdie.spec.ts", "e2e/boss-smoke.spec.ts"]
     },
+    "The Stranger (stranger)": {
+      "paths": [
+        "packages/chess/src/bosses/stranger.ts",
+        "packages/app/src/components/Stranger.tsx",
+        "packages/app/src/characters/stranger*.ts",
+        "packages/app/src/characters/effects/stranger.ts",
+        "packages/app/src/unlocks.ts",
+        "e2e/stranger.spec.ts"
+      ],
+      "specs": ["e2e/stranger.spec.ts", "e2e/boss-smoke.spec.ts"]
+    },
     "Timber (timber)": {
       "paths": [
         "packages/chess/src/bosses/timber.ts",
