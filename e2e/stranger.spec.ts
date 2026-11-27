@@ -83,7 +83,7 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   // (Every frame from the start, recorded in the page: the scene's own element and his figure's box, the ring, the dock's words.)
   await page.addInitScript(() => {
     const w = window as any;
-    w.__storm = { scene: [] as number[], outside: [] as string[], ring: 0, docks: [] as string[] };
+    w.__storm = { scene: [] as number[], outside: [] as string[], ring: 0, burn: 0, docks: [] as string[] };
     const look = () => {
       const fig = document.querySelector(".pm-storm .sg-fig");
       if (document.querySelector(".pm-storm")) w.__storm.scene.push(Date.now());
@@ -93,6 +93,8 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
         if (r.left + r.width * 0.25 < -1 || r.right - r.width * 0.25 > innerWidth + 1 || r.top + r.height * 0.1 < -1 || r.bottom > innerHeight + 1) w.__storm.outside.push(`${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.right)},${Math.round(r.bottom)}`);
       }
       if (document.querySelector(".sg-storm")) w.__storm.ring++;
+      // (The fire turn's burn, drawn as his thinking begins.)
+      if (document.querySelector(".pm-storm-burn .pw-burns")) w.__storm.burn++;
       const dock = document.querySelector(".bd-line, .dock-line")?.textContent ?? "";
       if (dock && w.__storm.docks.at(-1) !== dock) w.__storm.docks.push(dock);
       requestAnimationFrame(look);
@@ -146,7 +148,8 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   }
   expect([...kinds].sort()).toEqual(["fire", "ice"]);
   expect(burnt, "a marked piece of yours burnt").toBe(true);
-  const rec = await page.evaluate(() => (window as any).__storm as { scene: number[]; outside: string[]; ring: number; docks: string[] });
+  const rec = await page.evaluate(() => (window as any).__storm as { scene: number[]; outside: string[]; ring: number; burn: number; docks: string[] });
+  expect(rec.burn, "the burn drawn as his thinking began").toBeGreaterThan(5);
   // The scene: 10 to 12 s from his leap (its banner's second before it), every frame of him whole on screen.
   const ms = rec.scene.at(-1)! - rec.scene[0]!;
   expect(ms).toBeGreaterThan(10_500);

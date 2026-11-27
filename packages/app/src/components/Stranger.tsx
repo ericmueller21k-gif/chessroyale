@@ -233,17 +233,29 @@ const turnSeen = new Map<string, number>();
 export function strangerTurnMoments(boss: BossView, now = Date.now()): Moment[] {
   const p = boss.powers;
   if (boss.id !== "stranger" || !p) return [];
-  return p.events
+  const seen = (key: string) => {
+    let at = turnSeen.get(key);
+    if (at === undefined) {
+      turnSeen.set(key, (at = now));
+      if (turnSeen.size > 20) turnSeen.delete(turnSeen.keys().next().value!);
+    }
+    return at;
+  };
+  // (The burns as your move landed, his Frostfire's tile or his storm's marks: at once, as his thinking begins; strangerTurnMs gives
+  // them their time in it.)
+  const burns = p.events
+    .filter((e) => (e.kind === "frostfireBurn" || e.kind === "stormBurn") && e.turn === p.turn)
+    .map((e) => {
+      const key = `${boss.id}:${boss.startMove}:${p.turn}:${e.kind}`;
+      return { kind: e.kind, key, at: seen(key), ms: STRANGER_FX[e.kind as "frostfireBurn" | "stormBurn"], ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.shape ? { shape: e.shape } : {}) } satisfies Moment;
+    });
+  const finishers = p.events
     .filter((e) => e.kind === "finisher" && e.turn === p.turn && e.square)
     .map((e) => {
       const key = `${boss.id}:${boss.startMove}:${p.turn}:finisher:${e.square}`;
-      let at = turnSeen.get(key);
-      if (at === undefined) {
-        turnSeen.set(key, (at = now));
-        if (turnSeen.size > 20) turnSeen.delete(turnSeen.keys().next().value!);
-      }
-      return { kind: "finisher", key, at, ms: STRANGER_FX.finisher, square: e.square!, ...(e.shape ? { shape: e.shape } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.move ? { move: e.move } : {}) } satisfies Moment;
+      return { kind: "finisher", key, at: seen(key), ms: STRANGER_FX.finisher, square: e.square!, ...(e.shape ? { shape: e.shape } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.move ? { move: e.move } : {}) } satisfies Moment;
     });
+  return [...burns, ...finishers];
 }
 
 /**

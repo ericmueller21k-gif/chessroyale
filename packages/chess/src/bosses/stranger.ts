@@ -86,11 +86,13 @@ export function hisLoss(board: { fen: string; history: readonly string[]; bases?
 
 /**
  * How long his thinking lasts at least for his block (ms; the server's thinkMinAt and solo's bossTurn add it, as each boss's turn moments):
- * FINISHER_BLOCK_MS when a piece of his that isn't a pawn was just lost (hisLoss 3 or more); a storm's fire turn's burn as the crowd's
- * move landed, at least its moment (STRANGER_FX.stormBurn); else 0.
+ * FINISHER_BLOCK_MS when a piece of his that isn't a pawn was just lost (hisLoss 3 or more); a burn as the crowd's move landed (his
+ * Frostfire's tile, a storm's fire turn), at least its moment (STRANGER_FX); else 0.
  */
 export const strangerTurnMs = (boss: { id?: string; crowdSide: Side; board: { fen: string; history: readonly string[]; bases?: readonly Base[] | null }; powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): number =>
-  boss?.id !== "stranger" ? 0 : Math.max(hisLoss(boss.board, boss.crowdSide) >= 3 ? FINISHER_BLOCK_MS : 0, boss.powers?.events?.some((e) => e.kind === "stormBurn") ? STRANGER_FX.stormBurn : 0);
+  boss?.id !== "stranger"
+    ? 0
+    : Math.max(hisLoss(boss.board, boss.crowdSide) >= 3 ? FINISHER_BLOCK_MS : 0, boss.powers?.events?.some((e) => e.kind === "stormBurn") ? STRANGER_FX.stormBurn : 0, boss.powers?.events?.some((e) => e.kind === "frostfireBurn") ? STRANGER_FX.frostfireBurn : 0);
 
 const finisherTest = (test: string): { on: boolean; kind: number } => ({ on: test === "finisher" || test.startsWith("finisher-"), kind: test.startsWith("finisher-") ? FINISHERS.indexOf(test.slice(9) as Finisher) : -1 });
 export const finisherOf = (pick: number | undefined): Finisher => FINISHERS[(((pick ?? 0) % FINISHERS.length) + FINISHERS.length) % FINISHERS.length]!;
