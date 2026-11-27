@@ -11,6 +11,8 @@ import { asSignedIn, localSql, test, townReady, townTap } from "./helpers.ts";
  * `?pool=`). Number checks through `__townHere()` (who's where, seated at which table, in which game) and the canvas's `data-you`.
  */
 test.use({ actionTimeout: 15_000 });
+// (Three towns open at once in the second test: the two never run side by side.)
+test.describe.configure({ mode: "serial" });
 
 type Here = { uid: string | null; you: boolean; name: string; at: [number, number]; here: boolean; table: number | null; match: string | null };
 const hereOf = (p: Page) => p.evaluate(() => (window as unknown as { __townHere: () => Here[] }).__townHere());
@@ -20,12 +22,16 @@ const card = (p: Page) => p.getByRole("dialog", { name: "Chess table", exact: tr
 const search = (p: Page) => p.getByRole("dialog", { name: "Finding an opponent" });
 const tag = () => `${test.info().project.name.slice(0, 1)}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
+/** A still for Eric (`TOWN_STILLS`: a folder outside the repo; never in CI). */
+const still = async (p: Page, name: string) => void (process.env.TOWN_STILLS && (await p.screenshot({ path: `${process.env.TOWN_STILLS}/${name}-${test.info().project.name}.png` })));
+
 /** A signed-in player named `name`, in this test's town and queue (a phone or a computer, as this project). */
 async function into(page: Page, name: string, room: string, pool: string) {
   const id = await asSignedIn(page, "tr");
   await localSql(page, "UPDATE users SET name = ? WHERE id = ?", name, id);
   await page.goto(`/town?sky=day&debug&townroom=${room}&pool=${pool}`);
-  await townReady(page);
+  // (Up to three towns load one after another here, beside the other project's: longer than townReady's 40 s on a busy runner.)
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
   await page.waitForFunction(() => typeof (window as unknown as { __townHere?: unknown }).__townHere === "function");
   return id;
 }
@@ -36,12 +42,21 @@ async function another(browser: Browser) {
   return ctx.newPage();
 }
 
+/** The park's tables used here: 3 at (19, 31), 4 at (26, 31). You walk to the square two before one (a bot or a chip can stand in front of it far off). */
+const TABLE_COL: Record<number, number> = { 3: 19, 4: 26 };
+async function walkUpTo(page: Page, i: number) {
+  const c = TABLE_COL[i]!;
+  expect(await townTap(page, "square", [c, 29]), `the square before table ${i}`).toBe(true);
+  await expect.poll(() => youAt(page), { timeout: 10_000 }).toBe(`${c},29`);
+}
+
 /**
  * A tap on table `i` (walking you to its free stool), then its card's Ranked, once you sit there: the search over the town (`waits`: it
  * shows; the second of a pair can be paired with the first at once).
  */
 async function rankedAt(page: Page, i: number, waits = true) {
-  expect(await townTap(page, "table", i), `table ${i} is drawn at the start`).toBe(true);
+  await walkUpTo(page, i);
+  expect(await townTap(page, "table", i), `table ${i} is drawn`).toBe(true);
   await expect(card(page)).toBeVisible();
   await expect(card(page).getByRole("button", { name: "Casual", exact: true })).toBeDisabled();
   await expect(canvas(page)).toHaveAttribute("data-sit", "1", { timeout: 8000 });
@@ -58,6 +73,7 @@ test("a table's Ranked opens the 1 v 1 search over the town, you seated; Cancel 
   await rankedAt(page, 3);
   const stool = await youAt(page);
   expect(stool, "a stool of table 3, (19, 31)").toMatch(/^(18|20),31$/);
+  await still(page, "search-over-town");
   // The town is still there under it, still drawn; no Home on the stage (Cancel is the way back).
   await expect(canvas(page)).toBeVisible();
   await expect(search(page).getByRole("button", { name: /Home/ })).toHaveCount(0);
@@ -73,7 +89,7 @@ test("a table's Ranked opens the 1 v 1 search over the town, you seated; Cancel 
   expect(errors).toEqual([]);
 });
 
-test("two players found from two tables sit at the first's for a third visitor, who opens the game's spectator view; its end frees the table and its player's Back to town seats her there", async ({ page, browser }, info) => {
+test("two players found from two tables sit at the first's for a third visitor, who opens the game's spectator view; its end frees the table and its player's Back to town seats her there", async ({ page, browser }) => {
   test.setTimeout(240_000);
   const room = `tr${tag()}`;
   const pool = `p${tag()}`;
@@ -100,19 +116,20 @@ test("two players found from two tables sit at the first's for a third visitor, 
     )
     .toEqual(["ann@3:game", "bo@3:game"]);
   const code = (await hereOf(cy)).find((h) => h.match)!.match!;
-  if (process.env.TOWN_STILLS) await cy.screenshot({ path: `${process.env.TOWN_STILLS}/seated-pair-${info.project.name}.png` });
+  await still(cy, "seated-pair-far");
   // Cy walks up (two squares before it) and taps Ann, seated there: her table's card offers Spectate (who's playing), not a seat.
-  expect(await townTap(cy, "square", [19, 29])).toBe(true);
-  await expect.poll(() => youAt(cy), { timeout: 10_000 }).toBe("19,29");
+  await walkUpTo(cy, 3);
   expect(await townTap(cy, "player", annId)).toBe(true);
   await expect(card(cy)).toContainText(/Ann vs Bo|Bo vs Ann/);
   await expect(card(cy).getByRole("button", { name: "Ranked" })).toHaveCount(0);
+  await still(cy, "seated-pair-card");
   await card(cy).getByRole("button", { name: "Spectate", exact: true }).click();
   const watch = cy.locator(".dv-watch");
   await expect(watch).toBeVisible();
   await expect(watch.locator(".dv-strip")).toHaveCount(2);
   // (Black's strip at the top, White's at the foot: either way round.)
   await expect.poll(async () => (await watch.locator(".dv-strip .dv-name").allInnerTexts()).map((n) => n.trim()).sort()).toEqual(["Ann", "Bo"]);
+  await still(cy, "spectating");
   // Ann leaves before the first moves (an abort): Cy's view says so, and the town's table is free again.
   await expect.poll(() => page.evaluate(() => (window as unknown as { duel?: { snapshot(): { phase: string } } }).duel?.snapshot().phase ?? null), { timeout: 30_000 }).toMatch(/^(vote|overlay|play)$/);
   await page.getByRole("button", { name: "Match options" }).click();
