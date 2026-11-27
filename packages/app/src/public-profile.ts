@@ -1,4 +1,4 @@
-import { CROWD_SETTINGS, DEFAULT_SETTINGS, HIDDEN_ROOM, RECLUSE_FORMS, SLOT_NAMES, bossDef, divisionTitle, bossInfo, itemColor, itemDef, itemName, secondColor, shownLook, tierInfo, type ItemLook, type ItemSlot, type RankedRecentGame, type RankView } from "@chessroyale/core";
+import { CROWD_SETTINGS, DEFAULT_SETTINGS, HIDDEN_ROOM, RECLUSE_FORMS, SLOT_NAMES, recluseFormsAt, bossDef, divisionTitle, bossInfo, itemColor, itemDef, itemName, secondColor, shownLook, tierInfo, type ItemLook, type ItemSlot, type RankedRecentGame, type RankView } from "@chessroyale/core";
 import type { PublicProfile } from "./account.ts";
 
 /**
@@ -143,6 +143,13 @@ export function recluseFormsShown(r: Pick<PublicProfile["recent"][number], "mode
   if (typeof r.formsBeaten === "number" && Number.isFinite(r.formsBeaten)) return Math.max(0, Math.min(all, Math.round(r.formsBeaten)));
   return r.won === true ? all : 0;
 }
+
+/**
+ * The count a solo fight against him stores (App.tsx soloResult; core's recluseFormsAt, as online): Boss alone only (`mode` "boss"); his
+ * four boards once phase 2 began (`simul` on the result); else the runner's boss, its form counted once it fell. Null for any other.
+ */
+export const soloFormsBeaten = (mode: string, boss: Parameters<typeof recluseFormsAt>[1], teamWon: boolean | null, simul?: unknown): number | null =>
+  recluseFormsAt(mode === "boss", boss, teamWon === true, !!simul);
 
 /**
  * One of the profile's other games (crowd, a raid, Squads, Classic) as a row. "Ranked" when it counted toward their rating (the
