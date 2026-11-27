@@ -2055,3 +2055,61 @@ test("rare frames: gold Legendary, diamond Mythic, commons plain; the magnifier 
   await expect(page.getByRole("dialog").locator(".item-preview-tier")).toHaveText("Mythic · Head");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
+
+/**
+ * A crate page (Nov 27, Eric): "▶ Open" sits under the crate, the width of its box; a tap on the crate asks first ("Open this
+ * crate?": Cancel or Escape closes it, nothing opens; Open starts the opening as the button does); "Colors and purity" opens by
+ * default, and once a player closes it, it stays closed through a reload. Last in the file: its crates and item stay off the other tests' counts.
+ * SHOP_SHOTS: the still for the PR, phone and computer.
+ */
+test("a crate page (Nov 27): Open sits under the crate, its box's width; a tap on the crate asks first (Cancel closes, Open starts it); Colors and purity opens by default and stays closed once closed", async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await asServerAdmin(page);
+  await page.goto("/shop?crates");
+  const grants = page.getByRole("region", { name: "Admin test grants" });
+  await grants.getByRole("combobox", { name: "Crate" }).selectOption("beta-001");
+  await grants.getByRole("button", { name: "+5 crates" }).click();
+  await grants.getByRole("button", { name: "+1 crate key" }).click();
+  const row = page.locator('.crate-row[data-crate="beta-001"]');
+  await expect(row).toContainText("You have 5");
+  await row.click();
+  // "Colors and purity" is open by default; a tap closes it, and after a reload it is still closed.
+  const colors = page.locator(".odds-more");
+  await expect(colors).toHaveJSProperty("open", true);
+  await colors.locator("summary").click();
+  await expect(colors).toHaveJSProperty("open", false);
+  await page.reload();
+  await row.click();
+  await expect(page.locator(".crate-held")).toContainText("You have 5");
+  await expect(page.locator(".odds-more")).toHaveJSProperty("open", false);
+  // The Open sits under the crate: the crate's box's width, a gap below it, above the title.
+  const layout = await page.evaluate(() => {
+    const hero = document.querySelector(".crate-hero")!.getBoundingClientRect();
+    const open = document.querySelector(".crate-open-btn")!.getBoundingClientRect();
+    return { heroW: hero.width, openW: open.width, gap: open.top - hero.bottom };
+  });
+  expect(layout.openW).toBeCloseTo(layout.heroW, 0);
+  expect(layout.gap).toBeGreaterThanOrEqual(0);
+  expect(layout.gap).toBeLessThan(16);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/crate-page-open-${test.info().project.name}.png` });
+  // A tap on the crate asks first: Cancel closes it and nothing opens; Escape closes it too.
+  const art = page.locator(".crate-art-btn");
+  await art.click();
+  const ask = page.getByRole("alertdialog");
+  await expect(ask).toContainText("Open this crate?");
+  await expect(ask).toContainText("It uses 1 crate key.");
+  await ask.getByRole("button", { name: "Cancel" }).click();
+  await expect(ask).toHaveCount(0);
+  await expect(page.locator(".cox-reel")).toHaveCount(0);
+  await art.click();
+  await expect(ask).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(ask).toHaveCount(0);
+  // Open from the pop-up starts the opening, as the button does.
+  await art.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.locator(".cox-reel")).toBeVisible({ timeout: 15_000 });
+  expect(errors).toEqual([]);
+});

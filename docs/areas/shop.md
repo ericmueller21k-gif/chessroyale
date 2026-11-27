@@ -222,6 +222,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     counts the drops).
 - **Boingo's claw machine** (Nov 6; [2026-11-06-claw-machine.md](../decisions/2026-11-06-claw-machine.md); `CLAW`): its coin slot in his Funhouse opens `openClawMachine()`. One boss
   token in, 25% of the time that boss's Boss Crate, unopened: `POST /api/shop/claw {boss, request}` rolls it through the ledger (`clawOp`, keyed by `request`).
+- **A crate's page** (Nov 27; [2026-11-27-crate-page-open.md](../decisions/2026-11-27-crate-page-open.md)): "▶ Open" sits right under the crate, its box's width (a Welcome Crate's too); a tap on an openable crate's art asks "Open this crate?" first (`Confirm`, MatchMenu; Cancel, Escape or a tap outside closes it, Open starts the opening as the button does); "Colors and purity" opens by default and stays closed once closed (`hunchess-crate-colors-closed`). Test: `e2e/shop.spec.ts` ("a crate page (Nov 27)").
 - **The Crates tab's order** (Eric, Nov 25: "refactor this page a bit ... put the admin stuff all the way at the bottom";
   [2026-11-25-crates-page-tidy.md](../decisions/2026-11-25-crates-page-tidy.md)), top to bottom: Keys × N and Crates × N; **Ready to
   open** (a ready Welcome Crate, "Choose your boss crate" when one waits, the series and boss crates you hold; none: "Nothing to open right

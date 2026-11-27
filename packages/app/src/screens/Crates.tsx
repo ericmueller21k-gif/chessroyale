@@ -69,6 +69,7 @@ import { TokenArt } from "../components/TokenArt.tsx";
 import { Avatar, BetaCrateArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, MythicCrateArt, PresentArt, SupplyBoxArt, TranscendentArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
+import { Confirm } from "../components/MatchMenu.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { crateSoundsReady, play, unlockAudio, warmCrateSounds } from "../sound.ts";
 import { BonusStage, CrateStage, OpenLayer } from "../crate-open/CrateOpenStage.tsx";
@@ -142,6 +143,24 @@ function getUnseen(): Unseen | null {
     // Fall back to memory.
   }
   return unseenHere;
+}
+
+// "Colors and purity" opens by default; a player who closes it keeps it closed (Eric, Nov 27). Only the closed choice is stored.
+const COLORS_CLOSED_KEY = "hunchess-crate-colors-closed";
+function colorsClosedSaved(): boolean {
+  try {
+    return localStorage.getItem(COLORS_CLOSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function setColorsClosedSaved(closed: boolean) {
+  try {
+    if (closed) localStorage.setItem(COLORS_CLOSED_KEY, "1");
+    else localStorage.removeItem(COLORS_CLOSED_KEY);
+  } catch {
+    // No storage (private mode): it opens again next time, which is the default.
+  }
 }
 
 /** A crate by its id: the Crates tab's own (a series crate: one you hold opens with a crate key, Nov 9), or a boss's (bought in its shop, picked at a level or won, held until you open it). */
@@ -610,8 +629,30 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   // (How many of them are bonus ones: "You have 2 (1 bonus)". Nov 24.)
   const heldWords = `${held}${bonusHeld ? ` (${bonusHeld} bonus)` : ""}`;
   const [opening, setOpening] = useState(!!resume);
+  // The pop-up a tap on the crate's art asks first (Open this crate?), shown only when the crate can open.
+  const [askOpen, setAskOpen] = useState(false);
+  // (Read once, on mount: the player's own taps change the open panel after that, never a re-render.)
+  const [colorsOpen] = useState(() => !colorsClosedSaved());
   // (The opening's sounds made ahead in the sound worker as its page opens, once sound is on: before the Open's tap.)
   useEffect(() => warmCrateSounds(), []);
+  // Escape closes the pop-up, and only it: captured here so the shop's own Escape (back) doesn't also run.
+  useLayoutEffect(() => {
+    if (!askOpen) return;
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setAskOpen(false);
+    };
+    window.addEventListener("keydown", esc, true);
+    return () => window.removeEventListener("keydown", esc, true);
+  }, [askOpen]);
+  // The Open: a tap on the button or the pop-up's Open, the same.
+  const startOpen = () => {
+    // (A tap: the moment a phone allows sound, so the strip's clicks are heard.)
+    unlockAudio();
+    play("menuSelect");
+    setOpening(true);
+  };
   const look = CRATE_LOOKS[crate.look];
   // Commonest first; Legendary and Mythic (Fischer Random) last.
   const items = [...crate.items].sort((a, b) => tierIndex(a) - tierIndex(b));
@@ -632,9 +673,15 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         ‹ Crates
       </button>
       <div class="ff-window crate-hero">
-        <span class="crate-hero-art">
-          <look.Crate />
-        </span>
+        {canOpen ? (
+          <button type="button" class="crate-hero-art crate-art-btn" aria-label="Open this crate" onClick={() => setAskOpen(true)}>
+            <look.Crate />
+          </button>
+        ) : (
+          <span class="crate-hero-art">
+            <look.Crate />
+          </span>
+        )}
         <strong>
           <CrateName name={crate.name} />
         </strong>
@@ -655,6 +702,24 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           </span>
         )}
       </div>
+      {/* (Greyed with none to open, or a series crate with no key: shown, not hidden. Full width, under the crate: Eric, Nov 27.) */}
+      <button type="button" class="ff-button crate-open-btn" disabled={!canOpen} onClick={startOpen}>
+        {boss ? "▶ Open" : "▶ Open · uses 1 key"}
+      </button>
+      {askOpen && (
+        <div class="crate-confirm-overlay" onClick={() => setAskOpen(false)}>
+          <Confirm
+            heading="Open this crate?"
+            note={boss ? `You have ${heldWords}.` : "It uses 1 crate key."}
+            go="Open"
+            onCancel={() => setAskOpen(false)}
+            onGo={() => {
+              setAskOpen(false);
+              startOpen();
+            }}
+          />
+        </div>
+      )}
       <h3 class="ff-title">{look.boxes}</h3>
       <p class="small muted">
         {liveStrip(crate).every((x) => x.tier === FISCHER)
@@ -721,7 +786,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           );
         })}
       </div>
-      <details class="odds-more">
+      <details class="odds-more" open={colorsOpen} onToggle={(e) => setColorsClosedSaved(!e.currentTarget.open)}>
         <summary>Colors and purity</summary>
         <p class="small">Every item also rolls a color and a purity, 0-100%. The lower its purity, the more it's blotched (at 0%, all over, a shade darker). At 90% or more it's shiny ✨ (about 1 in 250).</p>
         <div class="color-odds">
@@ -754,20 +819,6 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           </label>
         </div>
       )}
-      {/* (Greyed with none to open, or a series crate with no key: shown, not hidden.) */}
-      <button
-        type="button"
-        class="ff-button"
-        disabled={!canOpen}
-        onClick={() => {
-          // (A tap: the moment a phone allows sound, so the strip's clicks are heard.)
-          unlockAudio();
-          play("menuSelect");
-          setOpening(true);
-        }}
-      >
-        {boss ? "▶ Open" : "▶ Open · uses 1 key"}
-      </button>
     </div>
   );
 }
@@ -806,6 +857,18 @@ function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Un
         </span>
         {row.ride && <span class="small">{itemDef(row.ride.def)?.name}</span>}
       </div>
+      <button
+        type="button"
+        class="ff-button crate-open-btn"
+        disabled={row.state !== "ready"}
+        onClick={() => {
+          unlockAudio();
+          play("menuSelect");
+          setOpening(true);
+        }}
+      >
+        ▶ Open
+      </button>
       <p class="small muted">
         Two per account: Welcome Crate 1 for finishing {WELCOME_GIFT.milestones[0]} games in any mode or against any boss, Welcome Crate 2 at{" "}
         {WELCOME_GIFT.milestones[1]}. Each holds one ride, any of the game's rides, each as likely (the second never the first's), in HunChess
@@ -831,18 +894,6 @@ function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Un
           );
         })}
       </div>
-      <button
-        type="button"
-        class="ff-button"
-        disabled={row.state !== "ready"}
-        onClick={() => {
-          unlockAudio();
-          play("menuSelect");
-          setOpening(true);
-        }}
-      >
-        ▶ Open
-      </button>
     </div>
   );
 }
