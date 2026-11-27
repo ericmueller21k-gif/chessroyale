@@ -99,6 +99,6 @@ ran the code before the change (`TOWER_DRAW=off` draws the same way); "careless"
 - **The climb is felt from floor 11:** with the draw back to the usual and +40 a floor, the 1000 bot wins about a third of floors 11
   to 20 and is out by 12 to 14; the 1500 bot wins about 57% and is out by 13 to 17. No run passed floor 17, so floors 10 to 30 are
   not too easy and the climb from 10 stays as it was (point 3 of the brief: steeper only if the sim said so).
-- **Short of the 20s for the 1500 bot:** read as the floor (the worst case), as above: the bot doesn't know the powers (almost every
-  lost floor was a mate: 7 of 9 careless losses at 1000 in the first two runs, every one at 1500). If Eric's own climbs find floors
+- **Short of the 20s for the 1500 bot:** read as the floor (the worst case), as above: the bot doesn't know the powers (most lost
+  floors were mates: 10 of 12 at 1000 and 7 of 9 at 1500 in the finished runs, the rest stalemates or other draws). If Eric's own climbs find floors
   11 to 15 a wall, the knob is the last `carelessDraw` row (say, the usual draw from floor 14 instead of 10).
