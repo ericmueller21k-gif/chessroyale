@@ -15,8 +15,8 @@ export function DuelRankPill({ rank, class: cls = "" }: { rank: RankView; class?
 
 /**
  * A player's rank in a 1 v 1 game's strip (Eric, Nov 25: "the emblem next to everyone... click on someone's rank and then it shows the
- * list of rankings"): their emblem (its box always there, empty in placements and for a bot, as on the stage) and the pill, one button
- * that opens the Ranks pop-up with their rank marked.
+ * list of rankings"): their emblem (its box always there, empty in placements, as on the stage) and the pill, one button
+ * that opens the Ranks pop-up with their rank marked. Ranked games only: a town or bot game keeps its pill alone (Duel.tsx DuelStrip).
  */
 export function DuelRankButton({ rank, who }: { rank: RankView; who: string }) {
   const [open, setOpen] = useState(false);
