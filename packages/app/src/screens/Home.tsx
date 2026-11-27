@@ -726,7 +726,9 @@ export function HomeScreen({
   // A boss unlocked by a win, not yet won (the Stranger, Eric Nov 27): his card shows him, every way to play greyed, the line says how.
   const unlocks = useUnlocks();
   const lockedPick = (id: string) => selectBosses().unlock.some((b) => b.id === id) && !unlocks.includes(id);
-  const unlockPicked = lockedPick(pick);
+  // (A test link's boss, `?boss=` where test switches are allowed, starts whoever it names, as the Hidden Boss's does: the guard
+  // tests meet every boss in BOSS_KITS that way. Online the server still checks the account's unlocks.)
+  const unlockPicked = lockedPick(pick) && !bossInUrl();
   // Boss Battle's party: in one with someone else, the stage shows them and START becomes the party's.
   const bp = bossParty?.client && !bossParty.client.done ? bossParty.client : null;
   const [, partyDrawn] = useState(0);
