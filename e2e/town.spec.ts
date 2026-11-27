@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { BOTS, STATUES, TABLES, TOWN_LINES, sidekickText } from "../packages/app/src/town/world.ts";
 import { BOARD_SEL, aDeployLanded, giveItems, tapInTown, test, townTap, townTapPoint, wearItem } from "./helpers.ts";
+import { TOWN_ITEM_FRAMES } from "@chessroyale/core";
 
 /**
  * The town square (/town; hidden: docs/areas/town-square.md), on a phone and a computer: the page loads, its world is
@@ -1839,5 +1840,46 @@ test("the arrow keys: holding ArrowUp walks you up and the up key lights while i
   await expect.poll(async () => (await you(page))[1], { message: "the on-screen down arrow walks you down", timeout: 8000 }).toBeLessThanOrEqual(r1 - 2);
   await page.mouse.up();
   await expect(down).not.toHaveClass(/\bon\b/);
+  expect(errors, "no page or console errors").toEqual([]);
+});
+
+test("an item that plays in the town (Eric, Nov 27: \"it needs to be playing in the town\"): your pawn wearing the Gift-Wrap Tube twists, its loop's frames painted once as you're dressed, the picture drawn changing as time passes, and walking uploads none of them", { tag: "@phone-only" }, async ({ page }) => {
+  type W = { __townYou: () => { moving: boolean; item: { frames: number; drawn: number } | null } | null; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townPaint: () => { uploads: number; resets: number } };
+  const errors = watchErrors(page);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+  const [tube] = await giveItems(page, [{ def: "gift-tube", color: "cobalt", blemish: 30 }]);
+  await wearItem(page, "weapon", tube!);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await page.evaluate(() => (window as unknown as W).__townHush(true));
+  // The frames drawn over 2 s (its loop is 1.5 s): several of them, each picked by the clock, none made in the frame.
+  const look = () =>
+    page.evaluate(async () => {
+      const w = window as unknown as W;
+      const seen = new Set<number>();
+      const t0 = performance.now();
+      while (performance.now() - t0 < 2000) {
+        await new Promise((go) => requestAnimationFrame(go));
+        const it = w.__townYou()?.item;
+        if (it) seen.add(it.drawn);
+      }
+      return { frames: w.__townYou()?.item?.frames ?? 0, seen: [...seen] };
+    });
+  const still = await look();
+  expect(still.frames, "the tube's loop: its frames").toBe(TOWN_ITEM_FRAMES.items["gift-tube"]!.n);
+  expect(still.seen.filter((i) => i >= 0).length, `frames drawn standing (${still.seen.join(", ")})`).toBeGreaterThanOrEqual(3);
+  // Walking a few squares, the loop still playing: nothing uploaded, no atlas page started again (its frames were kept on the loading screen).
+  const before = await page.evaluate(() => (window as unknown as W).__townPaint());
+  for (const sq of [[25, 20], [20, 20], [22, 17]] as const) {
+    await page.evaluate((s) => (window as unknown as W).__townWalk(s), sq);
+    await page.waitForTimeout(300);
+    await page.waitForFunction(() => !(window as unknown as W).__townYou()?.moving, null, { timeout: 8000 }).catch(() => undefined);
+  }
+  const walked = await look();
+  expect(walked.seen.filter((i) => i >= 0).length, `frames drawn after the walk (${walked.seen.join(", ")})`).toBeGreaterThanOrEqual(3);
+  const after = await page.evaluate(() => (window as unknown as W).__townPaint());
+  expect(after.uploads - before.uploads, "pictures uploaded while it played and you walked").toBe(0);
+  expect(after.resets - before.resets, "atlas pages started again").toBe(0);
   expect(errors, "no page or console errors").toEqual([]);
 });
