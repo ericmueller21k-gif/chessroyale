@@ -1336,6 +1336,29 @@ export const BATTLE_TOWER = {
    */
   soloBonus: 100,
   /**
+   * The first floors play like bad players (Eric, Nov 26: "everybody should be getting through the first like 6, 7, 8 without like any
+   * issue, unless you're like a terrible, terrible chess player ... I want these guys to play like bad players for the first 8 to 10
+   * levels"). Maia is at its lowest rating there already (BOSS_BRAIN.maiaRatingMin; reports/maia-calibration.md: 600 "can't be made
+   * easier"), so these floors draw Maia's move looser instead (core floorDraw): rows of [floor, temperature, topP], on straight lines
+   * between them, held at the first row before it; from the last row's floor on, BOSS_BRAIN's own draw (the last row is it: 0.8, 0.9).
+   * A temperature above 1 and topP 1 make a low player's real slips likelier (the box draws from every legal move). Solo and online
+   * alike: the battle's brain plan carries it (BossBrainPlan.draw, NetBossBrain.draw). The sims' tries: reports/tower-sim.md.
+   */
+  carelessDraw: [
+    [1, 1.6, 1],
+    [10, 0.8, 0.9],
+  ] as readonly (readonly [number, number, number])[],
+  /**
+   * Never a gift (Eric, Nov 26: "I don't want these bosses to [be] giving up your queen for nothing, but ... sometimes if they leave their
+   * queen hanging because they just like miss a move ... that's normal for a bad player"): on every Maia floor, a drawn move that puts the
+   * moved queen or rook (giftPieces) where it's simply lost is drawn again from Maia's other listed moves (boss-brain.ts giftedMaterial: a
+   * static exchange on its square with chess.js, no engine; lost: the crowd comes out at least giftLoss pawns up, net of what the move
+   * took). A piece already hanging may stay hanging: a missed threat is allowed. The director's call: rooks too (a rook for nothing
+   * reads as a gift as much as a queen); a rook for a minor piece (2) is a bad trade, not a gift.
+   */
+  giftPieces: ["q", "r"] as readonly string[],
+  giftLoss: 3,
+  /**
    * From this floor Stockfish (Eric: "at 50 wins ... we swap to stock fish and continue up"): its UCI_Elo stockfishStart, +stockfishStep a
    * floor, held at its ceiling (ENGINE_MAX_ELO, 3190); from the floor after that, its best every move. Nov 20 (the director's call, with
    * the gentler Maia climb): from about where Maia's floors end (1750, not a jump to 2500), +31 a floor: its ceiling on floor 98, and the top floor (99) its best.

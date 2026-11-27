@@ -1,4 +1,4 @@
-import { BOSS_BRAIN, BOSS_CHECK, BOSS_POWERS, lossForRating, openingPlies, type BossBrain, type BossPowerSettings, type Rng } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_CHECK, BOSS_POWERS, lossForRating, openingPlies, type BossBrain, type BossPowerSettings, type MaiaDraw, type Rng } from "@chessroyale/core";
 import type { BoardSlot, NetBoard } from "./protocol.ts";
 import { recentMoves, type BoardState } from "./boards.ts";
 import { applyMove, gameEnd, legalMoves, sideToMove } from "./rules.ts";
@@ -224,6 +224,8 @@ export interface BossBrainCall {
   settings?: typeof BOSS_BRAIN;
   /** Maia draws with this seed (an online boss move two devices play: BOSS_CHECK); none, at random. */
   seed?: number;
+  /** Maia's draw when not BOSS_BRAIN's (a Battle Tower floor's, BossBrainPlan.draw): its temperature and topP, and never a gift. */
+  draw?: MaiaDraw;
   onNote?(note: BrainNote): void;
 }
 
@@ -559,7 +561,10 @@ async function pickBossMove(
   const human = brain && brain.brain !== "stockfish" ? brain : null;
   const share = human && k !== "stagger" && (human.stockfishShare ?? 0) > 0 ? rng() < human.stockfishShare! : false;
   const asked = performance.now();
-  const ask = human && k !== "stagger" && !share && human.engine.ready() ? human.engine.candidates(fen, human.rating, allowed, { temperature: human.settings?.temperature ?? BOSS_BRAIN.temperature, topP: human.settings?.topP ?? BOSS_BRAIN.topP, multipv: human.settings?.multipv ?? BOSS_BRAIN.multipv, ...(human.seed ? { seed: human.seed } : {}) }) : null;
+  // (A tower floor's own draw (human.draw: looser on the first floors), else BOSS_BRAIN's.)
+  const temperature = human?.draw?.temperature ?? human?.settings?.temperature ?? BOSS_BRAIN.temperature;
+  const topP = human?.draw?.topP ?? human?.settings?.topP ?? BOSS_BRAIN.topP;
+  const ask = human && k !== "stagger" && !share && human.engine.ready() ? human.engine.candidates(fen, human.rating, allowed, { temperature, topP, multipv: human.settings?.multipv ?? BOSS_BRAIN.multipv, ...(human.seed ? { seed: human.seed } : {}) }) : null;
   // A boss power can stop the boss too (nobody moves onto a pie): it plays the best of what's allowed.
   const all = await engine.topMoves(fen, 8);
   const ok = allowed ? new Set(allowed) : null;
@@ -576,7 +581,8 @@ async function pickBossMove(
       const answer = await within(ask, (human.settings?.timeoutMs ?? BOSS_BRAIN.timeoutMs) - (performance.now() - asked));
       if (!answer) human.onNote?.({ ...note, by: "stockfish", why: "no answer" });
       else {
-        const pick = humanBrainMove(human.brain, answer, top, allowed, human.settings);
+        // (Never a gift on a tower floor: a draw that gives away the queen or rook it moves is drawn again, from this move's random source.)
+        const pick = humanBrainMove(human.brain, answer, top, allowed, human.settings, human.draw?.noGift ? { fen, temperature, rng } : null);
         if (pick.move) {
           human.onNote?.({ ...note, by: "maia", ...(pick.rank ? { rank: pick.rank } : {}), vetoed: pick.vetoed, ms: answer.ms });
           return pick.move;
