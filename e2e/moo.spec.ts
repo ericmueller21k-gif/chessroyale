@@ -159,7 +159,9 @@ test("Moo & Moon: a moonbeam falls on one of your pieces and burns a crescent in
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=moo");
+  // (?ult=0: no Full Moon. The danger line, Nov 26, fills his meter at once when engine-best moves put you well ahead, and its flurry
+  // stunned five more pieces on his 4th move: CI, Nov 27.)
+  await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=moo&ult=0");
   await bossAloneFromHome(page);
   await yourMove(page);
   await record(page);

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { account, keepSoloResult, loadAccount, recordSoloResult, retryAccount, signOut, startSoloBossBattle, startSoloGame, verifyEmailCode } from "../src/account.ts";
+import { account, keepSoloResult, loadAccount, recordSoloResult, retryAccount, signOut, startSoloBossBattle, startSoloGame, updateChatOn, verifyEmailCode } from "../src/account.ts";
 import { siteSignedOut } from "../src/site-gate.ts";
 import { FRONT_DOOR, SOLO_ABANDON } from "@chessroyale/core";
 import { testSwitchesAllowed } from "../src/test-switches.ts";
@@ -380,5 +380,43 @@ describe("the account's load and a solo game left (SOLO_ABANDON, Nov 22)", () =>
     expect(other.calls.some((c) => c.startsWith("/api/results"))).toBe(false);
     await loadAccount();
     expect(other.calls.filter((c) => c.startsWith("/api/me")).at(-1)).toBe("/api/me?settle=1");
+  });
+});
+
+describe("the chat switch", () => {
+  it("off then on before the off's save is answered: the server gets them in that order, and chat stays on whatever order the answers come in (main ec5b415, Nov 27)", async () => {
+    const SIGNED = { ...PROFILE, user: { ...PROFILE.user, signedIn: true }, chatOn: true };
+    let server = true;
+    const sent: boolean[] = [];
+    const held: (() => void)[] = [];
+    vi.stubGlobal("fetch", async (path: string, init?: RequestInit) => {
+      if (path.startsWith("/api/auth/config")) return Response.json(CONFIG);
+      if (init?.method === "PATCH") {
+        const on = (JSON.parse(String(init.body)) as { chatOn: boolean }).chatOn;
+        sent.push(on);
+        server = on;
+        const answer = { ...SIGNED, chatOn: on };
+        // (The first save's answer held back until the test lets it go: a slow runner.)
+        if (sent.length === 1) await new Promise<void>((go) => held.push(go));
+        return Response.json(answer);
+      }
+      return Response.json({ ...SIGNED, chatOn: server });
+    });
+    await loadAccount();
+    expect(account().profile?.chatOn).toBe(true);
+    const off = updateChatOn(false);
+    expect(account().profile?.chatOn).toBe(false);
+    const on = updateChatOn(true);
+    expect(account().profile?.chatOn, "shown at once").toBe(true);
+    await vi.waitFor(() => expect(held).toHaveLength(1));
+    // The second waits for the first: never two at once at the server.
+    expect(sent).toEqual([false]);
+    held[0]!();
+    await off;
+    expect(account().profile?.chatOn, "the off's late answer doesn't turn it back off").toBe(true);
+    await on;
+    expect(sent).toEqual([false, true]);
+    expect(server).toBe(true);
+    expect(account().profile?.chatOn).toBe(true);
   });
 });

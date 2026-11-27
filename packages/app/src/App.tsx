@@ -287,6 +287,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...(q.get("darkblock") === "2" || q.get("darkblock") === "3" ? { hollowBlockTest: Number(q.get("darkblock")) as 2 | 3 } : {}),
     // Testing, solo: ?mate=1, the boss mates you at once (1.f3 e5 2.g4, its move): its attack on your king, then the result.
     ...(q.get("mate") === "1" ? { bossMateTest: true } : {}),
+    // Testing, solo: ?ult=0, the boss has no ultimate this battle (a test of his passive alone: the danger line can't bring it early).
+    ...(q.get("ult") === "0" ? { bossNoUltTest: true } : {}),
     // Testing, solo: ?paint=1 or 2 (with ?boss=smudgy), his rook already hidden where your king can step into its line: a move the
     // board you see offers and the real board refuses ("A painted piece stops that move."). His moves are scripted: 1, the
     // rook steps like a pawn, then strikes; 2, it steps twice like a pawn (for your rook to take).

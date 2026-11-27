@@ -300,7 +300,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   bosses in `dangerBosses`: Timber, Chub & Chirp, Hollow, Alfil, Moo & Moon; Eric, Nov 26: "every boss has to ult in every game ... we
   don't want bosses to ... ult twice"; [decision](../decisions/2026-11-26-ult-danger-birdie-only.md)): a crowd move judged at
   `dangerAt` (0.70) or more fills the meter as the next crowd turn begins (`dangerCharge`, in `prepareTurn`), while he has used none
-  this battle (`ults` 0); after his first, never again. Full: a "RAGE!" warning, then the
+  this battle (`ults` 0); after his first, never again (a solo test of a passive alone: `?ult=0`, no ultimate, `bossNoUltTest`). Full: a "RAGE!" warning, then the
   ultimate as the next crowd turn begins. Hollow's Lights out, Big Boy's Big Bounce and Alfil's Mammoth Slam come at the
   start of the boss's turn instead (Lights out's only warning is the full meter). A cap a battle: `ultimateMax` in a boss's rules
   (Smudgy's `repaintMax`: after his last the meter goes; Timber's `maxUltimates.timber`, 2, Eric, Nov 2: after his second Gnaw the

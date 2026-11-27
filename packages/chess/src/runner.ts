@@ -459,7 +459,7 @@ export class MatchRunner {
       boss: {
         id: def.id,
         ...this.firstForm(def.id),
-        powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}), ...(setUp ?? {}) },
+        powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}), ...(setUp ?? {}), ...(this.settings.bossNoUltTest ? { noUlt: true as const } : {}) },
         tier: this.settings.bossFixedElo || raidBossElo([]),
         // (A tower floor: the floor's strength, no offset or difficulty.)
         elo: this.towerStrength()?.rating ?? bossStrength(this.settings.bossFixedElo || raidBossElo([]), def, this.settings.bossDifficulty),

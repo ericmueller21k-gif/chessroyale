@@ -122,7 +122,14 @@ export type PendingSignIn = { kind: "email"; email: string; code: string } | { k
 
 let state: AccountState = { config: null, profile: null, age: null, ageNote: null, pending: null, signInNote: null, failed: null, soloKept: null };
 const listeners = new Set<() => void>();
+/**
+ * The chat switch's value while its save is on its way (updateChatOn), else null. Any profile answer meanwhile (an earlier tap's save,
+ * a profile read sent before the tap) keeps it: off then on 180 ms apart, the off's answer landed last on a slow CI runner and chat
+ * showed off for good (main ec5b415, global-chat.spec.ts, Nov 27).
+ */
+let chatWanted: { user: string; on: boolean } | null = null;
 const set = (patch: Partial<AccountState>) => {
+  if (patch.profile && chatWanted && patch.profile.user?.id === chatWanted.user) patch = { ...patch, profile: { ...patch.profile, chatOn: chatWanted.on } };
   state = { ...state, ...patch };
   listeners.forEach((l) => l());
 };
@@ -537,11 +544,27 @@ export async function setPawnColor(c: PawnColor): Promise<void> {
 }
 
 /** The chat's opt-in, kept on a signed-in account (chat-on.ts): the profile as it is after it. */
+// (Its saves one at a time, in the order tapped: two at once could reach the server's database in either order.)
+let chatSaves: Promise<unknown> = Promise.resolve();
+let chatAsked = 0;
 export async function updateChatOn(on: boolean): Promise<void> {
   const p = state.profile;
-  // (Shown at once; the server's answer follows.)
-  if (p) set({ profile: { ...p, chatOn: on } });
-  set({ profile: await api<Profile>("/api/me", { method: "PATCH", body: JSON.stringify({ chatOn: on }) }) });
+  const n = ++chatAsked;
+  // (Shown at once and kept until its save is answered: chatWanted; the server's answer to the last tap then stands.)
+  if (p) {
+    chatWanted = { user: p.user.id, on };
+    set({ profile: { ...p, chatOn: on } });
+  }
+  const save = chatSaves.then(() => api<Profile>("/api/me", { method: "PATCH", body: JSON.stringify({ chatOn: on }) }));
+  chatSaves = save.catch(() => undefined);
+  try {
+    const answer = await save;
+    if (n === chatAsked) chatWanted = null;
+    set({ profile: answer });
+  } catch (e) {
+    if (n === chatAsked) chatWanted = null;
+    throw e;
+  }
 }
 
 /** Gets a shop item (free while SHOP_FREE is on, else paid in coins). */
