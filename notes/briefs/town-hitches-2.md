@@ -29,3 +29,19 @@ with 50+ other players present (moving, chatting). Whatever the gaps turn out to
 existing town perf spec) with 50+ simulated others sending presence and chat at a busy rate, its frame budget the same as today's.
 If presence or chat handling costs anything per message on the main thread, that's ours to fix (batching, no per-message allocation or
 re-render), not a reason.
+
+**Eric's Chrome/Edge Performance recording (~08:25), from his screenshots** (the 51 MB trace is in his Google Drive, too big to fetch;
+the director has the screenshots):
+- 11.01 s recorded while walking: **Scripting 5,063 ms**, System 1,019, Rendering 728, Painting 333. INP 166 ms.
+- **JS heap sawtooth: 52.7 → 68.5 MB about every second**, then a drop: roughly 15 MB/s of short-lived garbage while walking, minor
+  GCs every ~1 s. Our frame report's own parts sum to only ~3 ms a frame, so most of that scripting is outside the measured town loop
+  (or the measured parts miss allocations). Find the allocation source (Chrome's allocation sampling / heap timeline while walking):
+  per-frame arrays/objects/closures, string building (labels, keys), Preact re-renders, presence/chat handling, the frame report itself.
+  The fix target: walking allocates next to nothing per frame (no sawtooth), and scripting per frame stays within the frame report's parts.
+
+**5. The town squeezed narrow (Eric, ~08:25, three screenshots: a narrow town box, the Colosseum ghosting through, a big brick wall
+blocking the middle):** "i think we should shut the town off in browser if u squeeze it too much and it just says a popup like please
+expand the game to continue". Find the town box's aspect/width where the drawing breaks (the sight lines/occlusion at narrow aspects),
+and below it pause the town's frame loop and show a pop-up in the game's style ("Make the window wider to keep playing"), back the moment
+it's wide enough again. Phones in portrait must never hit it (their town works today): set the threshold by the box's aspect where it
+breaks, checked at 390x844 and a narrow desktop window. One focused e2e check (resize narrow → the message; wide → the town back).
