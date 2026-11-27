@@ -203,6 +203,8 @@ export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
   chandy: { neck: [62, 72], span: 60, at: 0.56 },
   // (His cap and face in the tile, his train's roof under him.)
   birdie: { neck: [30, 45], span: 58, at: 0.5 },
+  // (His crown and white hair in the tile, his coat's shoulders below; his card on an admin's picker until he's live, Nov 27.)
+  stranger: { neck: [64, 39], span: 58, at: 0.5 },
   recluse: { neck: [33, 47], span: 61, at: 0.5 },
 };
 
@@ -239,6 +241,8 @@ export const SELECT_TINT: Readonly<Record<string, string>> = {
   chandy: "#8a3a52",
   // (His cap's blue: apart from his brown and the train's yellow.)
   birdie: "#4a60a8",
+  // (His fire sword's deep ember: apart from his indigo coat, his white hair and his ice.)
+  stranger: "#bf3216",
 };
 
 /**
