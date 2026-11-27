@@ -1435,15 +1435,16 @@ test("the Mythic Crate (Nov 27): with Show unowned its page shows its odds, the 
   await grants.getByRole("button", { name: "+5 crates" }).click();
   await grants.getByRole("button", { name: "+1 crate key" }).click();
   await expect(page.getByRole("region", { name: "Ready to open" }).locator('.series-crate-row[data-crate="mythic"]')).toContainText("You have 5");
-  // Its page: one Transcendent spin, 100%; the Banana Suit among its items at 2.00% (MYTHIC_CRATE_ODDS.bananaSuit).
+  // Its page: one Transcendent spin, 100%; the Banana Suit among its items at 2.0% (MYTHIC_CRATE_ODDS.bananaSuit).
   await row.click();
   await expect(page.locator(".crate-held")).toContainText("You have 5");
   const odds = page.locator(".odds-row");
   await expect(odds.filter({ hasText: "Transcendent" }).first().locator(".odds-pct")).toHaveText("100%");
-  await expect(odds.filter({ hasText: "Banana Suit" }).locator(".odds-pct")).toHaveText("2.00%");
+  await expect(odds.filter({ hasText: "Banana Suit" }).locator(".odds-pct")).toHaveText("2.0%");
   await expect(page.getByText("Every one opens to a Transcendent spin: a Legendary or Mythic item.")).toBeVisible();
   // Open it: the strip spins, then the reveal; the item is one of the Mythic Crate's.
-  await page.getByRole("button", { name: /^▶ Open$/ }).click();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/mythic-crate-page-${test.info().project.name}.png`, fullPage: true });
+  await page.getByRole("button", { name: "▶ Open · uses 1 key" }).click();
   await expect(page.locator(".crate-opening .cox-reel")).toBeVisible({ timeout: 15_000 });
   const reveal = page.locator(".reveal-card");
   await expect(reveal).toBeVisible({ timeout: 30_000 });
