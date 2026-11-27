@@ -217,6 +217,9 @@ export function prewarmStranger(): void {
   const fx = (n: keyof typeof EFFECTS) => Object.entries(EFFECTS[n].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const));
   prewarm("strangerSquare", fx("strangerSquare"));
   prewarm("pieceBurn", fx("pieceBurn"));
+  // (His storm's: Grex's fire tile on its marks, Ginger's ice on the pieces it freezes.)
+  prewarm("fireTile", fx("fireTile"));
+  prewarm("iceOverlay", fx("iceOverlay"));
 }
 
 /** When this device first saw each finisher (it plays from then), by battle, turn and square. */

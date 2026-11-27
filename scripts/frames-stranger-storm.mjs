@@ -31,6 +31,10 @@ await p.addInitScript(() => {
     const b = window.match?.boss;
     const ev = b?.powers?.events ?? [];
     const st = b?.powers?.stranger;
+    const now = performance.now();
+    window.__gap = window.__gap ?? [];
+    if (window.__last !== undefined) window.__gap.push([Date.now(), now - window.__last, !!document.querySelector(".pm-storm"), !!document.querySelector(".sg-storm")]);
+    window.__last = now;
     window.__storm.push({ t: Date.now(), phase: window.match?.phase?.kind ?? "", kinds: ev.map((e) => e.kind).join("+"), turn: b?.powers?.turn ?? 0, storm: st?.storm ?? null, pick: st?.pick ?? null, stage: document.querySelector(".pm-storm")?.getAttribute("data-stage") ?? "" });
     if (window.__storm.length > 20000) window.__storm.splice(0, 5000);
     requestAnimationFrame(look);
@@ -39,6 +43,10 @@ await p.addInitScript(() => {
 });
 p.on("pageerror", (e) => console.log(tag, "pageerror", e.message));
 const cdp = await p.context().newCDPSession(p);
+// (PERF=1: a slowed phone, the page's CPU at a quarter speed (.claude/LESSONS.md: try a moment's path with the CPU slowed 4x); its frame
+// times printed for the scene and for the storm's turns. No screencast then: it costs frames of its own.)
+const PERF = !!process.env.PERF;
+if (PERF) await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
 const frames = [];
 cdp.on("Page.screencastFrame", async (f) => {
   frames.push({ t: f.metadata.timestamp * 1000, data: f.data });
@@ -118,7 +126,7 @@ const burnShot = (async () => {
   await p.screenshot({ path: join(outDir, `${tag}-9-burn.png`) });
 })();
 await waitFor(["play"], 60_000);
-await cdp.send("Page.startScreencast", { format: "jpeg", quality: 82, everyNthFrame: 1, maxWidth: 3200, maxHeight: 3200 });
+if (!PERF) await cdp.send("Page.startScreencast", { format: "jpeg", quality: 82, everyNthFrame: 1, maxWidth: 3200, maxHeight: 3200 });
 for (let i = 0; i < 6; i++) {
   if ((await move()) === null) break;
   const turn = await p.evaluate(() => window.match?.boss?.powers?.turn ?? 0);
@@ -129,6 +137,18 @@ await p.waitForTimeout(1500);
 await Promise.race([Promise.all([sceneShots, burnShot]), p.waitForTimeout(5000)]);
 await cdp.send("Page.stopScreencast");
 const log = await p.evaluate(() => window.__storm);
+if (PERF) {
+  const gaps = await p.evaluate(() => window.__gap);
+  const stat = (name, xs) => {
+    const v = xs.map((g) => g[1]).sort((a, b) => a - b);
+    if (!v.length) return console.log(`${tag} ${name}: no frames`);
+    const q = (f) => v[Math.min(v.length - 1, Math.floor(f * v.length))].toFixed(1);
+    console.log(`${tag} ${name}: ${v.length} frames, p50 ${q(0.5)} ms, p95 ${q(0.95)} ms, max ${v.at(-1).toFixed(1)} ms, over 50 ms: ${v.filter((x) => x > 50).length}`);
+  };
+  stat("scene (4x slower CPU)", gaps.filter((g) => g[2]));
+  stat("storm turns (4x slower CPU)", gaps.filter((g) => !g[2] && g[3]));
+  stat("the rest (4x slower CPU)", gaps.filter((g) => !g[2] && !g[3]));
+}
 console.log(`${tag} boss ${await p.evaluate(() => window.match?.boss?.id)}; kinds seen: ${[...new Set(log.map((x) => x.kinds))].join(" | ")}; picks ${JSON.stringify([...new Set(log.map((x) => JSON.stringify(x.pick)))].slice(0, 6))}`);
 // The storm's moment: from the first frame its stage shows to the last (its own clock: the frame log).
 const sceneFrames = log.filter((x) => x.stage);
