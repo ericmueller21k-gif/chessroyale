@@ -1,6 +1,17 @@
 import { BOSS_KITS, RECLUSE_CHILD_KIT, artOf, type BossKit } from "../src/characters/kits.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
-import { CHILD_FORM } from "../src/characters/portraits.ts";
+import { CHILD_FORM, FINAL_FORM } from "../src/characters/portraits.ts";
+import { RECLUSE, coatFrame } from "../src/characters/recluse.ts";
+
+/**
+ * The Hidden Boss in his final form (the four boards; recluse.ts `coatFrame`, as BossCharacter draws him from his transformation on): his
+ * phase-2 idle's first frame in the coat, the man's portrait window. Only for its portrait (the profile's match history, Nov 26).
+ */
+function finalFormKit(): BossKit {
+  const man = BOSS_KITS["Hidden Boss"]!;
+  const ch = { ...RECLUSE, anims: { idle: { loop: true, frames: [coatFrame(RECLUSE.anims.idle2!.frames[0]!)] } } };
+  return { ...man, ch, sprite: undefined, portrait: { ...man.portrait, anim: "idle", frame: 0 } };
+}
 
 /**
  * Every boss's portrait frame (`BossKit.portrait`'s animation and frame, as drawn: `artOf`), as pixels small enough for the first load
@@ -8,8 +19,9 @@ import { CHILD_FORM } from "../src/characters/portraits.ts";
  * (portraits.test.ts) checks characters/portraits.gen.ts against this; `npx tsx packages/app/scripts/portraits.ts` writes it again after a
  * change to a boss's drawing or portrait.
  */
+let finalKit: BossKit | undefined;
 export function portraitEntries(): [string, BossKit][] {
-  return [...Object.entries(BOSS_KITS), [CHILD_FORM, RECLUSE_CHILD_KIT]];
+  return [...Object.entries(BOSS_KITS), [CHILD_FORM, RECLUSE_CHILD_KIT], [FINAL_FORM, (finalKit ??= finalFormKit())]];
 }
 
 /** Palette keys, one character each (no digit: a run's count follows its key; "." is an empty pixel). */

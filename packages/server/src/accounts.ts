@@ -9,6 +9,8 @@
 import { countD1 } from "./ops.ts";
 import {
   BOSS_TIERS,
+  HIDDEN_ROOM,
+  recluseFormsBeaten,
   bossDef,
   FRONT_DOOR,
   SHOP_CATEGORIES,
@@ -304,6 +306,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // A solo result's game (Nov 22, 2026; xp.ts): its id from POST /api/xp/solo/start, so a game is recorded once: as its result, or as
   // a loss when it was left after SOLO_ABANDON.minMoves (then `abandoned` = 1). NULL online, for a solo game never timed, and before.
   { table: "results", column: "solo_game", type: "TEXT" },
+  // The Hidden Boss's forms a fight against him beat (Nov 26, 2026; Eric, Nov 13: his match history grays the forms you beat): 0 to 3
+  // in RECLUSE_FORMS' order (3: won), only on his fights' rows (mode boss, boss_id his). NULL on every other row and every one from before.
+  { table: "results", column: "forms_beaten", type: "INTEGER" },
   // The solo game the server times (xp.ts): whether it's real yet (SOLO_ABANDON.minMoves), and what its loss row would need.
   ...XP_COLUMNS,
   // Each account's latest rating, for the percentile (filled in from the results already stored).
@@ -909,6 +914,11 @@ export interface MatchResult {
   playMs?: number | null;
   moves?: number | null;
   xp?: XpGrant | null;
+  /**
+   * The Hidden Boss's fight: how many of his forms it beat (RECLUSE_FORMS' order; core's recluseFormsBeaten). Kept only on his fights'
+   * rows, held to what the row can be (a win beat all three; anything else at most two), so a device's word can't say more.
+   */
+  formsBeaten?: number | null;
 }
 
 /** A count from a result (0-500), or null. */
@@ -935,12 +945,19 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   const rated = rating !== null && ranked && !r.held;
   const since = once && "since" in once ? once.since : null;
   const soloGame = !r.online && once && "soloGame" in once ? once.soloGame : null;
+  const bossId = typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null;
+  const teamWon = r.teamWon === undefined || r.teamWon === null ? null : r.teamWon ? 1 : 0;
+  // (His fights only. Won: all of them, whatever was sent; else the number sent, held to 0-2; none sent: none known.)
+  const formsBeaten =
+    mode === "boss" && bossId === HIDDEN_ROOM.boss && (teamWon === 1 || (typeof r.formsBeaten === "number" && Number.isFinite(r.formsBeaten)))
+      ? recluseFormsBeaten(teamWon === 1, r.formsBeaten ?? 0)
+      : null;
   await sql.batch([
     stmt(
       `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
          brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned,
-         play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, coins, solo_game)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
+         play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, coins, solo_game, forms_beaten)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
        ${since !== null ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}
        ${soloGame !== null ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND solo_game = ?)" : ""}`,
       userId,
@@ -949,7 +966,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
       Math.max(1, Math.round(r.placement)),
       Math.max(1, Math.round(r.players)),
       r.team ?? null,
-      r.teamWon === undefined || r.teamWon === null ? null : r.teamWon ? 1 : 0,
+      teamWon,
       r.avgScore ?? null,
       rating,
       now,
@@ -965,7 +982,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
       lobby,
       ranked ? 1 : 0,
       r.held ? 1 : 0,
-      typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
+      bossId,
       flag(r.evalBar),
       // (Only an online match's room says a player abandoned it.)
       r.online && r.abandoned === true ? 1 : null,
@@ -974,6 +991,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
       typeof r.moves === "number" && Number.isFinite(r.moves) ? Math.max(0, Math.min(10_000, Math.round(r.moves))) : null,
       ...xpColumns(r.xp),
       soloGame,
+      formsBeaten,
       // (An account deleted mid-match gets nothing new.)
       userId,
       ...(since !== null ? [userId, lobby, since] : []),
@@ -1165,6 +1183,8 @@ export interface PublicProfile {
     bossElo: number | null;
     /** A boss raid: which boss (a BOSS_ROSTER id; null from before bosses had identities). */
     bossId?: string | null;
+    /** The Hidden Boss's fight: how many of his three forms it beat (3: won); null for every other row and his from before Nov 26, 2026. */
+    formsBeaten?: number | null;
     playedAt: number;
     /** It counted for ranking (false: under 30% real players, solo or practice; null: from before the rule). */
     ranked: boolean | null;
@@ -1190,6 +1210,7 @@ interface ResultRow {
   last_stand: number | null;
   boss_elo: number | null;
   boss_id?: string | null;
+  forms_beaten?: number | null;
   ranked: number | null;
   held: number | null;
 }
@@ -1237,7 +1258,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
   if (!u) return null;
   const rows = await sql.all<ResultRow>(
     `SELECT mode, online, placement, players, team, team_won, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes,
-       strikes_survived, survived, last_stand, boss_elo, boss_id, ranked, held
+       strikes_survived, survived, last_stand, boss_elo, boss_id, forms_beaten, ranked, held
      FROM results WHERE user_id = ? ORDER BY played_at DESC, id DESC`,
     userId,
   );
@@ -1292,6 +1313,8 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
       bestMove: r.best_move,
       bossElo: r.boss_elo,
       bossId: r.boss_id ?? null,
+      // (His fights' only: null on an older row of his, as on everyone else's.)
+      formsBeaten: r.forms_beaten ?? null,
       playedAt: r.played_at,
       ranked: r.ranked === null ? null : r.ranked === 1,
     })),

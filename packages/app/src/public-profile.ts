@@ -1,4 +1,4 @@
-import { CROWD_SETTINGS, DEFAULT_SETTINGS, SLOT_NAMES, bossDef, divisionTitle, bossInfo, itemColor, itemDef, itemName, secondColor, shownLook, tierInfo, type ItemLook, type ItemSlot, type RankedRecentGame, type RankView } from "@chessroyale/core";
+import { CROWD_SETTINGS, DEFAULT_SETTINGS, HIDDEN_ROOM, RECLUSE_FORMS, SLOT_NAMES, recluseFormsAt, bossDef, divisionTitle, bossInfo, itemColor, itemDef, itemName, secondColor, shownLook, tierInfo, type ItemLook, type ItemSlot, type RankedRecentGame, type RankView } from "@chessroyale/core";
 import type { PublicProfile } from "./account.ts";
 
 /**
@@ -108,6 +108,8 @@ export interface RecentRow {
   /** "Ranked · 2h ago", "Casual · Oct 25". */
   sub: string;
   rp: { text: string; tone: RpTone };
+  /** A fight against the Hidden Boss: how many of his three forms it beat (recluseFormsShown), drawn in the RP change's place. */
+  forms?: number;
 }
 
 /** "1st", "2nd", "3rd", "11th". */
@@ -131,6 +133,25 @@ const RESULT_PILL: Record<RankedRecentGame["result"], { text: string; tone: Pill
 };
 
 /**
+ * A fight against the Hidden Boss (a boss battle against him): how many of his forms (RECLUSE_FORMS) to gray in its row (Eric, Nov 13:
+ * "show like all three of his forms... gray out the ones you beat"). The stored count (results.forms_beaten); a row from before it was
+ * kept: a won fight beat all three, anything else none known (none grayed). Null for every other row.
+ */
+export function recluseFormsShown(r: Pick<PublicProfile["recent"][number], "mode" | "bossId" | "won" | "formsBeaten">): number | null {
+  if (r.mode !== "boss" || r.bossId !== HIDDEN_ROOM.boss) return null;
+  const all = RECLUSE_FORMS.length;
+  if (typeof r.formsBeaten === "number" && Number.isFinite(r.formsBeaten)) return Math.max(0, Math.min(all, Math.round(r.formsBeaten)));
+  return r.won === true ? all : 0;
+}
+
+/**
+ * The count a solo fight against him stores (App.tsx soloResult; core's recluseFormsAt, as online): Boss alone only (`mode` "boss"); his
+ * four boards once phase 2 began (`simul` on the result); else the runner's boss, its form counted once it fell. Null for any other.
+ */
+export const soloFormsBeaten = (mode: string, boss: Parameters<typeof recluseFormsAt>[1], teamWon: boolean | null, simul?: unknown): number | null =>
+  recluseFormsAt(mode === "boss", boss, teamWon === true, !!simul);
+
+/**
  * One of the profile's other games (crowd, a raid, Squads, Classic) as a row. "Ranked" when it counted toward their rating (the
  * game's own flag: online, enough real players; the director's review, Oct 29: a 50 v 50 that moved your rating isn't casual),
  * else "Casual". Only a ranked 1 v 1 has RP.
@@ -142,12 +163,15 @@ function resultRow(r: PublicProfile["recent"][number], i: number, now: number): 
     const def = bossDef(r.bossId);
     const known = !!(r.bossId || r.bossElo);
     const info = known ? bossInfo(r.bossElo ?? 0, r.bossId) : null;
+    const forms = recluseFormsShown(r);
     // (Beaten: the boss fell. Anything else, including a result nobody recorded, is a loss.)
     return {
       ...base,
+      ...(forms !== null ? { forms } : {}),
       face: { kind: "boss", id: def?.id ?? null, name: info?.name ?? "Boss", icon: info?.icon ?? "👑" },
       pill: r.won === true ? RESULT_PILL.win : RESULT_PILL.loss,
-      title: info ? `vs. ${info.name}` : "Boss Battle",
+      // (His row: his name alone, so his three forms fit whole beside it at every width, a 1280 laptop's narrow card too.)
+      title: info ? (forms !== null ? info.name : `vs. ${info.name}`) : "Boss Battle",
     };
   }
   if (r.mode === "crowd") {

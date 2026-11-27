@@ -67,6 +67,7 @@ import { debugSwitch, queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle, resumeSoloBattle, soloBattleId } from "./boss-tokens.ts";
 import { noteFloorGame, noteSoloGame, postingSoloResult, resumeSoloGame, settleSoloXp, soloGameId, soloTestGame, type SoloGameWatch } from "./xp.ts";
+import { soloFormsBeaten } from "./public-profile.ts";
 import { isPaused, pausedBosses } from "./status.ts";
 import { kingSay, type KingCue } from "./godKing.ts";
 import { game } from "./lazy-game.ts";
@@ -130,6 +131,9 @@ function soloResult(solo: SoloMatch, phase: Results) {
     : phase.gameWinner === undefined || !me?.team
       ? null
       : phase.gameWinner === me.team;
+  // (A fight against the Hidden Boss (Boss alone): how many of his forms it beat, for the profile's match history (soloFormsBeaten, as
+  // online). The server holds it to what it can check: won, all three.)
+  const formsBeaten = soloFormsBeaten(mode, runner.boss, teamWon, phase.simul);
   // XP (Nov 9): the server's clock times the game (its id from the start); your moves, the win, a resign and a test switch are this
   // device's word, which can only lower it. The answer's XP goes to the result screen's box (xp.ts).
   return {
@@ -144,6 +148,7 @@ function soloResult(solo: SoloMatch, phase: Results) {
     bestMove: bestMoveOf(solo.moves),
     ...feats,
     ...(resigned && feats?.strikes !== null && feats?.strikes !== undefined ? { survived: false } : {}),
+    ...(formsBeaten !== null ? { formsBeaten } : {}),
     evalBar: evalBarOn(),
     // (Every turn you took: a turn you called the God King to play counts, a missed one doesn't. Eric, Nov 21: ownMoves.)
     moves: ownMoves(solo.moves),
