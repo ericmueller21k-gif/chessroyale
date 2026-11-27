@@ -156,7 +156,7 @@ const record = (page: Page, square: string) =>
     requestAnimationFrame(frame);
   }, square);
 
-test("his finisher: your bishop takes his knight (he blocks), he takes your bishop back: his hop and his cut on it, the bishop gone, then his move", async ({ page }) => {
+test("his finisher: your bishop takes his knight (he blocks), he takes your bishop back: his hop and his cut on it, his piece on its square as it kills it, then his move", async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -173,21 +173,28 @@ test("his finisher: your bishop takes his knight (he blocks), he takes your bish
   await submitMove(page, take, t.fen);
   await yourTurn(page);
   const log: Frame[] = await page.evaluate(() => (window as any).__fin);
-  // He blocks as your bishop takes his knight (his thinking: a piece of his taken that isn't a pawn).
-  expect(log.some((f) => f.thinking && f.dock === "block")).toBe(true);
+  // He blocks as your bishop takes his knight (his thinking: a piece of his taken that isn't a pawn), and his hop comes as the block ends
+  // (his thinking lasts at least FINISHER_BLOCK_MS, 1800; no wait after it: before Nov 27 it came 3 s or more after the block began).
+  const blocked = log.findIndex((f) => f.thinking && f.dock === "block");
+  expect(blocked).toBeGreaterThanOrEqual(0);
+  expect(log.find((f) => f.stage)!.t - log[blocked]!.t).toBeLessThan(2700);
   // His finisher while he still thinks: the hop, the strike, the piece gone, the hop back, in that order; the cut, as switched.
   const fin = log.filter((f) => f.stage);
   expect([...new Set(fin.map((f) => f.stage))]).toEqual(["hop", "strike", "gone", "back"]);
   expect([...new Set(fin.map((f) => f.kind))]).toEqual(["cut"]);
   expect(fin.every((f) => f.thinking)).toBe(true);
-  // Your bishop on its square until his cut takes it; from then no piece of yours there; his move then shows, his piece on it.
+  // Your bishop on its square until his cut takes it; from then his piece on it (Eric, Nov 27: "capture the moment he kills it"), before
+  // he's home, and no piece of yours there; his move then shows the board as it already is, his piece on it.
+  const his = crowd === "w" ? "black" : "white";
   const gone = log.findIndex((f) => f.stage === "gone");
   const moved = log.findIndex((f, i) => i > gone && !f.thinking && f.phase === "boss");
   expect(gone).toBeGreaterThan(0);
   expect(moved).toBeGreaterThan(gone);
   expect(log.slice(log.findIndex((f) => f.stage === "strike"), gone - 2).every((f) => f.pieces.some((c) => c.includes(`${mine} bishop`)))).toBe(true);
   expect(log.slice(gone, moved).filter((f) => f.pieces.some((c) => c.includes(mine)))).toEqual([]);
-  await expect.poll(() => page.evaluate((sq) => [...document.querySelectorAll(`.hb-board piece[data-square="${sq}"]`)].map((e) => e.className).join(" "), square)).toContain(crowd === "w" ? "black" : "white");
+  expect(log.slice(gone, moved).filter((f) => !f.pieces.some((c) => c.includes(his)))).toEqual([]);
+  expect(log.some((f) => f.stage === "back" && f.pieces.some((c) => c.includes(his)))).toBe(true);
+  expect(log.slice(moved, moved + 30).every((f) => f.pieces.some((c) => c.includes(his)))).toBe(true);
   // His figure on the board whole on the screen, every frame (Eric's rule).
   const off = fin.filter((f) => f.fig && (f.fig[0]! < 0 || f.fig[1]! < 0 || f.fig[2]! > f.vw || f.fig[3]! > f.vh));
   expect(off.map((f) => f.fig)).toEqual([]);

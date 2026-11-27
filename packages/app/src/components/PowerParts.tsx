@@ -61,6 +61,8 @@ export interface Moment {
   /** Chandy's upgrade: the rifle's stage now, and the move it unlocked. */
   stage?: number;
   unlock?: ChandyMove;
+  /** The Stranger's finisher: his held move (the board shows it from the kill: strangerBoard). */
+  move?: string;
   /** A Battle Tower floor of several: the boss who cast it (his id), for its banner, his figure and his words (audit 2, finding 1). */
   boss?: string;
 }

@@ -1210,7 +1210,8 @@ const finFrames: Record<"flame" | "ice" | "cut" | "frostfire", () => Frame[]> = 
     ...hold("ready", 900),
     ...sheatheFrames(),
   ],
-  frostfire: () => [...drawFrames(), F("aimTips", 0, { ms: 200, cue: "shout", aura: 2 }), ...castFrames().slice(1), ...hold("ready", 900), ...sheatheFrames()],
+  // (Its ready hold 700 ms, 200 less than the others': its hop home ends 440 ms before his move shows. Review of #1002.)
+  frostfire: () => [...drawFrames(), F("aimTips", 0, { ms: 200, cue: "shout", aura: 2 }), ...castFrames().slice(1), ...hold("ready", 700), ...sheatheFrames()],
 };
 
 export const STRANGER_ANIMS: Record<string, Anim> = {

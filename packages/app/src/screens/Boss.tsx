@@ -429,9 +429,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const fenPlain = funMove?.move && !funPlayed ? fenAtPly(history, history.length - 1, bases) : introFen;
   const fenBurnt = burning.length && now < burnAt + BURN.goneAt ? burning.reduce((f, b) => withPiece(f, b.square, { color: boss.crowdSide, type: b.piece! }), fenPlain) : fenPlain;
   // Chandy's queen lock: the piece his round hits on its square until the round reaches it.
-  // (The Stranger's finisher, while he thinks: your piece off its square once his finisher has taken it, until his move shows.)
-  const stranger = strangerBoard(own("stranger"), moments, now, chandyFen(own("chandy"), moments, now, fenBurnt));
-  const fenShown = stranger?.fen ?? chandyFen(own("chandy"), moments, now, fenBurnt);
+  // (The Stranger's finisher, while he thinks: his move on the board from the moment it kills your piece, until his move shows.)
+  const fenChandy = chandyFen(own("chandy"), moments, now, fenBurnt);
+  const stranger = strangerBoard(own("stranger"), moments, now, fenChandy);
+  const fenShown = stranger?.fen ?? fenChandy;
   const lastShown = funMove?.move ? (funPlayed ? funMove.move : null) : introLast;
   // The Big Bounce: the board before it, less the pieces up in the air, then the new position as they come down; the
   // eval bar keeps the position before it until they've all settled. The board jolts as he lands and at the crash.
@@ -614,7 +615,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? (swapped ? swapped.lastMove : hangOn ? hangOn.lastMove : lastShown)} animate={!rush && !bounceShown && !splitStill(split, now) && !swapStill(moments, now) && !birdie?.still && !pig?.still && !stranger?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : onSide(boss, (b) => b.powers?.elephants)} gold={intro ? undefined : zebraGold(own("zebra"), moments, now)} decor={gardener?.decor ?? (intro ? undefined : battleDecor(boss, { moments, now, burnt, since: burnAt }))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading || gagAt !== undefined, hold: gagAt !== undefined }}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={stranger?.lastMove ?? pig?.lastMove ?? revised?.lastMove ?? (swapped ? swapped.lastMove : hangOn ? hangOn.lastMove : lastShown)} animate={!rush && !bounceShown && !splitStill(split, now) && !swapStill(moments, now) && !birdie?.still && !pig?.still && !stranger?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : onSide(boss, (b) => b.powers?.elephants)} gold={intro ? undefined : zebraGold(own("zebra"), moments, now)} decor={gardener?.decor ?? (intro ? undefined : battleDecor(boss, { moments, now, burnt, since: burnAt }))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading || gagAt !== undefined, hold: gagAt !== undefined }}>
             {/* (A floor of several: every boss's marks, each from his own part of the view with his own moments: audit 2, finding 1.) */}
             {!intro && partsOf(boss).map((b) => <PowerBoard key={b.id} boss={b} orientation={orientation} moments={sideOf(boss) ? moments.filter((m) => !m.boss || m.boss === b.id) : moments} now={now} fen={boardFen} />)}
             {rush && <RushLayer boss={boss} view={rush} now={now} orientation={orientation} onPlace={(from, to) => match.rushPlace(from, to)} />}

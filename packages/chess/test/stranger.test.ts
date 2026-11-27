@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BATTLE_TOWER, BOSS_POWERS, BOSS_ROSTER, adminFirst, adminFirstBosses, bossDef, canPick, chooseBoss, finishFloor, floorBoss, floorUnlocks, isPlayable, menuBosses, mulberry32, newRun, startFloor, towerPool, unlockBosses, unlockFloor, unlockReady, type BossDef } from "@chessroyale/core";
-import { FINISHERS, FINISHER_BLOCK_MS, FINISHER_TEST, MatchRunner, POWER_FX, STRANGER_FX, bossRules, finisherOf, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
+import { BATTLE_TOWER, BOSS_POWERS, BOSS_ROSTER, adminFirst, adminFirstBosses, bossDef, canPick, chooseBoss, finishFloor, floorBoss, floorUnlocks, isPlayable, menuBosses, mulberry32, newRun, startFloor, towerPool, unlockBosses, unlockFloor, unlockReady, type BossDef, type PowerEvent } from "@chessroyale/core";
+import { FINISHERS, FINISHER_BLOCK_MS, FINISHER_TEST, MatchRunner, POWER_FX, STRANGER_FX, bossRules, bossThinkMs, hisLoss, strangerTurnMs, finisherOf, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
 import { KIT_OPENING, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 import { powerRoll } from "../src/bosses/base.ts";
 
@@ -299,7 +299,7 @@ describe("his finisher (Eric, Nov 27: a capture of a piece that isn't a pawn sho
     const r = await onPosition(fen);
     expect(r.bossMoveMoment("g8f7")).toBe(0);
     expect(r.bossMoveMoment("c5d4")).toBe(STRANGER_FX.finisher);
-    expect(finishers(r)).toEqual([{ kind: "finisher", turn: r.boss!.powers!.turn, square: "d4", shape: "n", pick: expect.any(Number) }]);
+    expect(finishers(r)).toEqual([{ kind: "finisher", turn: r.boss!.powers!.turn, square: "d4", shape: "n", pick: expect.any(Number), move: "c5d4" }]);
     // (Marked once: the server asks again as it plays the held move.)
     expect(r.bossMoveMoment("c5d4")).toBe(0);
     expect(finishers(r)).toHaveLength(1);
@@ -337,6 +337,19 @@ describe("his finisher (Eric, Nov 27: a capture of a piece that isn't a pawn sho
   });
 });
 
+describe("what he lost to the crowd's last move (hisLoss: his block and its wait)", () => {
+  const after = "rnbqkb1r/pppp1ppp/5B2/4p3/3PP3/8/PPP2PPP/RN1QKBNR b KQkq - 0 4";
+  it("counts his knight taken, and nothing when the board has just gone back past the move (a base that goes back)", () => {
+    const board = { fen: after, history: ["g5f6"], bases: [{ ply: 0, fen: FINISHER_TEST.w }] };
+    expect(hisLoss(board, "w")).toBe(3);
+    expect(strangerTurnMs({ id: "stranger", crowdSide: "w", board })).toBe(FINISHER_BLOCK_MS);
+    expect(strangerTurnMs({ id: "grex", crowdSide: "w", board })).toBe(0);
+    const rewound = { ...board, bases: [...board.bases, { ply: 1, fen: after, from: 0 }] };
+    expect(hisLoss(rewound, "w")).toBe(0);
+    expect(strangerTurnMs({ id: "stranger", crowdSide: "w", board: rewound })).toBe(0);
+  });
+});
+
 describe("the finisher's test switch (?power=finisher, finisher-<kind>)", () => {
   it("starts where your bishop takes his knight; he takes it back, his finisher on it, the kind forced by finisher-<kind>", async () => {
     for (const side of ["w", "b"] as const)
@@ -349,11 +362,19 @@ describe("the finisher's test switch (?power=finisher, finisher-<kind>)", () => 
         await crowdMove(r, () => take);
         expect(r.bossToMove()).toBe(true);
         // His move takes your bishop back (the test move), held for his finisher.
+        // (Your bishop took his knight: his block plays in his thinking, which lasts at least as long; the finisher holds his move alone.)
+        expect(strangerTurnMs(r.bossView())).toBe(FINISHER_BLOCK_MS);
+        expect(bossThinkMs(r.bossView()!, false, strangerTurnMs(r.bossView()))).toBe(FINISHER_BLOCK_MS);
         let held = 0;
-        const move = await r.playBoss(undefined, async (ms) => void (held = ms));
+        let event: PowerEvent | undefined;
+        const move = await r.playBoss(undefined, async (ms) => {
+          held = ms;
+          event = r.boss!.powers!.events.find((x) => x.kind === "finisher");
+        });
         expect(move.slice(2, 4)).toBe(side === "w" ? "f6" : "f3");
-        // (After his block: your bishop took his knight.)
-        expect(held).toBe(STRANGER_FX.finisher + FINISHER_BLOCK_MS);
+        expect(held).toBe(STRANGER_FX.finisher);
+        // (The event carries the held move: the board shows it from the finisher's kill.)
+        expect(event?.move).toBe(move);
         r.deal();
         expect(pieceAt(fenOf(r), move.slice(2, 4))?.color).toBe(side === "w" ? "b" : "w");
       }

@@ -1938,7 +1938,8 @@ export type PowerEventKind =
   | "frostfireBurn"
   // His finisher (Nov 27, Eric: "he jumps down and does either like a flame strike ... or a literal strike with a sword"): as his move
   // that takes a piece of yours that isn't a pawn is about to show (`square` the piece, `shape` its kind, `pick` which finisher, from
-  // the seed), while he still thinks; the move shows after it, held as Chandy's lock is (bossMoveMoment).
+  // the seed, `move` the held move itself: his piece takes the square as the finisher kills it; Eric, Nov 27), while he still thinks; the
+  // move shows after it, held as Chandy's lock is (bossMoveMoment).
   | "finisher";
 export interface PowerEvent {
   kind: PowerEventKind;
@@ -1992,7 +1993,7 @@ export interface PowerEvent {
   /** Dash's Clock Slap: the ms it took from your clock (`bank`: from the time bank, else off your next move's clock). */
   ms?: number;
   bank?: boolean;
-  /** Dash's Time Scramble: how many of your moves it covers (`count`) and the seconds each gets; his flag: the move played for you. */
+  /** Dash's Time Scramble: how many of your moves it covers (`count`) and the seconds each gets; his flag: the move played for you. The Stranger's finisher: his held move. */
   count?: number;
   seconds?: number;
   move?: string;

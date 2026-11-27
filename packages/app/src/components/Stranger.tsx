@@ -1,4 +1,4 @@
-import { STRANGER_FX, finisherLeadMs, finisherOf, pieceAt, withoutPiece, type Finisher } from "@chessroyale/chess";
+import { STRANGER_FX, applyMove, finisherOf, pieceAt, type Finisher } from "@chessroyale/chess";
 import { EFFECTS, animLength, cueAt } from "../characters/power-art.ts";
 import { STRANGER, STRANGER_HOP } from "../characters/stranger.ts";
 import type { BossView } from "../game.ts";
@@ -14,8 +14,9 @@ import { Flight, PIECE_WORD, onComputer, onSquare, type BossUi, type Moment, typ
  * frozen turn), and its tile is Grex's fire tile, ablaze with its countdown on the flee turn, then Grex's burn as the crowd's move lands.
  * His own cast and swords are the characters lane's (claude/stranger-art); until they land, the shared cast.
  * His finisher (Eric, Nov 27): his move that takes a piece of yours that isn't a pawn shows first as his hop onto the board beside it and
- * one of four finishers on it (the flame strike, the ice and its shatter, the clean cut, the frostfire), the piece gone, his hop back;
- * then his move, his piece sliding onto the empty square (strangerTurnMoments, strangerBoard).
+ * one of four finishers on it (the flame strike, the ice and its shatter, the clean cut, the frostfire); as it kills the piece his own
+ * slides onto its square (Eric, Nov 27: "have it capture the moment he kills it"), then his hop back; his move, held till then, shows
+ * the board as it already is (strangerTurnMoments, strangerBoard).
  */
 
 function strikeMoment({ boss, moment, t, orientation, banner, cast }: MomentProps) {
@@ -35,7 +36,8 @@ function burnMoment({ moment, now, orientation }: MomentProps) {
   const burnt = [{ square: moment.square, ...(moment.shape && !moment.fizzled?.length ? { piece: moment.shape } : {}), ...(moment.fizzled?.length ? { fizzled: true } : {}) }];
   return (
     <div class="power-moment pm-frostfire-burn">
-      <FireBurn burnt={burnt} since={moment.at} now={now} orientation={orientation} />
+      {/* (Quiet: Grex's tile and burn art, but his own burn sound plays, from his figure: Grex's poof and fizz are Grex's.) */}
+      <FireBurn burnt={burnt} since={moment.at} now={now} orientation={orientation} quiet />
     </div>
   );
 }
@@ -51,7 +53,15 @@ const centreOf = (square: string, o: Orientation): Pt => {
   const { x, y } = squareXY(square, o);
   return { x: x / 8, y: y / 8 };
 };
-const arc = (a: Pt, b: Pt, h: number, u: number): Pt => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u - h * 4 * u * (1 - u) });
+export const arc = (a: Pt, b: Pt, h: number, u: number): Pt => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u - h * 4 * u * (1 - u) });
+/** His hop's height (% of the board): HOP_H, lower on a phone where it would rise above his corner (the highest he's proven on screen at). */
+const HOP_H = 14;
+/**
+ * The hop's height between his corner and where he stands (`computer`: his corner at the board's bottom, every stand above it). On a phone
+ * the corner is his highest place at rest (the bar above the board), so the arc never rises above it: its rise over the corner is at most
+ * 0 when the height is at most a quarter of the drop (arc's y at u minus the corner's = drop u - 4hu(1 - u) >= 0 for every u).
+ */
+export const hopHeight = (corner: Pt, stand: Pt, computer: boolean): number => (computer ? HOP_H : Math.min(HOP_H, Math.max(0, stand.y - corner.y) / 4));
 
 /** His box on the board (% of its width): 128 frame px, his body about 2.4 squares tall. */
 const FIG_W = 38;
@@ -60,12 +70,12 @@ const PX = FIG_W / STRANGER.w;
  * His corner of the board, where he hops from and back to (his feet), his box inside the board's left edge: on a phone its top left (his
  * place in the bar above it), on a computer its bottom left (his place beside it; the board's top is near the window's there).
  */
-const cornerOf = (computer: boolean): Pt => ({ x: FIG_W / 2 + 1, y: computer ? 97 : 6 });
+export const cornerOf = (computer: boolean): Pt => ({ x: FIG_W / 2 + 1, y: computer ? 97 : 6 });
 /**
  * His drawing's reach above his feet (sprite px, his crown and aura), so his head never rises more than `headRoom` % above the board: a
  * little on a phone (the bar is above it), none on a computer.
  */
-const UP = 110;
+export const UP = 110;
 
 /**
  * Where he stands to strike a piece: beside it, a square and a bit toward the board's middle, his feet on its square's bottom edge (lower
@@ -82,6 +92,11 @@ export function finisherStand(square: string, o: Orientation, computer = false):
  * ignition at `igniteAt`), the piece gone from `goneAt` (the board shows it without the piece from then until his move shows), then he
  * hops back to his corner (`backAt`, down by `homeAt`). Pure: from the art's cues.
  */
+/**
+ * How long before his held move shows he's home at least (ms): online each device starts the finisher as it hears of it, so a late one
+ * still sees him land before the move arrives (a unit test checks every finisher; review of #1002).
+ */
+export const FINISHER_MARGIN_MS = 400;
 export interface FinishTimeline {
   kind: Finisher;
   landAt: number;
@@ -156,7 +171,8 @@ function finisherMoment({ boss, moment, now, t, orientation }: MomentProps) {
   const CORNER = cornerOf(computer);
   const stand = finisherStand(square, orientation, computer);
   const flight = STRANGER_HOP.landAt - STRANGER_HOP.upAt;
-  const hop = (a: Pt, b: Pt, from: number): Pt => (t < from + STRANGER_HOP.upAt ? a : arc(a, b, 14, clamp01((t - from - STRANGER_HOP.upAt) / flight)));
+  const rise = hopHeight(CORNER, stand, computer);
+  const hop = (a: Pt, b: Pt, from: number): Pt => (t < from + STRANGER_HOP.upAt ? a : arc(a, b, rise, clamp01((t - from - STRANGER_HOP.upAt) / flight)));
   const going = t >= tl.backAt;
   const feet = going ? hop(stand, CORNER, tl.backAt) : hop(CORNER, stand, 0);
   const anim = going ? { anim: "hop", since: tl.backAt } : t < tl.finAt ? { anim: "hop", since: 0 } : { anim: `fin_${kind}`, since: tl.finAt };
@@ -207,8 +223,8 @@ const turnSeen = new Map<string, number>();
 
 /**
  * His finisher while he still thinks (strangerBattle.finisher: his move takes a piece of yours that isn't a pawn, known, about to show):
- * this turn's, from when this device first saw it (after his block, where a piece of his was just lost); his move shows after it (the
- * server holds it, solo waits).
+ * this turn's, from when this device first saw it (his block, where a piece of his was just lost, played in his thinking before it:
+ * strangerTurnMs); his move shows after it (the server holds it, solo waits).
  */
 export function strangerTurnMoments(boss: BossView, now = Date.now()): Moment[] {
   const p = boss.powers;
@@ -222,21 +238,35 @@ export function strangerTurnMoments(boss: BossView, now = Date.now()): Moment[] 
         turnSeen.set(key, (at = now));
         if (turnSeen.size > 20) turnSeen.delete(turnSeen.keys().next().value!);
       }
-      // (After his block, where a piece of his was just lost: it plays where he stands first, his move held as long: finisherLeadMs.)
-      return { kind: "finisher", key, at: at + finisherLeadMs(boss.board, boss.crowdSide), ms: STRANGER_FX.finisher, square: e.square!, ...(e.shape ? { shape: e.shape } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}) } satisfies Moment;
+      return { kind: "finisher", key, at, ms: STRANGER_FX.finisher, square: e.square!, ...(e.shape ? { shape: e.shape } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.move ? { move: e.move } : {}) } satisfies Moment;
     });
 }
 
 /**
- * The board while his finisher plays: your piece gone from its `goneAt` (its board art took it) until his move shows, his piece then
- * sliding onto the empty square; the board doesn't animate the piece going (`still`). Null: no finisher now.
+ * The board while his finisher plays (Eric, Nov 27: "have it capture the moment he kills it"): from its `goneAt` (its board art took your
+ * piece) his move on it (the moment's `move`), his piece sliding onto the square as any move slides, the move marked; until then the
+ * board as it is, held still. When his held move shows, the board already matches it, so nothing moves twice. Null: no finisher now.
  */
-export function strangerBoard(boss: Pick<BossView, "id">, moments: readonly Moment[], now: number, fen: string): { fen: string; still: boolean } | null {
+export function strangerBoard(boss: Pick<BossView, "id">, moments: readonly Moment[], now: number, fen: string): { fen: string; still: boolean; lastMove?: string } | null {
   if (boss.id !== "stranger") return null;
   const m = moments.find((x) => x.kind === "finisher");
   if (!m?.square) return null;
-  const gone = now >= m.at + finishTimeline(finisherOf(m.pick)).goneAt;
-  return { fen: gone && pieceAt(fen, m.square) ? withoutPiece(fen, m.square) : fen, still: true };
+  if (now < m.at + finishTimeline(finisherOf(m.pick)).goneAt) return { fen, still: true };
+  const after = m.move ? played(fen, m.move) : null;
+  return after ? { fen: after, still: false, lastMove: m.move } : { fen, still: true };
+}
+/** `fen` with `move` played, or null when it can't be (a stale event); the last one kept, as the board draws it every frame. */
+let last: { fen: string; move: string; after: string | null } | null = null;
+function played(fen: string, move: string): string | null {
+  if (last?.fen === fen && last.move === move) return last.after;
+  let after: string | null = null;
+  try {
+    after = applyMove(fen, move);
+  } catch {
+    after = null;
+  }
+  last = { fen, move, after };
+  return after;
 }
 
 export const STRANGER_UI = {
