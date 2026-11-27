@@ -1,5 +1,5 @@
 import { mulberry32, type Rng } from "./rng.ts";
-import { OUTFIT } from "./settings.ts";
+import { MYTHIC_CRATE_ODDS, OUTFIT } from "./settings.ts";
 
 /**
  * Crates: cosmetic items in stacked layers of rarity. Every drop rolls three things independently:
@@ -246,7 +246,7 @@ export type PresentTier = "common" | "uncommon" | "rare" | "epic";
 export type FischerTier = "legendary" | "mythic";
 
 /** How a crate looks in the app: its own box on the crate page, and the box each tier comes in on the strip. */
-export type CrateLook = "winter" | "beta" | "hunchess";
+export type CrateLook = "winter" | "beta" | "hunchess" | "mythic";
 
 export interface CrateDef {
   id: string;
@@ -266,6 +266,11 @@ export interface CrateDef {
   items: readonly string[];
   /** Fischer Random's odds out of 100, by tier; a tier's items share its weight evenly. */
   fischer: readonly { tier: FischerTier; weight: number }[];
+  /**
+   * A secret prize (the Mythic Crate's Banana Suit, Nov 27): one of its Legendary or Mythic items, with this weight out of Fischer
+   * Random's 100, taken from its own tier's: the tier's other items share the rest evenly. No other crate has one.
+   */
+  prize?: { item: string; weight: number };
 }
 
 export const CRATES: readonly CrateDef[] = [
@@ -364,13 +369,21 @@ export const tierItems = (crate: CrateDef, tier: string) => crate.items.filter((
 /** The items a tier's box can hold in a crate. */
 export const presentItems = (crate: CrateDef, tier: string) => (tier === FISCHER ? [] : tierItems(crate, tier));
 
-/** Fischer Random's odds per item (out of 100): each tier's weight shared evenly by its items; empty tiers left out. */
+/**
+ * Fischer Random's odds per item (out of 100): each tier's weight shared evenly by its items; empty tiers left out. A crate's prize
+ * (the Mythic Crate's) has its own weight, taken from its tier's; the tier's other items share what's left.
+ */
 export function fischerOdds(crate: CrateDef): { item: string; weight: number }[] {
   const live = crate.fischer.filter((f) => tierItems(crate, f.tier).length > 0);
   const total = live.reduce((s, f) => s + f.weight, 0);
+  const prize = crate.prize && crate.items.includes(crate.prize.item) ? crate.prize : undefined;
   return live.flatMap((f) => {
+    const share = (100 * f.weight) / total;
     const list = tierItems(crate, f.tier);
-    return list.map((item) => ({ item, weight: (100 * f.weight) / total / list.length }));
+    const others = prize ? list.filter((item) => item !== prize.item) : list;
+    if (others.length === list.length || !others.length) return list.map((item) => ({ item, weight: share / list.length }));
+    const won = Math.min(prize!.weight, share);
+    return [...others.map((item) => ({ item, weight: (share - won) / others.length })), { item: prize!.item, weight: won }];
   });
 }
 
@@ -380,14 +393,35 @@ export function fischerOdds(crate: CrateDef): { item: string; weight: number }[]
  */
 export const liveStrip = (crate: CrateDef) => crate.strip.filter((x) => (x.tier === FISCHER ? fischerOdds(crate).length > 0 : presentItems(crate, x.tier).length > 0));
 
-export const crateDef = (id: string) => CRATES.find((c) => c.id === id);
-
 /**
- * The Mythic Crate's contents (Eric, Nov 10: its secret item, the Banana Suit). The crate itself is still the shop's look-only
- * teaser (`MythicCrateArt`, the bundle's line): nothing buys, rolls or opens it yet, so it's not in CRATES. Admins own a copy of
- * every item, this one too (admin-copies.ts); tests give it straight.
+ * The Mythic Crate's own items, found in no other crate (Eric, Nov 10: "that one secret crate... the super secret item is the banana
+ * suit"). Admins own a copy of every item, this one too (admin-copies.ts).
  */
 export const MYTHIC_CRATE_ITEMS: readonly string[] = ["banana-suit"];
+
+/**
+ * The Mythic Crate (Eric, Nov 9: "the exceedingly rare crate"; Nov 27: docs/decisions/2026-11-27-banana-suit-prize.md): what a
+ * Transcendent spin holds, every time: the series crates' Legendary (80) and Mythic (20) items, and its secret prize, the Banana Suit
+ * (MYTHIC_CRATE_ODDS.bananaSuit of the 100, from the Mythic share). Held and opened as a series crate (one of it and a crate key, the
+ * server's roll), but not in CRATES: it's no daily reward, level crate or bonus crate, so no other crate's odds change. Nothing sells
+ * it yet (the shop's bundle, with purchases); admins' test grants give it.
+ */
+export const MYTHIC_CRATE: CrateDef = {
+  id: "mythic",
+  name: "Mythic Crate",
+  blurb: "Only Legendary and Mythic items, and a secret",
+  look: "mythic",
+  strip: [{ tier: FISCHER, weight: 100 }],
+  items: [...new Set([...CRATES.flatMap((c) => c.items.filter((id) => ["legendary", "mythic"].includes(itemDef(id)!.tier))), ...MYTHIC_CRATE_ITEMS])],
+  fischer: [
+    { tier: "legendary", weight: 80 },
+    { tier: "mythic", weight: 20 },
+  ],
+  prize: { item: "banana-suit", weight: MYTHIC_CRATE_ODDS.bananaSuit },
+};
+
+/** A series crate by its id (one held opens with a crate key): the Crates tab's (CRATES), or the Mythic Crate. */
+export const crateDef = (id: string) => CRATES.find((c) => c.id === id) ?? (id === MYTHIC_CRATE.id ? MYTHIC_CRATE : undefined);
 
 /** Whether a locker holds any outfit (the Outfit slot is secret until you own one: Eric, Nov 10). */
 export const ownsOutfit = (items: readonly { def: string }[]) => items.some((i) => itemDef(i.def)?.slot === "outfit");

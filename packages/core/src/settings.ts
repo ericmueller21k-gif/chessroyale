@@ -4034,6 +4034,17 @@ export const CRATE_BONUS = {
 } as const;
 
 /**
+ * The Mythic Crate (Eric, Nov 9: "the exceedingly rare crate"; Nov 10: "that one secret crate... the super secret item is the banana
+ * suit"; docs/decisions/2026-11-27-banana-suit-prize.md; core's `MYTHIC_CRATE`). Every opening is a Transcendent spin over the series
+ * crates' Legendary (80) and Mythic (20) items, plus its secret prize. Rolled only on the server, held and opened with a key as a
+ * series crate.
+ */
+export const MYTHIC_CRATE_ODDS = {
+  /** The Banana Suit's chance per opening, out of 100, taken from the Mythic share (20): the other Mythic items share the rest. */
+  bananaSuit: 2,
+} as const;
+
+/**
  * The Shop tab's page (Eric, Nov 9: his mockup, our art; docs/decisions/2026-11-09-shop-page.md). Look only for now: no purchase is
  * wired (a tapped price says "Buying opens soon"); Stripe and coin purchases come next.
  */
