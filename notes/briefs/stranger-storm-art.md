@@ -43,3 +43,7 @@ line; no model names. Stills only on the orphan stills branch; never images unde
 **Eric, ~17:00:** the crack in his reference is not part of the storm: he merged two screenshots (the opening and the storm); during the
 storm the board has no crack. And "see how it... darkens the side... That's what we are also trying to aim for": the storm dims the
 page and margins around the board (deepest at the edges and corners) so the fire and frost glow against them; the squares stay readable.
+
+**Eric, ~17:25, after the first mockup (he likes it):** keep the storm overlapping the screen (Moves, his figure, the strip): "That's
+what makes it cool. So don't have it get rid of that." Keep the ice as is. The opening's crack (lava-orange / ice-blue) stays on the
+board, under the pieces, through the storm's 3 turns and heals a little each turn; when it has fully healed the storm goes away.
