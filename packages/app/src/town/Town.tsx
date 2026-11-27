@@ -33,7 +33,7 @@
  * docs/areas/town-square.md.
  */
 import { roomLoadSlice } from "./shops/load-slice.ts";
-import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, reportMs, setFps, setRec, summarize, timerStep, upName } from "./frame-report.ts";
+import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, reportMs, setFps, setRec, summarize, timerStep, upName, watchLongFrames } from "./frame-report.ts";
 import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
@@ -1785,6 +1785,8 @@ function startTown(
   // are null checks.
   const rec = TOWN_ASKED.report ? new FrameRec(undefined, reportMs(TOWN_ASKED.reportS)) : null;
   setRec(rec);
+  // (Nov 27: the browser's long frames, what the page did in a stall, where it says.)
+  const unwatchLong = rec ? watchLongFrames(rec) : null;
   let recPill: ReturnType<typeof reportPill> | null = null;
   let recPanel: HTMLElement | null = null;
   if (rec) {
@@ -3119,6 +3121,7 @@ function startTown(
       if (FPS === fps) setFps(null);
       recPill?.remove();
       recPanel?.remove();
+      unwatchLong?.();
       if (REC === rec) setRec(null);
       halt();
       ro.disconnect();

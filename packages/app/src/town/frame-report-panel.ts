@@ -3,7 +3,7 @@
  * start" / "● Recording 12 s" with Done), and at the end one panel, the size of the world's box, made to be screenshotted. Made once
  * each (the pill's seconds set at most once a second), never per frame.
  */
-import { NP, PART_NAMES, PART_SHORT, type Summary } from "./frame-report.ts";
+import { NS, STALL, SUM_NAMES, SUM_SHORT, WAIT, type Summary } from "./frame-report.ts";
 
 export interface Device {
   /** The browser and device ("Safari 18.1 · iPhone"). */
@@ -33,10 +33,16 @@ export function panelHtml(s: Summary, d: Device): string {
     `<div class="tfr-dev">${esc(d.browser)} · ratio ${d.ratio} (drawn ${d.drawn}) · ${d.w}×${d.h} px · ${esc(d.backend)} · ${s.refresh ? `~${s.refresh} Hz` : "? Hz"} · timer ${d.timer >= 0.5 ? `${ms(d.timer)} ms` : `${Math.round(d.timer * 1000)} µs`}</div>`,
   );
   lines.push(`<div class="tfr-fps" data-tfr-fps="${Math.round(s.p50)}"><b>${fps(s.p50)}</b> fps median · <b>${fps(s.p5)}</b> 5th % · <b>${fps(s.p1)}</b> 1st % · over 20 ms ${pct(s.over20)} · over 33 ms ${pct(s.over33)}</div>`);
-  const part = (k: number, g: { avg: number[] }) => `<b>${esc(PART_NAMES[k]!)}</b> ${ms(g.avg[k]!)}`;
+  const part = (k: number, g: { avg: number[] }) => `<b>${esc(SUM_NAMES[k]!)}</b> ${ms(g.avg[k]!)}`;
   const most = s.top >= 0 ? `${s.frames} frames in ${s.secs.toFixed(1)} s. Most time: ${part(s.top, all!)} of ${ms(all!.mean)} ms (ours: ${part(s.ours, all!)})` : "No frames recorded";
   const mostTurn = s.topTurn >= 0 ? `. Turning, to ${Math.round(s.maxTurn)}°/s: ${part(s.topTurn, turn!)} of ${ms(turn!.mean)} (ours: ${part(s.oursTurn, turn!)})` : ". No turning";
   lines.push(`<div class="tfr-most">${most}${mostTurn}. ${s.bakes} painted, ${s.uploads} uploads, ${s.resets} atlas resets.</div>`);
+  // (Nov 27) Outside our code, split: the wait for the screen's next refresh (idle) and the stalls past it; and what the browser saw.
+  if (s.frames) {
+    const L = s.long;
+    const seen = !L ? "the browser doesn't report its long frames" : L.n ? `the browser's ${L.n} long frames (${ms(L.ms)} ms): other scripts ${ms(L.scripts)} ms${L.by.length ? ` (${L.by.map(([k, n]) => `${esc(k)} ${ms(n)}`).join(" · ")})` : ""}, style & layout ${ms(L.layout)} ms; the rest the GPU or garbage collection` : "no long frames";
+    lines.push(`<div class="tfr-out" data-tfr-wait="${ms(all!.avg[WAIT]!)}" data-tfr-stall="${ms(all!.avg[STALL]!)}">Outside our code, a frame: <b>waiting for the screen</b> ${ms(all!.avg[WAIT]!)} ms (idle), <b>stalls</b> ${ms(all!.avg[STALL]!)} ms (missed refreshes). In stalls: ${seen}.</div>`);
+  }
   // (Nov 26) What was uploaded, by source, the most first (the rest summed): Eric's 1,211 couldn't be placed from the panel.
   if (s.uploadsBy.length) {
     const top = s.uploadsBy.slice(0, 6).map(([k, n]) => `${esc(k)} ${n}`);
@@ -50,9 +56,9 @@ export function panelHtml(s: Summary, d: Device): string {
   // (Tight, "332·60": six columns since the rooms joined, Nov 11, on a 428 px phone.)
   for (const g of s.segs) t += `<td>${g.frames}·${fps(g.fps)}</td>`;
   t += `<td></td></tr></thead><tbody>`;
-  for (let k = 0; k < NP; k++) {
+  for (let k = 0; k < NS; k++) {
     const hot = k === s.top ? " class=\"tfr-hot\"" : "";
-    t += `<tr${hot}><td>${esc(PART_NAMES[k]!)}</td>`;
+    t += `<tr${hot}><td>${esc(SUM_NAMES[k]!)}</td>`;
     for (const g of s.segs) t += `<td>${g.frames ? ms(g.avg[k]!) : "–"}</td>`;
     t += `<td>${ms(all!.max[k]!)}</td></tr>`;
   }
@@ -61,7 +67,7 @@ export function panelHtml(s: Summary, d: Device): string {
   t += `<td>${ms(s.worst[0]?.ms ?? 0)}</td></tr></tbody></table>`;
   lines.push(t);
   let w = `<div class="tfr-worst"><b>Worst 10 frames</b> (ms, when, biggest part, what was happening)<ol>`;
-  for (const x of s.worst) w += `<li><b>${ms(x.ms)} ms</b> ${(x.at / 1000).toFixed(1)} s: ${esc(PART_SHORT[x.top]!)} ${ms(x.topMs)} · ${esc(x.what)}</li>`;
+  for (const x of s.worst) w += `<li><b>${ms(x.ms)} ms</b> ${(x.at / 1000).toFixed(1)} s: ${esc(SUM_SHORT[x.top]!)} ${ms(x.topMs)} · ${esc(x.what)}</li>`;
   w += `</ol></div>`;
   lines.push(w);
   return lines.join("");
