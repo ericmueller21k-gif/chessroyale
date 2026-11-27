@@ -4,6 +4,8 @@ import {
   bossMoveFrom,
   bossMoveFromScores,
   eloDrawT,
+  giftedMaterial,
+  isGift,
   brainGuard,
   brainLine,
   HumanUciEngine,
@@ -461,5 +463,85 @@ describe("his move at a strength from the engine server's numbers (bossMoveFromS
     expect(bossMoveFromScores([{ move: "e2e4", expected: Number.NaN }, ...ALL.filter((m) => m.move !== "e2e4")], "best", 2000, mulberry32(1))).toBe("d2d4");
     expect(bossMoveFromScores(ALL, "elo", 2000, mulberry32(1), [5, 15], undefined, ["e7e5"])).toBeNull();
     expect(bossMoveFromScores([], "elo", 2000, mulberry32(1))).toBeNull();
+  });
+});
+
+describe("never a gift on a Battle Tower floor (giftedMaterial, humanBrainMove's noGift; Eric, Nov 26: \"I don't want these bosses to [be] giving up your queen for nothing\")", () => {
+  /** White to move, its queen on d1; Black's pawn on e5 takes on d4 and f4, its knight on b4 covers c2, d3 and d5. */
+  const KNIGHT = "4k3/8/8/4p3/1n6/8/8/3QK3 w - - 0 1";
+
+  it("a queen or rook moved where it's simply lost, net of what it took, is a gift; a fair trade, a bad trade for a rook, a free piece taken or another piece left hanging isn't", () => {
+    const cases: [string, string, number][] = [
+      // (The queen onto a pawn's square, nothing to take back: all 9.)
+      ["4k3/8/8/4p3/8/8/8/3QK3 w - - 0 1", "d1d4", 9],
+      ["4k3/8/8/4p3/8/8/8/3QK3 w - - 0 1", "d1d5", 0],
+      // (Black too: the queen onto a pawn's square.)
+      ["3qk3/8/8/8/4P3/8/8/4K3 b - - 0 1", "d8d5", 9],
+      // (Queen for queen, the pawn taking back: even.)
+      ["3qk3/8/8/8/8/2P5/8/3QK3 w - - 0 1", "d1d4", 0],
+      // (A pawn taken where a pawn guards it: 9 less the pawn.)
+      ["4k3/8/2p5/3p4/8/8/8/3QK3 w - - 0 1", "d1d5", 8],
+      // (A free knight taken: nothing lost.)
+      ["4k3/8/8/3n4/8/8/8/3QK3 w - - 0 1", "d1d5", 0],
+      // (A rook for a bishop, the pawn taking back: 2, a bad trade, not a gift; with no pawn, the rook for nothing.)
+      ["4k3/3b4/8/8/8/1P6/8/R3K3 w - - 0 1", "a1a4", 2],
+      ["4k3/3b4/8/8/8/8/8/R3K3 w - - 0 1", "a1a4", 5],
+      // (The pawn that would take is pinned to its king: legal moves only.)
+      ["4k3/8/8/4p3/8/8/8/3QR1K1 w - - 0 1", "d1d4", 0],
+      // (Next to the king: taken when nothing guards it; guarded by the c6 pawn, the king can't.)
+      ["4k3/8/8/8/8/8/8/3QK3 w - - 0 1", "d1d7", 9],
+      ["4k3/8/2P5/8/8/8/8/3QK3 w - - 0 1", "d1d7", 0],
+      // (The queen already hanging, the king moving: a missed threat, allowed. A knight put where it's lost: not checked.)
+      ["4k3/8/8/4p3/3Q4/8/8/4K3 w - - 0 1", "e1e2", 0],
+      ["4k3/8/8/4p3/8/8/8/1N2K3 w - - 0 1", "b1c2", 0],
+      ["4k3/8/8/4p3/8/8/8/2N1K3 w - - 0 1", "c1d3", 0],
+      // (A mate is never a gift.)
+      ["r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4", "h5f7", 0],
+    ];
+    for (const [fen, move, lost] of cases) expect([fen, move, giftedMaterial(fen, move)]).toEqual([fen, move, lost]);
+    expect(isGift("4k3/8/8/4p3/8/8/8/3QK3 w - - 0 1", "d1d4")).toBe(true);
+    expect(isGift("4k3/3b4/8/8/8/1P6/8/R3K3 w - - 0 1", "a1a4")).toBe(false);
+    // (A move chess.js can't play, or a position it can't read: never a gift, nothing thrown.)
+    expect(giftedMaterial(KNIGHT, "d1h8")).toBe(0);
+    expect(giftedMaterial("not a fen", "d1d4")).toBe(0);
+  });
+
+  it("Maia's gift is drawn again from its other listed moves, never a gift among them, from the move's random source (one seed, one move); off the tower, played as drawn", () => {
+    const ans = answer("d1d4", [["d1d4", 0.4], ["d1d3", 0.3], ["d1f3", 0.2], ["e1e2", 0.1]]);
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 40; seed++) {
+      const pick = humanBrainMove("maia-raw", ans, TOP, null, BOSS_BRAIN, { fen: KNIGHT, temperature: 1.6, rng: mulberry32(seed) });
+      expect(pick.vetoed).toBe(1);
+      expect(["d1f3", "e1e2"]).toContain(pick.move);
+      seen.add(pick.move!);
+      // (One seed, one move: the checker online draws the same.)
+      expect(humanBrainMove("maia-raw", ans, TOP, null, BOSS_BRAIN, { fen: KNIGHT, temperature: 1.6, rng: mulberry32(seed) }).move).toBe(pick.move);
+    }
+    expect([...seen].sort()).toEqual(["d1f3", "e1e2"]);
+    // (A move a power forbids is never the redraw either.)
+    expect(humanBrainMove("maia-raw", ans, TOP, ["d1d4", "d1d3", "e1e2"], BOSS_BRAIN, { fen: KNIGHT, temperature: 1, rng: mulberry32(3) }).move).toBe("e1e2");
+    // (Not a gift: Maia's own draw, untouched, and the random source not used.)
+    let used = 0;
+    const counted = () => (used++, 0.5);
+    expect(humanBrainMove("maia-raw", answer("d1f3", [["d1d4", 0.5], ["d1f3", 0.3]]), TOP, null, BOSS_BRAIN, { fen: KNIGHT, temperature: 1.6, rng: counted })).toEqual({ move: "d1f3", rank: 2, vetoed: 0 });
+    expect(used).toBe(0);
+    // (Off the tower (no noGift): the gift is played, as before.)
+    expect(humanBrainMove("maia-raw", ans, TOP, null).move).toBe("d1d4");
+    // (Every listed move a gift: Stockfish's best, the guard.)
+    expect(humanBrainMove("maia-raw", answer("d1d4", [["d1d4", 0.6], ["d1d3", 0.4]]), TOP, null, BOSS_BRAIN, { fen: KNIGHT, temperature: 1, rng: mulberry32(1) })).toEqual({ move: null, vetoed: 1, why: "guard" });
+  });
+
+  it("the boss's move on a tower floor (bossMoveFrom with the floor's draw): Maia asked at the floor's temperature and topP, its gift drawn again; the debug line says the guard stepped in", async () => {
+    const opts: { temperature: number; topP: number }[] = [];
+    const maia: HumanEngineLike = { ready: () => true, candidates: async (_f, _r, _a, o) => (opts.push(o), answer("d1d4", [["d1d4", 0.5], ["d1f3", 0.3], ["d1d3", 0.2]])) };
+    let note: BrainNote | null = null;
+    const draw = { temperature: 1.6, topP: 1, noGift: true as const };
+    const move = await bossMoveFrom(scripted(), KNIGHT, 700, 1000, "elo", mulberry32(9), [5, 15], undefined, null, { brain: "maia-raw", rating: 700, engine: maia, draw, onNote: (n) => (note = n) });
+    expect(move).toBe("d1f3");
+    expect(opts[0]).toMatchObject({ temperature: 1.6, topP: 1 });
+    expect(brainLine(note!)).toBe("Maia 700 · no guard · guard → Maia's #2 · 90 ms");
+    // (No draw: BOSS_BRAIN's temperature and topP, and the gift played.)
+    expect(await bossMoveFrom(scripted(), KNIGHT, 700, 1000, "elo", mulberry32(9), [5, 15], undefined, null, { brain: "maia-raw", rating: 700, engine: maia })).toBe("d1d4");
+    expect(opts[1]).toMatchObject({ temperature: BOSS_BRAIN.temperature, topP: BOSS_BRAIN.topP });
   });
 });

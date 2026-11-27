@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   BATTLE_TOWER,
+  BOSS_BRAIN,
   BOSS_ROSTER,
   ENGINE_MAX_ELO,
   adminFirstBosses,
   finishFloor,
   floorBossCount,
+  floorDraw,
   floorsWonBest,
   floorStrength,
   hiddenBosses,
@@ -92,6 +94,39 @@ describe("the tower: floors and strength", () => {
       }
       expect(floorStrength(f, 3)).toEqual(floorStrength(f, 2));
     }
+  });
+});
+
+describe("the tower: how Maia's move is drawn by floor (floorDraw; Eric, Nov 26: \"play like bad players for the first 8 to 10 levels\")", () => {
+  it("the first floors draw looser than BOSS_BRAIN (a temperature above 1, every move in reach), easing back to BOSS_BRAIN's own by the last row, held there to floor 50; never a gift on any floor", () => {
+    const rows = BATTLE_TOWER.carelessDraw;
+    const [, t1, p1] = rows[0]!;
+    const last = rows[rows.length - 1]!;
+    expect(floorDraw(1)).toEqual({ temperature: t1, topP: p1, noGift: true });
+    expect(t1).toBeGreaterThan(1);
+    expect(p1).toBe(1);
+    // (The last row is BOSS_BRAIN's own draw, so the ease ends where every other boss draws: no step at its floor.)
+    expect([last[1], last[2]]).toEqual([BOSS_BRAIN.temperature, BOSS_BRAIN.topP]);
+    expect(last[0]).toBeLessThanOrEqual(10);
+    let prev = floorDraw(1);
+    for (let f = 1; f <= 50; f++) {
+      const d = floorDraw(f);
+      expect(d.noGift).toBe(true);
+      expect(d.temperature).toBeLessThanOrEqual(prev.temperature);
+      expect(d.topP).toBeLessThanOrEqual(prev.topP);
+      if (f >= last[0]) expect(d).toEqual({ temperature: BOSS_BRAIN.temperature, topP: BOSS_BRAIN.topP, noGift: true });
+      prev = d;
+    }
+  });
+
+  it("straight between the rows, held at the first before it, the brain's own from the last row's floor on", () => {
+    const rows = [[2, 2, 1], [6, 1.2, 1], [10, 1, 0.5]] as const;
+    const own = { temperature: 0.7, topP: 0.8 };
+    expect(floorDraw(1, rows, own)).toEqual({ temperature: 2, topP: 1, noGift: true });
+    expect(floorDraw(4, rows, own)).toEqual({ temperature: 1.6, topP: 1, noGift: true });
+    expect(floorDraw(8, rows, own)).toEqual({ temperature: 1.1, topP: 0.75, noGift: true });
+    expect(floorDraw(10, rows, own)).toEqual({ temperature: 0.7, topP: 0.8, noGift: true });
+    expect(floorDraw(40, [], own)).toEqual({ temperature: 0.7, topP: 0.8, noGift: true });
   });
 });
 
