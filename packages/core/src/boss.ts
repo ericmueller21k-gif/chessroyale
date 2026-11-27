@@ -107,9 +107,10 @@ export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funh
 /**
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
  * fake move a few seconds into the first move it can come on), his lying-down clock tap from the first move (`clocktap`) and his
- * "Hang on" on his second turn (`hangon`: no pop-off before it; Nov 26).
+ * "Hang on" on his second turn (`hangon`: no pop-off before it; Nov 26). Chub & Chirp's Turf (`turf`, Nov 27): the hop-around on his
+ * first turn (then every turfHopEvery), and he starts with the two ranks in front of his own too (32 squares: Long legs from his first turn).
  */
-export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower", "hangon", "finisher", "finisher-flame", "finisher-ice", "finisher-cut", "finisher-frostfire"];
+export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower", "hangon", "finisher", "finisher-flame", "finisher-ice", "finisher-cut", "finisher-frostfire", "turf"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after

@@ -460,11 +460,23 @@ export const HOPPER: BossRules = {
       const test = b.settings.bossPowerTest;
       const moves = test === "leapfrog" ? LEAPFROG_TEST_MOVES[at.crowdSide] : test === "carrotpatch" ? CARROT_TEST_MOVES[at.crowdSide] : null;
       if (moves) b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...moves] }, moves.length, at.generation));
-      return b.settings.towerFloor != null ? {} : { turf: newTurf(b.boards.get(at.boardId)!.fen, at.crowdSide) };
+      if (b.settings.towerFloor != null) return {};
+      const turf = newTurf(b.boards.get(at.boardId)!.fen, at.crowdSide);
+      return { turf: test === "turf" ? turfTest(turf, at.crowdSide) : turf };
     },
   },
   view: (p) => ({ hop: p.hop ?? null, pawnBounce: p.pawnBounce ?? null, carrots: carrotView(p.carrots), turf: turfView(p.turf) }),
 };
+
+/**
+ * The test switch ?power=turf: the hop-around on his first turn (his last "came" turfHopEvery - 1 crowd moves before the battle), and
+ * the two ranks in front of his own his too (32 squares: Long legs from his first turn).
+ */
+export function turfTest(t: TurfState, crowd: Side, s: Pick<BossPowerSettings, "turfHopEvery"> = BOSS_POWERS): TurfState {
+  const ranks = crowd === "w" ? [5, 6] : [3, 4];
+  const owner = [...t.owner].map((c, i) => (ranks.includes(Math.floor(i / 8) + 1) ? "b" : c)).join("");
+  return { ...t, owner, hopAt: 1 - s.turfHopEvery };
+}
 
 /** His Turf as the screens get it (NetBossPowers.turf): who holds each square, his holds and the turn they're for, his last hop-around. */
 export interface TurfView {

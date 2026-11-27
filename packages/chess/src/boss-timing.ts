@@ -127,6 +127,9 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   slam: [[0, 1500]],
   hop: [[0, 720]],
   pawnBounce: [[0, 720]],
+  // (Chub & Chirp's TURF HOP!, Nov 27: off the board as Chirp drops onto it. DOUBLE HOP!: as his second move lands, as TWICE!.)
+  turfHop: [[0, 720]],
+  doubleHop: [[0, 1500]],
   carrots: [[0, 1100]],
   carrotWin: [[0, 1500]],
   camouflage: [[0, 1500]],
