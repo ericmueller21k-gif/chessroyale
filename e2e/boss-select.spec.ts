@@ -424,7 +424,7 @@ test("on a computer the pawn and the picked boss stand bigger on the stage, as t
 });
 
 for (const scheme of ["light", "dark"] as const) {
-  test(`the grid, ${scheme}: square slanted tiles all the same size with a small gap, six to a row on a phone (a short row centered), two rows of eight across a computer's column (Eric, Nov 2), edge to edge, bigger than before, 44 px targets, each filled by its boss's figure, nothing sideways`, async ({ page }) => {
+  test(`the grid, ${scheme}: square slanted tiles all the same size with a small gap, six to a row on a phone (a short row centered), two rows across a computer's column (Eric, Nov 2), edge to edge, bigger than before, 44 px targets, each filled by its boss's figure, nothing sideways`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     for (const [w, h] of SIZES()) {
       const at = `${scheme} ${w}x${h}`;
@@ -518,10 +518,12 @@ for (const scheme of ["light", "dark"] as const) {
         expect(a.x, `${at} ${t.name}: figure to the left edge`).toBeLessThanOrEqual(t.inner.x + 0.5);
         expect(a.r, `${at} ${t.name}: figure to the right edge`).toBeGreaterThanOrEqual(t.inner.r - 0.5);
         expect(a.b, `${at} ${t.name}: figure on past the foot`).toBeGreaterThanOrEqual(t.inner.b - 0.5);
-        if (t.name !== "Locked boss") fills.add(t.fill);
+        // (A locked card is dark, the Hidden Boss's and a boss's still to win alike: its color shows once won.)
+        if (t.name.startsWith("Locked boss")) expect(t.fill, `${at} ${t.name}: dark while locked`).toBe("none");
+        else fills.add(t.fill);
       }
-      // A color of its own for each boss with a character (the Hidden Boss's is dark, "?" plain): fourteen, no two the same.
-      expect(fills.size, `${at}: a color each`).toBe(14);
+      // A color of its own for each boss you can meet, no two the same (counted from the roster, as GUEST_TILES is).
+      expect(fills.size, `${at}: a color each`).toBe(playableBosses().length);
 
       // Nothing spills past a tile's shape: the gaps are empty, art and all (on either side of each slanted edge, and between the rows).
       const gap = gaps[0]!;
@@ -651,15 +653,15 @@ test("on a computer the tiles go in two rows across the middle column, and START
   // Two rows, the first the longer: the rows fill the column with the same 10 px buffer as a phone's, and START is in the window.
   expect(await tileLines(page)).toEqual(twoRows(GUEST_TILES));
   const column = (await page.locator(".rd-page").boundingBox())!;
-  const rowEnd = (await page.locator(".bs-tile").nth(7).boundingBox())!;
+  const rowEnd = (await page.locator(".bs-tile").nth(twoRows(GUEST_TILES)[0]! - 1).boundingBox())!;
   const buffer = rowEnd.x + rowEnd.width - (column.x + column.width);
   expect(buffer, "right buffer").toBeGreaterThanOrEqual(-12);
   expect(buffer, "right buffer").toBeLessThanOrEqual(-8);
   const start = (await page.locator(".bs-start").boundingBox())!;
   expect(start.y + start.height, "START in the window at 1280 x 800").toBeLessThanOrEqual(800);
-  // A narrower window: six a row (Nov 12, Eric: six a row; was five), the sixteen as 6, 6 and 4.
+  // A narrower window: six a row (Nov 12, Eric: six a row; was five).
   await page.setViewportSize({ width: 1100, height: 800 });
-  expect(await tileLines(page)).toEqual([6, 6, 4]);
+  expect(await tileLines(page)).toEqual(rowSizes(GUEST_TILES, 6));
 });
 
 test("home's Boss Battle card: a still portrait that moves on to the next boss you can meet, never the Hidden Boss, the card never changing size", async ({ page }) => {
