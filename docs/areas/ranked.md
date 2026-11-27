@@ -30,6 +30,9 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   clocks, no power-ups, no engine scoring. One tap queues (`/1v1`, or `startRanked1v1()` from any screen); no
   settings. Online needs an account wherever sign-in is set up (`mayPlay`, as every mode), so guests and under-13
   devices can't queue there; banned players can't either.
+- **From a town table** (Nov 27; [town-square.md](town-square.md), "Ranked at the tables"): the same queue with `town=1` on the first ask;
+  paired, the matchmaker tells the hub before the code goes out (`townMatch`, at most `TOWN_TABLES.seatWaitMs`), the game is made with
+  `town` and tells the hub when it ends; only such a game takes watchers (`/ws?watch=1`: the game's messages, never chat or outcomes).
 - **Its kill switch:** `PAUSE_RANKED1V1` ([ops.md](ops.md) "Kill switches"): the queue answers 503 with "1 v 1 is resting
   for a bit. Back soon."; games already running finish.
 - **The queue** (`matchmaker.ts`'s duel mode, `queue.ts` `PAIR_BY_RATING`, core's `pairUp`): the Matchmaker object for
