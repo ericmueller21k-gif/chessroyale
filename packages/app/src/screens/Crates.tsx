@@ -894,18 +894,6 @@ function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Un
           );
         })}
       </div>
-      <button
-        type="button"
-        class="ff-button"
-        disabled={row.state !== "ready"}
-        onClick={() => {
-          unlockAudio();
-          play("menuSelect");
-          setOpening(true);
-        }}
-      >
-        ▶ Open
-      </button>
     </div>
   );
 }
