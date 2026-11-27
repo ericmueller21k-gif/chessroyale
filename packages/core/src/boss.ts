@@ -109,7 +109,7 @@ export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funh
  * fake move a few seconds into the first move it can come on), his lying-down clock tap from the first move (`clocktap`) and his
  * "Hang on" on his second turn (`hangon`: no pop-off before it; Nov 26).
  */
-export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower", "hangon"];
+export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower", "hangon", "finisher", "finisher-flame", "finisher-ice", "finisher-cut", "finisher-frostfire"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after

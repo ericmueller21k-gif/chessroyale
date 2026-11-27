@@ -1486,7 +1486,8 @@ export class MatchRunner {
     // (Test switch ?paint=1: Smudgy's hidden rook steps like a pawn, whose name the e2e reads.)
     const paint = this.settings.bossPaintTest ? smudgyBattle.paintStep(this.battle, this.bossAllowed() ?? legalMoves(fen)) : undefined;
     // (Test switch ?power=lockon: Chandy takes a piece as soon as he can, so his first lock comes early.)
-    const grab = chandyBattle.testMove(this.battle, this.bossAllowed()) ?? undefined;
+    // (Test switch ?power=finisher: the Stranger takes a piece of yours that isn't a pawn whenever he can.)
+    const grab = chandyBattle.testMove(this.battle, this.bossAllowed()) ?? strangerBattle.testMove(this.battle, this.bossAllowed()) ?? undefined;
     // (His brain for this move (brainNow): the Hidden Boss's child's rating now, Armored Birdie's stronger one, or Stockfish.)
     const now = this.brainNow(this.humanBrain?.rating ?? null);
     const brain = this.humanBrain && now.rating !== null ? { ...this.humanBrain, rating: now.rating } : null;

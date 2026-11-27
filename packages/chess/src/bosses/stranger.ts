@@ -22,7 +22,7 @@
  * and the admins' trigger waits). Eric's ult lands in the next PR.
  */
 import { BOSS_POWERS, type BalloonShape, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type StrangerState } from "@chessroyale/core";
-import { boardEnd, type BoardState } from "../boards.ts";
+import { BOSS_OPENING, boardEnd, newBoard, type BoardState } from "../boards.ts";
 import { heldIn } from "../board-layer.ts";
 import { applyMove, keptEnPassant, kingAttacked, legalMoves, pieceAt, positionOver, sideToMove, withoutPiece } from "../rules.ts";
 import { stockfishRefuses, type MoveScore } from "../uci.ts";
@@ -44,6 +44,16 @@ export const STRANGER_FX = { frostfire: 2300, frostfireBurn: 1500, finisher: 460
  */
 export const FINISHERS = ["flame", "ice", "cut", "frostfire"] as const;
 export type Finisher = (typeof FINISHERS)[number];
+/**
+ * The test switch `?power=finisher` (and `finisher-<kind>`, that finisher every time; test links only): the battle starts where your
+ * bishop can take his knight at once (by your side: your move first), and every move of his takes a piece of yours that isn't a pawn
+ * when one can (the most valuable), so the e2e sees his block and then his finisher. Not a position the game reaches; nothing else changes.
+ */
+export const FINISHER_TEST = {
+  w: "rnbqkb1r/pppp1ppp/5n2/4p1B1/3PP3/8/PPP2PPP/RN1QKBNR w KQkq - 0 4",
+  b: "rn1qkbnr/ppp2ppp/8/3pp3/4P1b1/5N2/PPPP1PPP/RNBQKB1R b KQkq - 0 4",
+} as const;
+const finisherTest = (test: string): { on: boolean; kind: number } => ({ on: test === "finisher" || test.startsWith("finisher-"), kind: test.startsWith("finisher-") ? FINISHERS.indexOf(test.slice(9) as Finisher) : -1 });
 export const finisherOf = (pick: number | undefined): Finisher => FINISHERS[(((pick ?? 0) % FINISHERS.length) + FINISHERS.length) % FINISHERS.length]!;
 
 const FILES = "abcdefgh";
@@ -292,6 +302,16 @@ export const STRANGER: BossRules = {
   afterCrowdMove(b) {
     strangerBattle.afterCrowdMove(b);
   },
+  // (The test switch ?power=finisher: the battle starts on FINISHER_TEST, your move first.)
+  opening: {
+    setUp(b, at) {
+      if (!finisherTest(b.settings.bossPowerTest).on) return {};
+      const fen = FINISHER_TEST[at.crowdSide];
+      const board = newBoard(at.boardId, BOSS_OPENING, 0, at.generation);
+      b.boards.set(at.boardId, { ...board, fen, bases: [{ ply: 0, fen }] });
+      return {};
+    },
+  },
   view: (p) => {
     const st = strangerOf(p);
     return { stranger: { strike: st.strike ? { ...st.strike } : null, burn: st.burn ? { ...st.burn } : null } };
@@ -301,6 +321,19 @@ export const STRANGER: BossRules = {
 // ---------------- His part in the match runner ----------------
 
 export const strangerBattle = {
+  /** The test switch's move (`?power=finisher`, solo): a capture of your most valuable piece that isn't a pawn (nor the king); else null. */
+  testMove(b: Battle, allowed: readonly string[] | null): string | null {
+    const boss = b.state.boss;
+    if (!boss || boss.id !== "stranger" || !finisherTest(b.settings.bossPowerTest).on || !b.bossToMove()) return null;
+    const fen = boardOf(b).fen;
+    const takes = (allowed ?? legalMoves(fen))
+      .map((m) => ({ m, sq: capturedSquare(fen, m) }))
+      .map(({ m, sq }) => ({ m, v: sq ? pieceAt(fen, sq) : null }))
+      .filter((x) => x.v && x.v.color === boss.crowdSide && x.v.type !== "p" && x.v.type !== "k")
+      .sort((a, c) => (VALUE[c.v!.type] ?? 0) - (VALUE[a.v!.type] ?? 0) || (a.m < c.m ? -1 : 1));
+    return takes[0]?.m ?? null;
+  },
+
   /**
    * His finisher, as his move is about to show (`move`: the move he plays; him to move): a move that takes a piece of yours that isn't a
    * pawn (nor the king) is shown as his leap onto the board and a finisher on that piece (`finisher`: `square`, `shape`, `pick` from the
@@ -318,7 +351,8 @@ export const strangerBattle = {
     const sq = capturedSquare(fen, move);
     const piece = sq ? pieceAt(fen, sq) : null;
     if (!sq || !piece || piece.color !== boss.crowdSide || piece.type === "p" || piece.type === "k") return false;
-    const pick = Math.floor(powerRoll(p.seed, "finisher", p.turn, sq) * 4096);
+    const forced = finisherTest(b.settings.bossPowerTest).kind;
+    const pick = forced >= 0 ? forced : Math.floor(powerRoll(p.seed, "finisher", p.turn, sq) * 4096);
     const event: PowerEvent = { kind: "finisher", turn: p.turn, square: sq, shape: piece.type as BalloonShape, pick };
     b.state = { ...b.state, boss: { ...boss, powers: { ...p, events: [...p.events, event] } } };
     return true;

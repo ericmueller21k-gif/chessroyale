@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BATTLE_TOWER, BOSS_POWERS, BOSS_ROSTER, adminFirst, adminFirstBosses, bossDef, canPick, chooseBoss, finishFloor, floorBoss, floorUnlocks, isPlayable, menuBosses, mulberry32, newRun, startFloor, towerPool, unlockBosses, unlockFloor, unlockReady, type BossDef } from "@chessroyale/core";
-import { FINISHERS, MatchRunner, POWER_FX, STRANGER_FX, bossRules, finisherOf, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
+import { FINISHERS, FINISHER_TEST, MatchRunner, POWER_FX, STRANGER_FX, bossRules, finisherOf, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
 import { KIT_OPENING, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 import { powerRoll } from "../src/bosses/base.ts";
 
@@ -332,6 +332,38 @@ describe("his finisher (Eric, Nov 27: a capture of a piece that isn't a pawn sho
     // (His move shown, the crowd's turn's events are its own: the finisher doesn't play again after the move.)
     expect(finishers(a)).toEqual([]);
     expect(POWER_FX.finisher).toBe(STRANGER_FX.finisher);
+  });
+});
+
+describe("the finisher's test switch (?power=finisher, finisher-<kind>)", () => {
+  it("starts where your bishop takes his knight; he takes it back, his finisher on it, the kind forced by finisher-<kind>", async () => {
+    for (const side of ["w", "b"] as const)
+      for (const test of ["finisher", "finisher-cut"]) {
+        const r = battle(9, side, test);
+        r.deal();
+        expect(fenOf(r)).toBe(FINISHER_TEST[side]);
+        // Your bishop takes his knight.
+        const take = side === "w" ? "g5f6" : "g4f3";
+        await crowdMove(r, () => take);
+        expect(r.bossToMove()).toBe(true);
+        // His move takes your bishop back (the test move), held for his finisher.
+        let held = 0;
+        const move = await r.playBoss(undefined, async (ms) => void (held = ms));
+        expect(move.slice(2, 4)).toBe(side === "w" ? "f6" : "f3");
+        expect(held).toBe(STRANGER_FX.finisher);
+        r.deal();
+        expect(pieceAt(fenOf(r), move.slice(2, 4))?.color).toBe(side === "w" ? "b" : "w");
+      }
+  });
+
+  it("the forced kind is the event's pick (finisher-ice: the ice)", async () => {
+    const r = battle(9, "w", "finisher-ice");
+    r.deal();
+    await crowdMove(r, () => "g5f6");
+    await r.playBoss(undefined, async () => {
+      const e = r.boss!.powers!.events.find((x) => x.kind === "finisher")!;
+      expect(finisherOf(e.pick)).toBe("ice");
+    });
   });
 });
 
