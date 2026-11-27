@@ -632,7 +632,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   // The pop-up a tap on the crate's art asks first (Open this crate?), shown only when the crate can open.
   const [askOpen, setAskOpen] = useState(false);
   // (Read once, on mount: the player's own taps change the open panel after that, never a re-render.)
-  const [colorsOpen] = useState(() => !colorsClosedSaved());
+  const [colorsOpen, setColorsOpen] = useState(() => !colorsClosedSaved());
   // (The opening's sounds made ahead in the sound worker as its page opens, once sound is on: before the Open's tap.)
   useEffect(() => warmCrateSounds(), []);
   // Escape closes the pop-up, and only it: captured here so the shop's own Escape (back) doesn't also run.
@@ -786,8 +786,18 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           );
         })}
       </div>
-      <details class="odds-more" open={colorsOpen} onToggle={(e) => setColorsClosedSaved(!e.currentTarget.open)}>
-        <summary>Colors and purity</summary>
+      {/* (Saved as it's tapped, not in the details' toggle event: that one comes a moment later, and leaving the page first lost the
+          choice: main's run 45954591183.) */}
+      <details class="odds-more" open={colorsOpen}>
+        <summary
+          onClick={(e) => {
+            e.preventDefault();
+            setColorsOpen(!colorsOpen);
+            setColorsClosedSaved(colorsOpen);
+          }}
+        >
+          Colors and purity
+        </summary>
         <p class="small">Every item also rolls a color and a purity, 0-100%. The lower its purity, the more it's blotched (at 0%, all over, a shade darker). At 90% or more it's shiny ✨ (about 1 in 250).</p>
         <div class="color-odds">
           {ITEM_COLORS.map((c) => (
