@@ -636,7 +636,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   // (The opening's sounds made ahead in the sound worker as its page opens, once sound is on: before the Open's tap.)
   useEffect(() => warmCrateSounds(), []);
   // Escape closes the pop-up, and only it: captured here so the shop's own Escape (back) doesn't also run.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!askOpen) return;
     const esc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
