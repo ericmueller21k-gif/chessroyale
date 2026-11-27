@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_POWERS, DASH_HANG_ON, type BossPowerState } from "@chessroyale/core";
-import { DASH, DASH_FX, clockHitOn, clockHitTurns, hangOnClock, hangOnPending, hangOnTimeline, popOffMs, popOffPending, popOffTurns } from "../src/bosses/dash.ts";
+import { DASH, DASH_FX, clockHitOn, clockHitTurns, hangOnClock, hangOnPending, hangOnTimeline, popOffHolding, popOffMs, popOffPending, popOffTurns } from "../src/bosses/dash.ts";
 import { POWER_FX } from "../src/index.ts";
 
 /**
@@ -118,6 +118,18 @@ describe("Dash's pop-off (Eric, Nov 7: once a battle; Eric, Nov 8: twice, before
     // (His extra move after a failed Scramble Rush, before your move of that turn: neither plays, nor holds it.)
     expect(popOffPending({ ...on, crowdMoves: at - 1 })).toBe(false);
     expect(popOffMs({ ...on, crowdMoves: at - 1 })).toBe(0);
+  });
+
+  it("keeps his move's row out of the move list while he thinks after your move (and as his move lands), never in his extra move's thinking before yours (the review's nit 2, Nov 27)", () => {
+    const at = 9;
+    const on = { id: "dash", crowdMoves: at, powers: { turn: at, dash: { popOff: { at } } } };
+    expect(popOffHolding(on)).toBe(true);
+    // (His move played, the runner's turn on: still held while its beats end.)
+    expect(popOffHolding({ ...on, powers: { ...on.powers, turn: at + 1 } })).toBe(true);
+    // (His extra move's thinking after a failed Rush on the pop-off's turn, your move of it not yet made: his last move stays listed.)
+    expect(popOffHolding({ ...on, crowdMoves: at - 1 })).toBe(false);
+    expect(popOffHolding({ ...on, powers: { ...on.powers, turn: at + 2 } })).toBe(false);
+    expect(popOffHolding({ ...on, id: "moo" })).toBe(false);
   });
 });
 

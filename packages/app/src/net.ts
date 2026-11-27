@@ -682,6 +682,9 @@ export class NetMatch implements GameView {
     // (Birdie's moments' start, on the lobby's clock: onto this device's, BirdieView.turnAt.)
     const bd = next.powers?.birdie;
     if (bd?.turnAt) next = { ...next, powers: { ...next.powers!, birdie: { ...bd, turnAt: { turn: bd.turnAt.turn, at: this.local(bd.turnAt.at), ...(bd.turnAt.dropAt !== undefined ? { dropAt: this.local(bd.turnAt.dropAt) } : {}) } } } };
+    // (Dash's pop-off's hold's start, the same: DashView popOff.since.)
+    const pop = next.powers?.dash?.popOff;
+    if (pop?.since !== undefined) next = { ...next, powers: { ...next.powers!, dash: { ...next.powers!.dash!, popOff: { ...pop, since: this.local(pop.since) } } } };
     return (this.boss = { ...next, board: this.toView(next.board) });
   }
 

@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BOOST_CRATE_NAME, CRATE_BONUS_NAME, LEVEL_CRATE_BONUS, crateDef, hasRewards, rewardDrops, rewardLines, type CrateLook, type XpGrant, type XpRewards } from "@chessroyale/core";
 import { refreshProfile } from "../account.ts";
 import { play } from "../sound.ts";
-import { BetaCrateArt, HunchessCrateArt, KeyArt, WinterCrateArt } from "./Items.tsx";
+import { BetaCrateArt, HunchessCrateArt, KeyArt, MythicCrateArt, WinterCrateArt } from "./Items.tsx";
 import { CoinBoostCrateArt, CrateBonusArt } from "./BoostArt.tsx";
 import { InventoryLayer } from "./PageLayer.tsx";
 
@@ -24,7 +24,7 @@ import { InventoryLayer } from "./PageLayer.tsx";
 /** The grants whose toast has shown: the same game's next screen (Squads' card, then its results) doesn't show it again. */
 const seen = new WeakSet<XpGrant>();
 
-const CRATE_ART: Record<CrateLook, () => JSX.Element> = { winter: WinterCrateArt, beta: BetaCrateArt, hunchess: HunchessCrateArt };
+const CRATE_ART: Record<CrateLook, () => JSX.Element> = { winter: WinterCrateArt, beta: BetaCrateArt, hunchess: HunchessCrateArt, mythic: MythicCrateArt };
 
 /**
  * The end screen's (Nov 20): its rows show each quest done and its XP, and its bar the level, so the toast shows only the things they

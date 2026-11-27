@@ -29,6 +29,7 @@ import { dashSound, type DashSound } from "./characters/dash-sounds.ts";
 import { zebraSound, type ZebraSound } from "./characters/zebra-sounds.ts";
 import { chandySound, type ChandySound } from "./characters/chandy-sounds.ts";
 import { birdieSound, type BirdieSound } from "./characters/birdie-sounds.ts";
+import { strangerSound, type StrangerSound } from "./characters/stranger-sounds.ts";
 import { clawSound, type ClawSound } from "./claw/sounds.ts";
 import { CRATE_SOUNDS, crateSound } from "./crate-open/sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
@@ -570,6 +571,7 @@ const dashBoss = (name: DashSound) => (t: number) => buffer(dashSound(name, ctx!
 const zebraBoss = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
 const chandyBoss = (name: ChandySound) => (t: number) => buffer(chandySound(name, ctx!.sampleRate), t);
 const birdieBoss = (name: BirdieSound) => (t: number) => buffer(birdieSound(name, ctx!.sampleRate), t);
+const strangerBoss = (name: StrangerSound) => (t: number) => buffer(strangerSound(name, ctx!.sampleRate), t);
 const zebraRoom = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
 /** Timber's build sound picks one of these each time (Eric, Nov 2: "interchangeable between the tap, the whack, and the knock"). */
 export const TIMBER_BUILD = ["timberTap", "timberWhack", "timberKnock"] as const satisfies readonly SoundName[];
@@ -1087,6 +1089,19 @@ export type SoundName =
   | "chandySurface"
   | "chandyCrate"
   | "chandySplash"
+  // The Stranger, the fire-and-ice swordsman (a raid boss, art first): synthesized, see characters/stranger-sounds.ts.
+  | "strangerDraw"
+  | "strangerSheathe"
+  | "strangerSlash"
+  | "strangerTips"
+  | "strangerCast"
+  | "strangerHit"
+  | "strangerFall"
+  | "strangerKneel"
+  | "strangerHum"
+  | "strangerVoice"
+  | "strangerFreeze"
+  | "strangerBurn"
   // Birdie, Eric's young mourning dove on his toy diesel (a raid boss): synthesized, see characters/birdie-sounds.ts.
   | "birdieHello"
   | "birdieTsip"
@@ -1548,6 +1563,18 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   chandyAlarm: chandyBoss("alarm"),
   chandyBlast: chandyBoss("blast"),
   chandyUpgrade: chandyBoss("upgrade"),
+  strangerDraw: strangerBoss("draw"),
+  strangerSheathe: strangerBoss("sheathe"),
+  strangerSlash: strangerBoss("slash"),
+  strangerTips: strangerBoss("tips"),
+  strangerCast: strangerBoss("cast"),
+  strangerHit: strangerBoss("hit"),
+  strangerFall: strangerBoss("fall"),
+  strangerKneel: strangerBoss("kneel"),
+  strangerHum: strangerBoss("hum"),
+  strangerVoice: strangerBoss("voice"),
+  strangerFreeze: strangerBoss("freeze"),
+  strangerBurn: strangerBoss("burn"),
   birdieHello: birdieBoss("hello"),
   birdieTsip: birdieBoss("tsip"),
   birdieTeeoo: birdieBoss("teeoo"),
@@ -1925,6 +1952,18 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   chandyAlarm: [["chandy", "alarm"]],
   chandyBlast: [["chandy", "blast"]],
   chandyUpgrade: [["chandy", "upgrade"]],
+  strangerDraw: [["stranger", "draw"]],
+  strangerSheathe: [["stranger", "sheathe"]],
+  strangerSlash: [["stranger", "slash"]],
+  strangerTips: [["stranger", "tips"]],
+  strangerCast: [["stranger", "cast"]],
+  strangerHit: [["stranger", "hit"]],
+  strangerFall: [["stranger", "fall"]],
+  strangerKneel: [["stranger", "kneel"]],
+  strangerHum: [["stranger", "hum"]],
+  strangerVoice: [["stranger", "voice"]],
+  strangerFreeze: [["stranger", "freeze"]],
+  strangerBurn: [["stranger", "burn"]],
   birdieHello: [["birdie", "hello"]],
   birdieTsip: [["birdie", "tsip"]],
   birdieTeeoo: [["birdie", "teeoo"]],

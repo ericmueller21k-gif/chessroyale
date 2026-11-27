@@ -391,13 +391,30 @@ describe("Watering: the engine's placement within the band", () => {
     expect(quick.late).toBeUndefined();
   });
 
-  it("searches at most waterBudget positions (besides the one before), however many seeds", async () => {
+  it("searches at most waterBudget positions (besides the one before and the pass alone), however many seeds", async () => {
     const tenPlants: WaterKind[] = Array(10).fill("plant");
     const pick = (await waterFrom(engines, QUIET, ask(tenPlants), { ...S, waterBudget: 9 }))!;
-    expect(pick.looks).toBeLessThanOrEqual(9);
+    expect(pick.looks).toBeLessThanOrEqual(9 + 1);
     expect(pick.placed.length).toBeLessThanOrEqual(3);
     const full = (await waterFrom(engines, QUIET, ask(tenPlants)))!;
-    expect(full.looks).toBeLessThanOrEqual(S.waterBudget);
+    expect(full.looks).toBeLessThanOrEqual(S.waterBudget + 1);
+  });
+
+  it("the floor: an outcome whose every square leaves him far under the band comes up as nothing, never pulling him down (Nov 27)", async () => {
+    // (An engine that calls the position before and the pass even, and every grown pawn a disaster for him.)
+    const board = QUIET.split(" ")[0];
+    const disaster: EngineLike = {
+      topMoves: async (f, n) => legalMoves(f).slice(0, n).map((move) => ({ move, expected: f.split(" ")[0] === board ? 0.5 : 0.99 })),
+      scoreMoves: async (f, moves) => moves.map((move) => ({ move, expected: f.split(" ")[0] === board ? 0.5 : 0.99 })),
+    };
+    const pick = (await waterFrom([disaster], QUIET, ask(["p", "plant"])))!;
+    expect(pick.placed.map((p) => p.kind)).toEqual(["plant"]);
+    expect(pick.gain).toBeGreaterThanOrEqual(Math.min(S.waterBand[0], 0) - S.waterFloorMargin);
+    expect((await waterAnswer([disaster], QUIET, ask(["p", "plant"]))).answer).not.toBe(PASS_WAIT);
+    // (Without the floor, the least bad of the disasters: the pawn grows and the pass guard has to hold the watering.)
+    const noFloor = (await waterFrom([disaster], QUIET, ask(["p", "plant"]), { ...S, waterFloorMargin: Infinity }))!;
+    expect(noFloor.placed.map((p) => p.kind)).toContain("p");
+    expect(noFloor.gain).toBeLessThanOrEqual(-S.passGuardPawns);
   });
 
   it("the pass guard: a watering that loses him real material waits (PASS_WAIT), unless it's the test switch's or the trigger's", async () => {
@@ -501,6 +518,26 @@ describe("Watering: the regrowth (Eric, Nov 26: the piece he'd lose by passing g
     onPosition(off, KNIGHT, ["plant"]);
     off.state.boss = { ...off.boss!, powers: { ...off.boss!.powers!, noAdd: true } } as typeof off.state.boss;
     expect(off.waterAsk()!.regrow).toBeUndefined();
+  });
+
+  it("an even trade isn't a loss: no regrowth when the engine's line trades a piece of that kind evenly, and none of the budget spent (review of #983)", async () => {
+    // His knights on d4 (the e3 pawn wins it for a pawn: named) and c6 (the b5 bishop takes it, a pawn takes back: even).
+    const TWO = "4k3/1p1p4/2n5/1B6/3n4/4P3/8/4K3 b - - 0 20";
+    expect(regrowKind(TWO)).toBe("n");
+    /** An engine that calls every position even, its line the first legal move, or `crowdLine` with the crowd to move on TWO's board. */
+    const even = (crowdLine: string): EngineLike => {
+      const top = (f: string) => [{ move: f.startsWith(TWO.split(" ")[0] + " w") ? crowdLine : legalMoves(f)[0]!, expected: 0.5 }];
+      return { topMoves: async (f, n) => top(f).slice(0, n), topMovesAt: async (f, n) => top(f).slice(0, n), scoreMoves: async (f, moves) => moves.map((move) => ({ move, expected: 0.5 })) };
+    };
+    const tenPlants: WaterKind[] = Array(10).fill("plant");
+    const small = { ...S, waterBudget: 5 };
+    // (The line trades on c6, a bishop for a knight: nothing grows back, and the seeds get the whole budget, as with none named.)
+    const trade = (await waterFrom([even("b5c6")], TWO, ask(tenPlants, TWO), small))!;
+    expect(trade.placed.some((p) => p.regrow)).toBe(false);
+    expect(trade.placed).toEqual((await waterFrom([even("b5c6")], TWO, { kinds: tenPlants, plants: [], order: 1 }, small))!.placed);
+    // (The line wins the d4 knight: it grows back, however even the engine calls the pass, as a pass a pawn down measures little.)
+    const wins = (await waterAnswer([even("e3d4")], TWO, ask(["plant"], TWO))).answer;
+    expect(wins.startsWith("gn")).toBe(true);
   });
 
   it("a full set can't regrow (the hard guards stay): the guard still waits, and when it comes anyway, nothing grows back", async () => {

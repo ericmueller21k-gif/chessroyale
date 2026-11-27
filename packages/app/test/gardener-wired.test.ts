@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { BOSS_POWERS, BOSS_ROSTER, GARDENER_NAME, isPlayable, menuBosses, playableBosses, type PowerEvent, type WaterGrowth } from "@chessroyale/core";
-import { GARDENER_ANIM, GARDEN_ART, KING_ATTACKERS, START_FEN, WATER_BEATS, growthAt, growthMs, pieceAt, seedFill, seedsAt, waterMs } from "@chessroyale/chess";
+import { GARDENER_ANIM, GARDEN_ART, KING_ATTACKERS, START_FEN, WATER_BEATS, growthArt, growthAt, growthMs, pieceAt, seedFill, seedsAt, waterMs } from "@chessroyale/chess";
 import { GARDENER, GARDENER_ATTACK } from "../src/characters/gardener.ts";
 import { GARDENER_BAR, isSpray } from "../src/characters/gardener-bar.ts";
 import { GARDENER_CHANCE, GARDENER_LINES } from "../src/characters/gardener-lines.ts";
@@ -259,6 +259,9 @@ describe("his watering is as long as his art (so the server never moves on befor
       expect(total, `outcome ${i + 1}`).toBeGreaterThanOrEqual(growthAt(i) + art);
     });
     expect(total).toBe(growthAt(9) + animLength(GARDEN_PLANT.anims.kill!));
+    // (A regrown queen is a regrowth, not the jackpot: a plain bud, so no chime and no grander bud; Nov 27.)
+    expect([growthArt({ kind: "q" }), growthArt({ kind: "q", regrow: true })]).toEqual(["budQueen", "bud"]);
+    expect(growthMs({ kind: "q", square: "e4", regrow: true })).toBe(animLength(GARDEN_PLANT.anims.bud!));
     // The sprouts: the sweep starts at his `spray` cue and its front reaches every square within SWEEP_MS; each sprout (300 ms) holds its look until the first outcome.
     expect(WATER_BEATS.sprayAt).toBe(cueAt(GARDENER.anims.water!, "spray"));
     let latest = 0;

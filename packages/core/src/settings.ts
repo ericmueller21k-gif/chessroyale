@@ -2040,10 +2040,16 @@ export const BOSS_POWERS = {
    * was small (only plants), and nothing placed would only be less. Each outcome
    * weighs at most waterLooks squares (seeded among those its guards allow; a killer plant the crowd's pieces first, his
    * own only when none keeps the band), each searched at waterNodes; a watering searches at most waterBudget positions in
-   * all, besides the one before it, so ten seeds never stall a phone.
+   * all, besides the one before it and the pass alone, so ten seeds never stall a phone.
    */
   waterBand: [0.5, 2.5] as readonly [number, number],
   waterTarget: 1.5,
+  /**
+   * The placement's floor (Nov 27): no outcome goes where it leaves him more than this under the band's bottom, or under
+   * where he stands before the seeds (the pass alone, or with the regrowth) if that's lower; with no square above it, the
+   * outcome comes up as nothing. Without it a seed step could pull him far under (−6.99 in one probe: every option bad).
+   */
+  waterFloorMargin: 0.5,
   jackpotMax: 6,
   waterLooks: 4,
   waterNodes: 20_000,
@@ -4083,6 +4089,17 @@ export const CRATE_OPEN = {
 export const CRATE_BONUS = {
   /** The chance an opening also gives a bonus crate (and its key, if it opens with one). */
   chance: 0.25,
+} as const;
+
+/**
+ * The Mythic Crate (Eric, Nov 9: "the exceedingly rare crate"; Nov 10: "that one secret crate... the super secret item is the banana
+ * suit"; docs/decisions/2026-11-27-banana-suit-prize.md; core's `MYTHIC_CRATE`). Every opening is a Transcendent spin over the series
+ * crates' Legendary (80) and Mythic (20) items, plus its secret prize. Rolled only on the server, held and opened with a key as a
+ * series crate.
+ */
+export const MYTHIC_CRATE_ODDS = {
+  /** The Banana Suit's chance per opening, out of 100, taken from the Mythic share (20): the other Mythic items share the rest. */
+  bananaSuit: 2,
 } as const;
 
 /**
@@ -6379,3 +6396,12 @@ export const RESIDENTS = {
   gamePollMs: 30_000,
   host: { sleepAfter: "30m", args: ["--follow-deploys"], versionCheckMinutes: 2, drainMinutes: 20 },
 } as const;
+
+/**
+ * Rare item frames (Eric, Nov 12: "a nice clean like gold border or like diamond border";
+ * docs/decisions/2026-11-27-rare-frames-preview.md): the frame an item's tile wears by its tier, in the locker, a crate's
+ * "Possible items" and the item's preview. A tier not listed has no frame (its colored edge, as before).
+ */
+export const ITEM_FRAMES: Readonly<Record<string, "gold" | "diamond">> = { legendary: "gold", mythic: "diamond" };
+/** The tile class for an item tier's frame (" frame-gold", " frame-diamond", or "" for none). */
+export const frameClass = (tier: string) => (ITEM_FRAMES[tier] ? ` frame-${ITEM_FRAMES[tier]}` : "");

@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { SHOP, bossCrateOf, discountLabel, shopPrice } from "@chessroyale/core";
+import { MYTHIC_CRATE, SHOP, bossCrateOf, discountLabel, shopPrice } from "@chessroyale/core";
 import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, tapInTown, test, townTapPoint, wearItem, townReady } from "./helpers.ts";
 
 /**
@@ -1414,6 +1414,54 @@ test("the coin boost in the Crates tab (Nov 26): the boost lines always there, g
   await expect(dialog).toHaveCount(0);
 });
 
+test("the Mythic Crate (Nov 27): listed while unowned (greyed, never behind Show unowned), its page shows its odds, the Banana Suit 2%; an admin grants one, it opens with a key, every opening a Transcendent spin, to one of its items", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await asServerAdmin(page);
+  await page.goto("/shop?crates");
+  const row = page.locator('.series-crate-row[data-crate="mythic"]');
+  // None held: listed, greyed with a padlock as the series crates, whether "Show unowned" is ticked or not (nothing hidden: the review
+  // of #998); its page says none can be earned yet (nothing sells the bundle).
+  await expect(page.locator(".crates")).toContainText("Ready to open");
+  await expect(row).toContainText("You have none");
+  await expect(row).toHaveClass(/none/);
+  await expect(row.locator(".crate-lock")).toBeVisible();
+  await page.getByRole("checkbox", { name: "Show unowned" }).check();
+  await expect(row).toHaveCount(1);
+  await page.getByRole("checkbox", { name: "Show unowned" }).uncheck();
+  await expect(row).toHaveCount(1);
+  await row.click();
+  await expect(page.locator(".crate-held")).toContainText("None can be earned yet");
+  await page.goto("/shop?crates");
+  // An admin's test grants: Mythic Crates and a key; its row under Ready to open.
+  const grants = page.getByRole("region", { name: "Admin test grants" });
+  await grants.getByRole("combobox", { name: "Crate" }).selectOption("mythic");
+  await grants.getByRole("button", { name: "+5 crates" }).click();
+  await grants.getByRole("button", { name: "+1 crate key" }).click();
+  await expect(page.getByRole("region", { name: "Ready to open" }).locator('.series-crate-row[data-crate="mythic"]')).toContainText("You have 5");
+  // Its page: one Transcendent spin, 100%; the Banana Suit among its items at 2.0% (MYTHIC_CRATE_ODDS.bananaSuit).
+  await row.click();
+  await expect(page.locator(".crate-held")).toContainText("You have 5");
+  const odds = page.locator(".odds-row");
+  await expect(odds.filter({ hasText: "Transcendent" }).first().locator(".odds-pct")).toHaveText("100%");
+  await expect(odds.filter({ hasText: "Banana Suit" }).locator(".odds-pct")).toHaveText("2.0%");
+  await expect(page.getByText("Every one opens to a Transcendent spin: a Legendary or Mythic item.")).toBeVisible();
+  // Open it: the strip spins, then the reveal; the item is one of the Mythic Crate's.
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/mythic-crate-page-${test.info().project.name}.png`, fullPage: true });
+  await page.getByRole("button", { name: "▶ Open · uses 1 key" }).click();
+  await expect(page.locator(".crate-opening .cox-reel")).toBeVisible({ timeout: 15_000 });
+  const reveal = page.locator(".reveal-card");
+  await expect(reveal).toBeVisible({ timeout: 30_000 });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/mythic-crate-reveal-${test.info().project.name}.png` });
+  const locker = (await (await page.request.get("/api/locker")).json()) as { items: { id: string; def: string }[]; seriesCrates: Record<string, number>; keys: number };
+  const mine = locker.items.filter((i) => !i.id.startsWith("admin:"));
+  expect(mine).toHaveLength(1);
+  expect(MYTHIC_CRATE.items).toContain(mine[0]!.def);
+  expect([locker.seriesCrates.mythic, locker.keys]).toEqual([4, 0]);
+  expect(errors).toEqual([]);
+});
+
 test("boss tokens: a counted boss battle (Boss alone, 5 minutes by the server's clock) drops one: the result screen's square box, OK, and it's in the inventory", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1951,4 +1999,59 @@ test("the shop page's width (Eric, Nov 8): on a computer all three tabs sit 120 
     const shots = process.env.PADDED_SHOTS;
     if (computer && shots) await page.screenshot({ path: `${shots}/${c.shot}-computer-padded.png` });
   }
+});
+
+/**
+ * Rare frames and the item preview (Eric, Nov 12; docs/decisions/2026-11-27-rare-frames-preview.md). In the locker a Common tile
+ * has no frame, a Legendary one gold and a Mythic one diamond, each tile the same size. A tile's own tap still wears it; its small
+ * magnifier opens the preview instead: the pawn riding the ride (or wearing the hat) in a framed box, the item's name and
+ * "Mythic · Ride", Close (Escape too); nothing worn by it. A crate's "Possible items" row opens the same preview with a tap.
+ */
+test("rare frames: gold Legendary, diamond Mythic, commons plain; the magnifier previews a pawn riding a ride or wearing a hat, the tile's tap still wears it", async ({ page }) => {
+  await asSignedIn(page, "frames");
+  await page.goto("/shop");
+  await giveItems(page, [
+    { def: "beanie", color: "red" },
+    { def: "candy-cane", color: "red" },
+    { def: "riding-chirp", color: "red" },
+  ]);
+  await page.reload();
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  const tile = (name: string) => page.locator(".locker-cell").filter({ has: page.getByRole("button", { name: new RegExp(`^${name}, `) }) });
+  await expect(tile("Beanie").locator(".locker-item")).not.toHaveClass(/frame-/);
+  await expect(tile("Candy Cane").locator(".locker-item")).toHaveClass(/frame-gold/);
+  await expect(tile("Riding Chirp").locator(".locker-item")).toHaveClass(/frame-diamond/);
+  const sizes = await page.locator(".locker-item").evaluateAll((els) => els.map((e) => `${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`));
+  expect(new Set(sizes).size, `every tile the same size: ${sizes.join(" ")}`).toBe(1);
+  // The magnifier: the preview, nothing worn.
+  await page.getByRole("button", { name: "Preview Riding Chirp" }).click();
+  const box = page.getByRole("dialog");
+  await expect(box.locator(".item-preview-stage.frame-diamond .avatar.riding[data-ride=riding-chirp]")).toHaveAttribute("data-drawn", "1");
+  await expect(box.locator("#item-preview-title")).toHaveText("Riding Chirp");
+  await expect(box.locator(".item-preview-tier")).toHaveText("Mythic · Ride");
+  await expect(page.locator(".locker-worn")).toHaveCount(0);
+  const stage = (await box.locator(".item-preview-stage").boundingBox())!;
+  const vp = page.viewportSize()!;
+  expect(stage.x).toBeGreaterThanOrEqual(0);
+  expect(stage.x + stage.width).toBeLessThanOrEqual(vp.width);
+  await box.getByRole("button", { name: /Close/ }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // The tile's own tap still wears it.
+  await page.getByRole("button", { name: /^Riding Chirp, / }).click();
+  await expect(tile("Riding Chirp").locator(".locker-worn")).toHaveText("Worn");
+  // A hat's preview: the pawn wearing it; Escape closes it.
+  await page.getByRole("button", { name: "Preview Beanie" }).click();
+  await expect(page.getByRole("dialog").locator(".item-preview-stage:not([class*=frame-]) .avatar")).toHaveCount(1);
+  await expect(page.getByRole("dialog").locator(".item-preview-tier")).toHaveText("Common · Head");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // A crate's Possible items: the row's tap previews it (the Fire & Ice Crown, Mythic: diamond).
+  await page.getByRole("tab", { name: "Crates", exact: true }).click();
+  await page.locator('.crate-row[data-crate="winter-1"]').click();
+  await expect(page.locator(".odds-item .odds-art.frame-gold")).toHaveCount(2);
+  await expect(page.locator(".odds-item .odds-art.frame-diamond")).toHaveCount(1);
+  await page.getByRole("button", { name: "Preview Fire & Ice Crown" }).click();
+  await expect(page.getByRole("dialog").locator(".item-preview-stage.frame-diamond .avatar")).toHaveCount(1);
+  await expect(page.getByRole("dialog").locator(".item-preview-tier")).toHaveText("Mythic · Head");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
