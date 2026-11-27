@@ -60,9 +60,9 @@ const DAY = 86_400_000;
 
 /** A result's columns in the download (not `held`, which would say fair play is looking at the account). */
 const RESULT_COLUMNS =
-  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, coins, solo_game";
+  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, coins, solo_game, forms_beaten";
 /** A kept result's columns (every column but its id and account: a test pins the table's columns, so a new one is seen). */
-const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, coins, solo_game";
+const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, coins, solo_game, forms_beaten";
 
 export const ACCOUNT_STORES: AccountStore[] = [
   {
@@ -84,7 +84,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
         `INSERT INTO results (user_id, ${KEPT_RESULT})
          SELECT ?, mode, online, placement, players, team, team_won, avg_score, NULL, played_at - played_at % ${DAY}, brilliant, NULL,
            cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, NULL, ranked, held, NULL, abandoned,
-           play_ms, moves, NULL, xp_parts, xp_none, xp_rewards, coins, NULL
+           play_ms, moves, NULL, xp_parts, xp_none, xp_rewards, coins, NULL, forms_beaten
          FROM results WHERE user_id = ? ORDER BY random()`,
         DELETED_ID,
         u.id,

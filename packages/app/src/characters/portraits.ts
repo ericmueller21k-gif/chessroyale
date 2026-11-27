@@ -22,6 +22,8 @@ export interface PortraitData {
 
 /** The Hidden Boss's child form's portrait (kits.ts, RECLUSE_CHILD_KIT). */
 export const CHILD_FORM = "Hidden Boss:child";
+/** His final form's (the four boards: his coat, from his transformation on; test/portraits-make.ts). Only the profile's match history draws it. */
+export const FINAL_FORM = "Hidden Boss:four";
 const KEYS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+,-/:;<=>?@[]^_{|}~";
 
 /** Test links only (?wip=1&kit=<name>, as kits.ts's wipKit): that kit's portrait in every boss's place. */
