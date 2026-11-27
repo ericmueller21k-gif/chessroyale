@@ -37,6 +37,6 @@
 - Nov 27 09:10 crates: staff barber-pole twist; Welcome Crate on first visit, open at level 5 (view before); opening: still strip -> rubber-band pull-back -> spin [crates-nov27]
 - Nov 27 · Chub & Chirp: 5-carrot line "Chub & Chirp wins" (was "they win") · PR #1021
 - Nov 27 · Animated items in Chess Town (tube, candy cane first) · LIVE #1022 5645e3a. Next: crown flames, parrot, tommy gun, confetti (a table line each)
-- Nov 27 · Stranger storm redrawn (GBA ring, rift, opening crack animation) · MERGED #1023 7811257 (deploying)
+- Nov 27 · Stranger storm redrawn (GBA ring, rift, opening crack animation) · LIVE #1023 7811257
 - Nov 27 · Don Dough: back room (his head covered by the table), timer bottom-left of the board on a computer + bigger, counts down 1 every turn (not 2 on his), tick 30% quieter; no destination ring on a ride · BUILDING (brief don-dough-and-ride-ring.md)
 - Nov 27 · Town tables: Ranked live (1v1 search overlay; seated during the match with the opponent's pawn; others spectate from the town; back to town after); Casual stays Coming soon · QUEUED (brief town-ranked-tables.md, xhigh), after Turf
