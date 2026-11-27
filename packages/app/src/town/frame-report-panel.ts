@@ -40,8 +40,9 @@ export function panelHtml(s: Summary, d: Device): string {
   // (Nov 27) Outside our code, split: the wait for the screen's next refresh (idle) and the stalls past it; and what the browser saw.
   if (s.frames) {
     const L = s.long;
-    const seen = !L ? "the browser doesn't report its long frames" : L.n ? `the browser's ${L.n} long frames (${ms(L.ms)} ms): other scripts ${ms(L.scripts)} ms${L.by.length ? ` (${L.by.map(([k, n]) => `${esc(k)} ${ms(n)}`).join(" · ")})` : ""}, style & layout ${ms(L.layout)} ms; the rest the GPU or garbage collection` : "no long frames";
-    lines.push(`<div class="tfr-out" data-tfr-wait="${ms(all!.avg[WAIT]!)}" data-tfr-stall="${ms(all!.avg[STALL]!)}">Outside our code, a frame: <b>waiting for the screen</b> ${ms(all!.avg[WAIT]!)} ms (idle), <b>stalls</b> ${ms(all!.avg[STALL]!)} ms (missed refreshes). In stalls: ${seen}.</div>`);
+    // (Kept short, its top two scripts only, Nov 27: the whole panel must fit a phone's box for one screenshot.)
+    const seen = !L ? "not reported by this browser" : L.n ? `${L.n} long frames (${ms(L.ms)} ms): scripts ${ms(L.scripts)} ms${L.by.length ? ` (${L.by.slice(0, 2).map(([k, n]) => `${esc(k)} ${ms(n)}`).join(" · ")})` : ""}, layout ${ms(L.layout)} ms; the rest GPU or GC` : "none";
+    lines.push(`<div class="tfr-out" data-tfr-wait="${ms(all!.avg[WAIT]!)}" data-tfr-stall="${ms(all!.avg[STALL]!)}">Outside our code, a frame: <b>waiting for the screen</b> ${ms(all!.avg[WAIT]!)} ms (idle), <b>stalls</b> ${ms(all!.avg[STALL]!)} ms. Long frames: ${seen}.</div>`);
   }
   // (Nov 26) What was uploaded, by source, the most first (the rest summed): Eric's 1,211 couldn't be placed from the panel.
   if (s.uploadsBy.length) {
