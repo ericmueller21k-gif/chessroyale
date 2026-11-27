@@ -27,6 +27,7 @@ import { heldIn } from "../board-layer.ts";
 import { applyMove, keptEnPassant, kingAttacked, legalMoves, pieceAt, positionOver, sideToMove, withoutPiece } from "../rules.ts";
 import { stockfishRefuses, type MoveScore } from "../uci.ts";
 import { VALUE, from, heldBy, logit, other, powerRoll, turnOf, type Battle, type BossRules, type JudgedEvaluation, type Side } from "./base.ts";
+import { capturedSquare } from "./chandy.ts";
 
 type StrangerSettings = BossPowerSettings["stranger"];
 
@@ -35,7 +36,15 @@ type StrangerSettings = BossPowerSettings["stranger"];
  * the bolt onto the piece and its ice) as the crowd's turn after his move begins; the burn at the start of his turn. His art plays
  * within them (the characters lane's).
  */
-export const STRANGER_FX = { frostfire: 2300, frostfireBurn: 1500 } as const;
+export const STRANGER_FX = { frostfire: 2300, frostfireBurn: 1500, finisher: 4600 } as const;
+
+/**
+ * His finishers (Eric, Nov 27: "a flame strike ... or a literal strike with a sword ... one of them could be he cuts the piece in half
+ * ... some ice or some fire, or cuts the piece, or ... a combination"): which one an event's `pick` plays (`pick` modulo their count).
+ */
+export const FINISHERS = ["flame", "ice", "cut", "frostfire"] as const;
+export type Finisher = (typeof FINISHERS)[number];
+export const finisherOf = (pick: number | undefined): Finisher => FINISHERS[(((pick ?? 0) % FINISHERS.length) + FINISHERS.length) % FINISHERS.length]!;
 
 const FILES = "abcdefgh";
 /** How far a square is from the board's middle (0.5 on the four center squares, 3.5 in a corner): the strike's tie-break. */
@@ -293,6 +302,29 @@ export const STRANGER: BossRules = {
 
 export const strangerBattle = {
   /**
+   * His finisher, as his move is about to show (`move`: the move he plays; him to move): a move that takes a piece of yours that isn't a
+   * pawn (nor the king) is shown as his leap onto the board and a finisher on that piece (`finisher`: `square`, `shape`, `pick` from the
+   * seed, the same on every device), then the move. The server holds the move for it, solo waits (STRANGER_FX.finisher; the runner's
+   * bossMoveMoment). The move itself is an ordinary capture. Marked once a turn (the server asks again as it plays the held move); never
+   * once the battle is over. Returns whether it marked one.
+   */
+  finisher(b: Battle, move: string): boolean {
+    const boss = b.state.boss;
+    const p = boss?.powers;
+    if (!boss || !p || boss.id !== "stranger" || boss.result || !b.bossToMove() || b.finalGameOver()) return false;
+    if (p.events.some((e) => e.kind === "finisher" && e.turn === p.turn)) return false;
+    const fen = boardOf(b).fen;
+    if (!legalMoves(fen).includes(move)) return false;
+    const sq = capturedSquare(fen, move);
+    const piece = sq ? pieceAt(fen, sq) : null;
+    if (!sq || !piece || piece.color !== boss.crowdSide || piece.type === "p" || piece.type === "k") return false;
+    const pick = Math.floor(powerRoll(p.seed, "finisher", p.turn, sq) * 4096);
+    const event: PowerEvent = { kind: "finisher", turn: p.turn, square: sq, shape: piece.type as BalloonShape, pick };
+    b.state = { ...b.state, boss: { ...boss, powers: { ...p, events: [...p.events, event] } } };
+    return true;
+  },
+
+  /**
    * After the crowd's move with him to move: the strike's tile burns as crowd move `burnAt` lands (frostfireOutcome: whatever stands there,
    * a king or a loss no game can have spared; nothing there, the tile burns empty). A base on the board where it changes it. Nothing
    * once the battle is decided, the game is over on the board, or at the move cap.
@@ -327,4 +359,4 @@ export const strangerBattle = {
 };
 
 /** His events for a turn (the sims and tests read them). */
-export const strangerEvents = (events: readonly PowerEvent[]) => events.filter((e) => e.kind === "frostfire" || e.kind === "frostfireBurn");
+export const strangerEvents = (events: readonly PowerEvent[]) => events.filter((e) => e.kind === "frostfire" || e.kind === "frostfireBurn" || e.kind === "finisher");

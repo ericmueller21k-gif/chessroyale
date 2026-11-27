@@ -1935,7 +1935,11 @@ export type PowerEventKind =
   // its tile burning (as the crowd's move that ends the flee turn lands, the start of his turn: `square`, `shape` the piece burnt if
   // any, `fizzled` [the square] when the piece there was spared: a king, or a loss no game can have).
   | "frostfire"
-  | "frostfireBurn";
+  | "frostfireBurn"
+  // His finisher (Nov 27, Eric: "he jumps down and does either like a flame strike ... or a literal strike with a sword"): as his move
+  // that takes a piece of yours that isn't a pawn is about to show (`square` the piece, `shape` its kind, `pick` which finisher, from
+  // the seed), while he still thinks; the move shows after it, held as Chandy's lock is (bossMoveMoment).
+  | "finisher";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;

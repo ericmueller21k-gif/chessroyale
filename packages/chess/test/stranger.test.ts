@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BATTLE_TOWER, BOSS_POWERS, BOSS_ROSTER, adminFirst, adminFirstBosses, bossDef, canPick, chooseBoss, finishFloor, floorBoss, floorUnlocks, isPlayable, menuBosses, mulberry32, newRun, startFloor, towerPool, unlockBosses, unlockFloor, unlockReady, type BossDef } from "@chessroyale/core";
-import { MatchRunner, POWER_FX, bossRules, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
+import { FINISHERS, MatchRunner, POWER_FX, STRANGER_FX, bossRules, finisherOf, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
 import { KIT_OPENING, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
+import { powerRoll } from "../src/bosses/base.ts";
 
 /**
  * The Stranger's rules (docs/decisions/2026-11-27-stranger-rules.md; bosses/stranger.ts): his Frostfire strike (its pick, the freeze for
@@ -276,3 +277,63 @@ describe("the strike's state survives a turn's set-up untouched when nothing is 
     expect(crowdAllowed(r.boss, fenOf(r))).toBeNull();
   });
 });
+
+describe("his finisher (Eric, Nov 27: a capture of a piece that isn't a pawn shows as his leap and a finisher, then the move)", () => {
+  /** His battle on `fen` (him to move), after a crowd move so his powers have a turn. */
+  async function onPosition(fen: string, crowd: "w" | "b" = "w") {
+    const r = battle(5, crowd);
+    await crowdMove(r);
+    const id = r.state.boards[0]!;
+    const board = r.boards.get(id)!;
+    r.boards.set(id, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== board.history.length), { ply: board.history.length, fen }] });
+    r.state = { ...r.state, boss: { ...r.boss!, crowdSide: crowd } };
+    return r;
+  }
+  const finishers = (r: MatchRunner) => r.boss!.powers!.events.filter((e) => e.kind === "finisher");
+
+  it("a capture of your knight, bishop, rook or queen holds his move for it; a pawn, a quiet move or another boss: none", async () => {
+    // Black (him) to move: his pawn on c5 (or his rook on d8) can take your knight on d4.
+    const fen = "3r2k1/8/8/2p5/3N4/8/7P/3QK3 b - - 0 1";
+    const r = await onPosition(fen);
+    expect(r.bossMoveMoment("g8f7")).toBe(0);
+    expect(r.bossMoveMoment("c5d4")).toBe(STRANGER_FX.finisher);
+    expect(finishers(r)).toEqual([{ kind: "finisher", turn: r.boss!.powers!.turn, square: "d4", shape: "n", pick: expect.any(Number) }]);
+    // (Marked once: the server asks again as it plays the held move.)
+    expect(r.bossMoveMoment("c5d4")).toBe(0);
+    expect(finishers(r)).toHaveLength(1);
+    // A pawn taken: no finisher (his slash plays where he stands).
+    const r2 = await onPosition("6k1/8/8/2p5/3P4/8/8/4K3 b - - 0 1");
+    expect(r2.bossMoveMoment("c5d4")).toBe(0);
+    expect(finishers(r2)).toEqual([]);
+    // Each kind but the pawn and the king, by the same rook.
+    for (const [type, at] of [["b", "d4"], ["r", "d4"], ["q", "d4"]] as const) {
+      const rr = await onPosition(`3r2k1/8/8/8/3${type.toUpperCase()}4/8/8/4K3 b - - 0 1`);
+      expect(rr.bossMoveMoment("d8d4"), type).toBe(STRANGER_FX.finisher);
+      expect(finishers(rr)[0]).toMatchObject({ square: at, shape: type });
+    }
+  });
+
+  it("its pick is the seed's (the same on every device) and plays one of four finishers; the move itself is an ordinary capture", async () => {
+    const fen = "3r2k1/8/8/8/3Q4/8/8/4K3 b - - 0 1";
+    const a = await onPosition(fen);
+    const b = await onPosition(fen);
+    a.bossMoveMoment("d8d4");
+    b.bossMoveMoment("d8d4");
+    expect(finishers(a)[0]!.pick).toBe(finishers(b)[0]!.pick);
+    expect(FINISHERS).toEqual(["flame", "ice", "cut", "frostfire"]);
+    expect(FINISHERS.map((_, i) => finisherOf(i))).toEqual([...FINISHERS]);
+    expect(finisherOf(4097)).toBe("ice");
+    // (Every pick across many seeds and turns: all four come up.)
+    const seen = new Set<string>();
+    for (let seed = 0; seed < 200; seed++) seen.add(finisherOf(Math.floor(powerRollFor(seed) * 4096)));
+    expect([...seen].sort()).toEqual([...FINISHERS].sort());
+    a.applyBossMove("d8d4");
+    expect(pieceAt(fenOf(a), "d4")).toEqual({ color: "b", type: "r" });
+    // (His move shown, the crowd's turn's events are its own: the finisher doesn't play again after the move.)
+    expect(finishers(a)).toEqual([]);
+    expect(POWER_FX.finisher).toBe(STRANGER_FX.finisher);
+  });
+});
+
+/** The roll his finisher's pick is made from, at a seed (his first crowd turn, d4). */
+const powerRollFor = (seed: number) => powerRoll(seed, "finisher", 1, "d4");

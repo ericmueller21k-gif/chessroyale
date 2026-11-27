@@ -139,6 +139,8 @@ import {
   blackedOut,
   chandyBattle,
   CHANDY_FX,
+  strangerBattle,
+  STRANGER_FX,
   dodgeWon,
   mateHeld,
   trainSquare,
@@ -1824,13 +1826,16 @@ export class MatchRunner {
 
   /**
    * A moment of the boss's that plays with his move known, before it shows (Chandy's first captures, chandy.teachCaptures: the
-   * crosshair locks onto the piece he's about to take, chandyBattle.firstLock): marks it and returns how long it holds the screen (ms) before the move may show; 0:
+   * crosshair locks onto the piece he's about to take, chandyBattle.firstLock; the Stranger's capture of a piece of yours that isn't a pawn: his
+   * finisher, strangerBattle.finisher): marks it and returns how long it holds the screen (ms) before the move may show; 0:
    * none. The server holds the host's move that long; solo's playBoss waits (its `beforeShow`).
    */
   bossMoveMoment(move: string): number {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     if (!(this.bossAllowed() ?? legalMoves(fen)).includes(move)) return 0;
-    return chandyBattle.firstLock(this.battle, move) ? CHANDY_FX.lockOn : 0;
+    if (chandyBattle.firstLock(this.battle, move)) return CHANDY_FX.lockOn;
+    // (The Stranger's finisher on a piece of yours that isn't a pawn: his leap, the strike, then the move.)
+    return strangerBattle.finisher(this.battle, move) ? STRANGER_FX.finisher : 0;
   }
 
   /** Boingo's funhouse: he plays the crowd's move this turn (the funhouse's first, once), before the crowd picks. */
