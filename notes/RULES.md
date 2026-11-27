@@ -228,3 +228,4 @@ waited out, or its result fetched later), and any red one is fixed forward befor
 - **Opus cap for the night (Eric, Nov 27 ~01:40): "Yes, 3 for now"** (was "two Opus at a time for the rest of the night"). Back to 2 by default after.
 - **Nov 27 ~01:55 UTC, Eric: "For the next exact 60 minutes, run as much as we can... make a hard shut off in 60 minutes."** Shut-off scheduled for 02:56 UTC (trig_01QX7qKPqzmUAoNGcguESm37): interrupt and archive every helper, start none. The cap is lifted for that hour only.
 - Eric ~02:00 UTC Nov 27: after the 02:55 shut-off, keep ONE Opus running ("whatever one you think wants to keep running"); the director keeps the Stranger (rules first, else art). Then one Opus at a time.
+- Nov 27: when Eric says a mockup looks good, that IS the OK: queue the build at once and mark ASKS.md (Turf sat 5 days on an OK I didn't record). When Eric asks what to build with spare usage, read ASKS.md's waiting items first.

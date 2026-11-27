@@ -1,6 +1,6 @@
 # Eric's asks: every one until it's live (RULES.md, Nov 26). Newest last. States: queued / building / waiting on Eric / merged / live.
 
-- Nov 22 · Chub & Chirp Turf (his prints on his squares, your logo on yours, the count, holds Legs/Fuse/Hop, Chirp's hop-around) · WAITING ON ERIC: round-2 mockup re-sent Nov 26 · never built
+- Nov 22 · Chub & Chirp Turf (his prints on his squares, your logo on yours, the count, holds Legs/Fuse/Hop, Chirp's hop-around) · BUILDING (Nov 27 ~19:10; Eric had OK'd round 2 and it was never queued: my miss) brief hopper-turf-build.md
 - Nov 26 · Chandy: Dodge also on checkmate + its art · MERGED #973 #982
 - Nov 26 · Birdie room: longer crossing arms; ~50 birds at the bar · MERGED #974
 - Nov 26 · Chub & Chirp + Puddles: ult waits at most 3 times after its warning · MERGED #972
@@ -35,3 +35,6 @@
 - Nov 27 05:50 Stranger ult: Storm of Two Worlds (fire/ice ring; up to 2/game, ~70% see 2; 3 turns, random first; ice: all but 2 frozen, best move free; fire: 3-4 marks, <=1 on a non-pawn; engine fairness: best play loses nothing, decent loses <= ~1 pawn) [ult PR]
 
 - Nov 27 09:10 crates: staff barber-pole twist; Welcome Crate on first visit, open at level 5 (view before); opening: still strip -> rubber-band pull-back -> spin [crates-nov27]
+- Nov 27 · Chub & Chirp: 5-carrot line "Chub & Chirp wins" (was "they win") · PR #1021
+- Nov 27 · Animated items in Chess Town (tube, candy cane first) · PAUSED for Turf (WIP on claude/town-item-frames, .wip.md)
+- Nov 27 · Stranger storm redrawn (GBA ring, rift, opening crack animation) · BUILDING (Fable), approved round 4
