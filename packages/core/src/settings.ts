@@ -4080,6 +4080,14 @@ export const CRATE_OPEN = {
    * 3 s makes the whole thing long." One number, so Eric can change it.
    */
   spinMs: 4000,
+  /**
+   * The pull-back before a crate's strip spins (Eric, Nov 27: "like a rubber band style where the slot of items looks like it's pulled
+   * back slightly before going full speed into the normal shuffle spin"): the strip, drawn and still, eases `pullPx` against the
+   * spin's direction over `pullMs`, then lets go at full speed. Before the first strip only (the one an Open tap starts); every beat
+   * after it keeps its timing from the spin's first frame.
+   */
+  pullMs: 280,
+  pullPx: 16,
 } as const;
 
 /**

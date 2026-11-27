@@ -1,4 +1,5 @@
 import type { ComponentChildren, JSX } from "preact";
+import { memo } from "preact/compat";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   BOSS_CRATES,
@@ -944,7 +945,12 @@ const itemTile = (list: readonly { item: string; weight: number }[]) => (): Tile
   return { kind: "item", def, finish: isHunchess(def) ? { ...HUNCHESS_FINISH, seed: 1 } : decoyFinish() };
 };
 
-function TileView({ tile, look }: { tile: Tile; look: CrateLook }) {
+/**
+ * One strip tile, drawn again only when its own tile changes (Nov 27, the smoother opening): the server's answer changes only the
+ * winning tile, so the other 45 (and their 45 blurred copies) aren't redrawn on the frames just before the spin.
+ */
+const TileView = memo(TileDrawing, (a, b) => a.tile === b.tile && a.look === b.look);
+function TileDrawing({ tile, look }: { tile: Tile; look: CrateLook }) {
   if (tile.kind === "fischer") {
     return (
       <span class="spin-tile fischer">
