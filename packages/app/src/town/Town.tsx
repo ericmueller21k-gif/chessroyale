@@ -2788,7 +2788,7 @@ function startTown(
     const h = town.you.walker.here();
     const rd = r.youRider;
     return {
-      you: { ride: rd?.id ?? null, color: rd?.color ?? null, scale: rd?.scale ?? null, ready: !!rd?.ready, coming: r.youSoon?.coming ? r.youSoon.id : null, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r], stepMs: town.you.walker.stepMs, marks: r.marksShown(), sound: rideSoundState() },
+      you: { ride: rd?.id ?? null, color: rd?.color ?? null, scale: rd?.scale ?? null, ready: !!rd?.ready, coming: r.youSoon?.coming ? r.youSoon.id : null, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r], stepMs: town.you.walker.stepMs, marks: r.marksShown(), ring: r.ringShown, sound: rideSoundState() },
       others: [...r.riders].map(([id, x]) => ({ id, ride: x.id, color: x.color, scale: x.scale, ready: x.ready, box: r.drawnBox(town.people.findIndex((p) => p.id === id)), stepMs: town.people.find((p) => p.id === id)?.walker.stepMs ?? null })),
       // (Sets of rider frames held, shared by riders who look the same.)
       held: ridersHeld(),

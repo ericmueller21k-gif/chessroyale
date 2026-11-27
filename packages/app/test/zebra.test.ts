@@ -189,7 +189,8 @@ describe("his sounds", () => {
       expect(peak, name).toBeLessThan(MOVE_PEAK / 2);
       const db = 10 * Math.log10(sum / s.length);
       expect(db, name).toBeLessThan(MOVE_MEAN_DB - 2);
-      expect(db, name).toBeGreaterThan(MOVE_MEAN_DB - 7);
+      // (The timer's roll 30% under its old level, about 3 dB more: Eric, Nov 27, "drop it about 30%".)
+      expect(db, name).toBeGreaterThan(MOVE_MEAN_DB - (name === "roll" ? 10.2 : 7));
       expect(s, `${name} is the same every time`).toEqual(zebraSound(name, 44100));
     }
   });

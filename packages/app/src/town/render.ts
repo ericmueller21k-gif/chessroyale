@@ -3538,6 +3538,8 @@ export class Renderer {
   }
 
   /** (Tests) Your trail now: the ride's marks showing (by view: side, back, front) and the droplets showing. */
+  /** Your destination's ring was drawn in the last frame (the test hook's `ring`). */
+  ringShown = false;
   marksShown(): { side: number; back: number; front: number; drops: number } {
     const now = performance.now();
     const out = { side: 0, back: 0, front: 0, drops: 0 };
@@ -4081,13 +4083,16 @@ export class Renderer {
       ctx.fill();
     }
     ctx.globalAlpha = 1;
-    // Your destination: a small gold ring on its square, while you walk there.
-    if (w.moving()) {
+    // Your destination: a small gold ring on its square, while you walk there on foot. On a ride, never (Eric, Nov 27: "only when
+    // we're not on anything"): its frames on their way (`youSoon`) count as on it, so the ring doesn't show for a moment as it comes.
+    this.ringShown = false;
+    if (w.moving() && !rd && !this.youSoon) {
       const gc = w.goalC();
       const gr = w.goalR();
       const ps = this.pressSq;
       rel(this.view, this.camX, this.camY, gc, gr, this.rq);
       if (!(ps.on && ps.c === gc && ps.r === gr) && proj(this.view, this.rq.dx, this.rq.dz, 0, this.p)) {
+        this.ringShown = true;
         const k = this.p.k;
         ctx.strokeStyle = f.pressEdge;
         ctx.fillStyle = "rgba(255,215,106,.35)";
