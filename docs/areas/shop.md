@@ -249,7 +249,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     now, 15 rides at 6.67%; each back by itself when its boss goes live; holders keep theirs;
     [2026-11-23-welcome-crate-admin-first.md](../decisions/2026-11-23-welcome-crate-admin-first.md); a boss's ride goes in with its boss
     crate, or the Welcome Crate can't tell it's an admins-first boss's and lists it), each as likely, in the **HunChess colorway** (`<ride>-hunchess`, its own item:
-    `HUNCHESS_RIDES` in crates.ts, made from every ride; "HunChess Balloon Pup"), rolled and stored by the server
+    `HUNCHESS_RIDES` in crates.ts, made from every ride but the crate riders (`CRATE_RIDES`); "HunChess Balloon Pup"), rolled and stored by the server
     (`POST /api/locker/open {crate: "welcome-hunchess"}`: one transaction, opened once; again answers the same ride). Drawn from its
     ride's drawing, cells, size and pace (`components/rides/hunchess.tsx`: an SVG filter remapping each ride layer to black, gold and
     cream, with a gold trim; `HUNCHESS_LEVELS` lifts a ride whose remap fails: the Rodeo Bull). No purity shown, no shine.

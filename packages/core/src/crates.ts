@@ -231,7 +231,8 @@ export const HUNCHESS_SUFFIX = "-hunchess";
 /**
  * The HunChess colorway of every ride (Eric, Nov 6: "a special HunChess-colored random rider"; docs/decisions/2026-11-06-welcome-crate.md):
  * an item of its own (`<ride>-hunchess`), drawn from its ride's drawing in gold and black (the app's `components/rides/hunchess.tsx`),
- * only ever from the Welcome Crate (welcome.ts), in no other crate. A new ride gets its colorway here with no change.
+ * only ever from the Welcome Crate (welcome.ts), in no other crate. A new boss ride gets its colorway here with no change; the crate riders
+ * (`CRATE_RIDES`, Nov 27) have none.
  */
 export const HUNCHESS_RIDES: readonly ItemDef[] = BASE_ITEM_DEFS.filter((d) => d.slot === "ride" && !CRATE_RIDES.includes(d.id)).map((d) => ({
   id: d.id + HUNCHESS_SUFFIX,

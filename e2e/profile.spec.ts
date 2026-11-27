@@ -443,9 +443,9 @@ test("rides for an admin (Oct 31; admins own one of every item): the Ride tab ha
   await page.getByRole("tab", { name: "Ride", exact: true }).click();
   const grid = page.locator(".locker-grid").first();
   const rides = ITEM_DEFS.filter((d) => d.slot === "ride").length;
-  // (18 rides (Nov 23: Birdie's Train), and since Nov 6 each one's HunChess colorway, the Welcome Crate's: an admin owns one of every
-  // item, an admins-first boss's colorway too.)
-  expect(rides).toBe(36);
+  // (23 rides: 18 boss rides (Nov 23: Birdie's Train) and, since Nov 27, the 5 crate riders; plus each boss ride's HunChess colorway
+  // since Nov 6 (18; the crate riders have none), the Welcome Crate's: an admin owns one of every item, an admins-first boss's too.)
+  expect(rides).toBe(41);
   await expect(grid.locator(".locker-item")).toHaveCount(rides);
   await expect(grid.locator(".locker-admin")).toHaveCount(rides);
   const chirp = grid.getByRole("button", { name: /^Riding Chirp, / });
