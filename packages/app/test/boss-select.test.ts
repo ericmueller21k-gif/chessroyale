@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER, hiddenBosses, menuBosses } from "@chessroyale/core";
+import { BOSS_ROSTER, hiddenBosses, menuBosses, unlockBosses } from "@chessroyale/core";
 import { readFileSync } from "node:fs";
 import { rowSizes, SELECT_FRAMING, SELECT_LINES, SELECT_SOUND, SELECT_TINT, selectLine, TILE_RATIO, TILES_PER_ROW, townSound } from "../src/characters/boss-select.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
@@ -9,6 +9,8 @@ import { HOMES } from "../src/town/world.ts";
 /** The Boss raid screen's character select: each boss's sound and lines (docs/decisions/2026-10-16-boss-character-select.md). */
 describe("the boss select", () => {
   const all = [...menuBosses({ admin: false, raid: true }), ...hiddenBosses()];
+  /** Every boss with a tile on someone's select: the bosses unlocked by a win too (their cards: the Stranger's, an admin's for now). */
+  const tiled = [...all, ...unlockBosses(undefined, false, true)];
 
   it("has a sound from its own pack and lines for every boss with a tile, the Hidden Boss's too", () => {
     expect(all.length).toBeGreaterThanOrEqual(8);
@@ -97,7 +99,8 @@ describe("the boss select", () => {
   };
 
   it("frames every boss's whole figure: it covers the tile's width, the head is inside the tile, and the body runs on past its foot", () => {
-    for (const b of all) {
+    expect(tiled.map((b) => b.id)).toContain("stranger");
+    for (const b of tiled) {
       const { img, ink, tile, fit } = framed(b);
       expect(fit, b.id).toBeDefined();
       expect(fit.at, b.id).toBeGreaterThan(0.3);
@@ -146,7 +149,7 @@ describe("the boss select", () => {
     // The gradient's two ends in each theme, worked out as the stylesheet's color-mix does.
     const themes = { dark, light };
     const ends = (tint: string, at: number) => ({ hi: mix(tint, get("bs-mix-hi", at), get("bs-base-hi", at)), lo: mix(tint, get("bs-mix-lo", at), get("bs-base-lo", at)) });
-    for (const b of all) {
+    for (const b of tiled) {
       if (b.id === "recluse") {
         expect(SELECT_TINT[b.id], "the Hidden Boss's tile is always dark").toBeUndefined();
         continue;

@@ -576,7 +576,9 @@ describe("several bosses: a tower floor of three, one ultimate each (BATTLE_TOWE
    */
   const trios = (): string[][] => {
     const hidden = new Set(hiddenBosses().map((b) => b.id));
-    const ids = [...new Set([...towerPool(), ...kitBosses().map((d) => d.id).filter((id) => !hidden.has(id))])];
+    // (Never a boss of his own floors, the Stranger: he fights alone there, BATTLE_TOWER.bossFloors, and never shares a floor.)
+    const own = new Set(Object.values(BATTLE_TOWER.bossFloors));
+    const ids = [...new Set([...towerPool(), ...kitBosses().map((d) => d.id).filter((id) => !hidden.has(id) && !own.has(id))])];
     const left = [...ids];
     const out: string[][] = [];
     while (left.length) {

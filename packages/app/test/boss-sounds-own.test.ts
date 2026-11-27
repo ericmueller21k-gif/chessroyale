@@ -65,7 +65,6 @@ const PACKS: Record<string, { prefix: string; module: string }> = {
   zebra: { prefix: "zebra", module: "zebra" },
   chandy: { prefix: "chandy", module: "chandy" },
   birdie: { prefix: "birdie", module: "birdie" },
-  // (The Stranger, art first: his kit is in ART_KITS until his rules put him in the roster as `stranger`.)
   stranger: { prefix: "stranger", module: "stranger" },
   recluse: { prefix: "recluse", module: "recluse" },
 };

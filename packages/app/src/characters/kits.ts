@@ -1252,20 +1252,11 @@ export const BOSS_KITS: Record<string, BossKit> = {
     portrait: { x: 10, y: 12, w: 36, h: 36, anim: "idle", frame: 0 },
     powered: { on: birdieArmoredNow, idle: "p_idle" },
   },
-};
-
-/**
- * Kits drawn ahead of their boss (Nov 16): a boss's art, complete as a kit, before his rules put him in the roster. Not in BOSS_KITS
- * (that's the roster's: its tests walk every playable boss), so nothing in the game plays one; the art's previews do. The rules job
- * moves a kit into BOSS_KITS (Chandy's moved there with his rules, Nov 16).
- */
-export const ART_KITS: Readonly<Record<string, BossKit>> = {
-  // The Stranger (docs/decisions/2026-11-27-stranger-art.md): the fire-and-ice swordsman, his swords on his back at rest, drawn for a
+  // The Stranger (docs/decisions/2026-11-27-stranger-art.md; his rules 2026-11-27-stranger-rules.md, admins first until his ult): the fire-and-ice swordsman, his swords on his back at rest, drawn for a
   // capture, a check or his strike (draw, the double slash, sheathe) and for his power (draw, the twin-tip cast, sheathe). His sounds are
   // his own (stranger-sounds.ts); his lines are placeholders for Eric.
   Stranger: {
-    // (His phone bar's fit, measured with packages/app/test/bar-fit.ts's barFit over his rest frames; re-measure with scripts/bar-fit.ts
-    // once he's in the roster.)
+    // (His phone bar's fit, measured with packages/app/test/bar-fit.ts's barFit over his rest frames.)
     barScale: 0.79,
     barShift: 1,
     ch: STRANGER,
@@ -1295,6 +1286,13 @@ export const ART_KITS: Readonly<Record<string, BossKit>> = {
     portrait: { ...STRANGER_PORTRAIT, anim: "idle", frame: 0 },
   },
 };
+
+/**
+ * Kits drawn ahead of their boss (Nov 16): a boss's art, complete as a kit, before his rules put him in the roster. Not in BOSS_KITS
+ * (that's the roster's: its tests walk every playable boss), so nothing in the game plays one; the art's previews do. The rules job
+ * moves a kit into BOSS_KITS (Chandy's moved there with his rules, Nov 16; the Stranger's, Nov 27). None waiting now.
+ */
+export const ART_KITS: Readonly<Record<string, BossKit>> = {};
 
 /**
  * The Hidden Boss in his child form (BossView.form "child", RECLUSE_CHILD; Nov 13): his growing figure (the child, 13, 20, then his

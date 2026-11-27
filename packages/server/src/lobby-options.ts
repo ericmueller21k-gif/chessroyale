@@ -1,4 +1,4 @@
-import { XP, BOSS_TIERS, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, startOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { XP, BOSS_TIERS, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, canPick, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, startOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 
 /**
@@ -33,7 +33,7 @@ function withoutTestSwitches(q: URLSearchParams): URLSearchParams {
  * "1" (local, e2e, staging). Anywhere else (an admin on production) it's a test switch like the others: the lobby is a test game,
  * no XP (review m1, Nov 9: it paid real XP to everyone in an admin's lobby).
  */
-export function lobbyOptions(query: URLSearchParams, test: boolean, xpGameOn = false): { overrides: NonNullable<LobbyRecord["overrides"]>; keepMs?: number } {
+export function lobbyOptions(query: URLSearchParams, test: boolean, xpGameOn = false, unlocked: readonly string[] = []): { overrides: NonNullable<LobbyRecord["overrides"]>; keepMs?: number } {
   const q = test ? query : withoutTestSwitches(query);
   // Playtest overrides, e.g. POST /api/lobby?rounds=2&clock=15
   const n = (k: string) => (q.has(k) ? Math.max(1, Math.min(600, Number(q.get(k)) || 0)) : undefined);
@@ -54,7 +54,9 @@ export function lobbyOptions(query: URLSearchParams, test: boolean, xpGameOn = f
         const b = bossIdFromLink(q.get("boss"));
         const tier = Number(b);
         if (raid && BOSS_TIERS.includes(tier)) return { bossFixedElo: tier, bossFixed: tier };
-        return b && isPlayable(bossDef(b)) ? { bossId: b, bossPicked: b } : {};
+        // (A boss unlocked by a win, the Stranger: only for a creator who has unlocked him, `unlocked`, the server's read of their tower
+        // best (towerUnlocks); a test's server meets him before his art.)
+        return b && canPick(bossDef(b), unlocked, xpGameOn) ? { bossId: b, bossPicked: b } : {};
       })(),
       ...(() => {
         const p = q.get("power");

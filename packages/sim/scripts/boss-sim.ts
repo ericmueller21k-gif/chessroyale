@@ -634,6 +634,14 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const boardFen = () => runner.boards.get(runner.state.boards[0]!)!.fen;
       // (Birdie: each warning (after which crowd move, the piece), each ride (smashed, spared, missed: the piece saved, or your king), his
       // fall, and the material he had lost by then.)
+      // The Stranger (Nov 27): each Frostfire strike (the crowd turn it came, the piece) and each burn (after which crowd move, what burnt).
+      const stranger = { strikes: [] as { at: number; piece: string }[], burns: [] as { at: number; piece?: string; side?: string; spared?: true }[] };
+      const strangerLook = () => {
+        const st = runner.boss?.powers?.stranger;
+        if (!st) return;
+        if (st.strike && !stranger.strikes.some((x) => x.at === st.strike!.turn)) stranger.strikes.push({ at: st.strike.turn, piece: st.strike.piece });
+        if (st.burn && !stranger.burns.some((x) => x.at === st.burn!.at)) stranger.burns.push({ ...st.burn });
+      };
       const birdie = { warns: [] as { at: number; piece: string }[], rides: [] as { at: number; piece: string; spared?: true; king?: true; missed?: true }[], fell: null as number | null, lostAtFall: null as number | null };
       const birdieLook = () => {
         const bd = runner.boss?.powers?.birdie;
@@ -708,6 +716,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       while (!runner.isOver()) {
         if (bossId === "chandy") chandyLook();
         if (bossId === "birdie") birdieLook();
+        if (bossId === "stranger") strangerLook();
         if (runner.stageComplete()) {
           result = runner.finishBossBattle();
           break;
@@ -1047,6 +1056,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         }
         if (bossId === "chandy") chandyLook();
         if (bossId === "birdie") birdieLook();
+        if (bossId === "stranger") strangerLook();
         if (tusksBefore && runner.boss!.powers?.fusion?.why === "taken" && runner.boss!.powers.fusion.at === runner.boss!.crowdMoves) alfil.taken++;
         if (runner.boss!.powers?.landed?.early && runner.boss!.powers.landed.at === runner.boss!.crowdMoves) alfil.early++;
         if (runner.bossKillDue()) runner.bossKill();
@@ -1076,7 +1086,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           }
         : null;
       if (zs) for (const g of zs.gilds) ults.push({ kind: "goldPlate", turn: g.at });
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "bigboy" ? { bigboy } : {}), ...(bossId === "grex" ? { grex: { ...grex, hitsToBurn: BOSS_POWERS.candleHitsToBurn } } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gingerbread" ? { superFreeze: { used: b.powers?.superFreeze?.used ?? 0, last: b.powers?.superFreeze?.hit ? { after: b.powers.superFreeze.hit.at, squares: b.powers.superFreeze.hit.squares.length, held: b.powers.superFreeze.hit.held?.length ?? null } : null } } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "birdie" ? { birdie } : {}), ...(bossId === "chandy" ? { chandy: { ...chandy, fifthAt: chandy.upgrades[BOSS_POWERS.chandy.upgradesMax - 1] ?? null, unlocked: b.powers?.chandy?.unlocked ?? [] } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "bigboy" ? { bigboy } : {}), ...(bossId === "grex" ? { grex: { ...grex, hitsToBurn: BOSS_POWERS.candleHitsToBurn } } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gingerbread" ? { superFreeze: { used: b.powers?.superFreeze?.used ?? 0, last: b.powers?.superFreeze?.hit ? { after: b.powers.superFreeze.hit.at, squares: b.powers.superFreeze.hit.squares.length, held: b.powers.superFreeze.hit.held?.length ?? null } : null } } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "birdie" ? { birdie } : {}), ...(bossId === "stranger" ? { stranger } : {}), ...(bossId === "chandy" ? { chandy: { ...chandy, fifthAt: chandy.upgrades[BOSS_POWERS.chandy.upgradesMax - 1] ?? null, unlocked: b.powers?.chandy?.unlocked ?? [] } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

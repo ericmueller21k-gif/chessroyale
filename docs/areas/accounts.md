@@ -251,7 +251,7 @@ Who's online, who's in a match and what they're doing (`?doing=`) stay in the li
 | Purchases, refunds and the account's buying columns (D1): the checkout, the credit, earned-first spending, refundable | `packages/server/src/purchases.ts`, `ledger.ts`; [payments.md](payments.md) |
 | App side: Settings → ACCOUNT's download link and delete confirmation | `packages/app/src/components/AccountData.tsx`, `account.ts` (`deleteMyAccount`) |
 | Fair play's tables (made with the rest of the schema) | `packages/server/src/fairplay-schema.ts` |
-| The Battle Tower's climbs and bests (`tower_runs`, `tower_best`), `/api/tower*`, its part of the merge, the download and deleting | `packages/server/src/tower.ts`, routed from `api.ts`; [battle-tower.md](battle-tower.md) |
+| The Battle Tower's climbs, bests and bosses unlocked there (`tower_runs`, `tower_best`, `boss_unlocks`), `/api/tower*`, its part of the merge, the download and deleting | `packages/server/src/tower.ts`, routed from `api.ts`; [battle-tower.md](battle-tower.md) |
 | Friends: requests, blocks, invites, settings, caps (D1); the API (`/api/friends`, its kill switch) | `packages/server/src/friends.ts`, `friends-api.ts`; shared types `packages/core/src/friends.ts` |
 | App side: the friends list, actions, the invite toast, who's blocked | `packages/app/src/friends.ts`; screens on [hub.md](hub.md) |
 

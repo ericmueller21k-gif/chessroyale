@@ -1,4 +1,4 @@
-import { BOSS_PARTY, bossDef, bossPartySettings, isPlayable } from "@chessroyale/core";
+import { BOSS_PARTY, bossDef, bossPartySettings, canPick } from "@chessroyale/core";
 import type { LobbyRecord, PartyLobby } from "./lobby.ts";
 import type { BossStart } from "./squads-party.ts";
 
@@ -12,8 +12,9 @@ import type { BossStart } from "./squads-party.ts";
  * - the boss at the leader's difficulty: its Maia rating and its offset on the members' strength, as Boss alone;
  * - never ranked (LobbyCore.ranked), scored as a raid.
  */
-export function bossPartyOverrides(s: Pick<BossStart, "boss" | "difficulty">): NonNullable<LobbyRecord["overrides"]> {
-  const pick = s.boss && isPlayable(bossDef(s.boss)) ? { bossId: s.boss, bossPicked: s.boss } : {};
+export function bossPartyOverrides(s: Pick<BossStart, "boss" | "difficulty">, unlocked: readonly string[] = [], unfinished = false): NonNullable<LobbyRecord["overrides"]> {
+  // (A boss unlocked by a win, the Stranger: only when the leader, who picks, has unlocked him: `unlocked`, the server's read.)
+  const pick = s.boss && canPick(bossDef(s.boss), unlocked, unfinished) ? { bossId: s.boss, bossPicked: s.boss } : {};
   return JSON.parse(JSON.stringify({ ...bossPartySettings(s.difficulty), ...pick })) as NonNullable<LobbyRecord["overrides"]>;
 }
 
