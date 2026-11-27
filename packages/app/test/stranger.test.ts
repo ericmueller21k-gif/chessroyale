@@ -100,7 +100,8 @@ describe("the Stranger's art", () => {
     const own = (n: string) => `stranger${n[0]!.toUpperCase()}${n.slice(1)}`;
     const used = new Set([...Object.values(STRANGER_SOUNDS), "strangerVoice"]);
     for (const n of STRANGER_SOUND_NAMES) expect(used.has(own(n) as never), n).toBe(true);
-    for (const s of used) expect(s.startsWith("stranger"), s).toBe(true);
+    // (His own, but his shout: the God King's recorded four, one at random, given to him too by Eric, Nov 27.)
+    for (const s of used) expect(s.startsWith("stranger") || s === "gkHyuah", s).toBe(true);
     for (const name of STRANGER_SOUND_NAMES)
       for (const rate of [44100, 48000]) {
         const s = strangerSound(name, rate);

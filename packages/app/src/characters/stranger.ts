@@ -922,6 +922,72 @@ export const POSES = {
     head: [0, 2],
     kneel: 1,
   },
+  // A hop onto the board and off it (his finisher): a crouch, then in the air, his knees tucked and his arms out for balance.
+  crouch: { ...REST, armF: [[44, 72], [40, 82]], armI: [[84, 72], [88, 82]], eyes: "narrow", kneel: 0.5 },
+  air: { ...REST, armF: [[42, 62], [34, 58]], armI: [[86, 62], [94, 58]], eyes: "narrow", mouth: "flat", kneel: 0.3, sway: 1 },
+  // The block (a piece of his taken): both swords up and crossed before his face, then knocked back by the blow.
+  guard: {
+    ...REST,
+    armF: [[50, 64], [58, 54]],
+    armI: [[78, 64], [70, 54]],
+    swordF: held([58, 54], 35),
+    swordI: held([70, 54], -35),
+    eyes: "narrow",
+    mouth: "grit",
+  },
+  guardHit: {
+    ...REST,
+    armF: [[50, 66], [57, 57]],
+    armI: [[78, 66], [69, 57]],
+    swordF: held([57, 57], 30),
+    swordI: held([69, 57], -40),
+    eyes: "shut",
+    mouth: "grit",
+    head: [1, 1],
+    kneel: 0.25,
+    sway: 1,
+  },
+  // The sweep: both swords wound back to our left, then swept across to our right.
+  sweepWind: {
+    ...REST,
+    armF: [[44, 61], [40, 57]],
+    armI: [[70, 62], [50, 60]],
+    swordF: held([40, 57], -65),
+    swordI: held([50, 60], -95),
+    eyes: "narrow",
+    mouth: "grit",
+  },
+  sweepEnd: {
+    ...REST,
+    armF: [[60, 64], [78, 64]],
+    armI: [[85, 62], [88, 62]],
+    swordF: held([78, 64], 75),
+    swordI: held([88, 62], 45),
+    eyes: "narrow",
+    mouth: "grit",
+    head: [1, 0],
+  },
+  // The rising cut: both blades low at our right, then up across him to high at our left.
+  riseLow: {
+    ...REST,
+    armF: [[56, 72], [72, 86]],
+    armI: [[84, 74], [82, 90]],
+    swordF: held([72, 86], 140),
+    swordI: held([82, 90], 155),
+    eyes: "narrow",
+    mouth: "grit",
+    kneel: 0.2,
+  },
+  riseHigh: {
+    ...REST,
+    armF: [[44, 52], [40, 42]],
+    armI: [[70, 52], [48, 44]],
+    swordF: held([40, 42], -30),
+    swordI: held([48, 44], -45),
+    eyes: "narrow",
+    mouth: "flat",
+    head: [-1, 0],
+  },
   // Won: one sword raised (fire), the other held low, a smirk.
   triumph: {
     ...REST,
@@ -944,27 +1010,31 @@ export const TIPS_AT: Pt = (() => {
 
 // ---- Over him: the slash arcs and the cast's light.
 
-/** One slash's arc: a crescent of its blade's color across his front, from our upper `from` side down to the other. */
-function arcPart(kind: "fire" | "ice", step: 0 | 1 | 2): { name: string; at: Pt } | null {
+/**
+ * One slash's arc: a crescent of its blade's color across his front, from our upper `from` side down to the other (`deg` 45, his X); `deg`
+ * 0 a sweep across him, bowed down. Its middle at height `cy`. `steel`: a clean cut, white and silver.
+ */
+function arcPart(kind: "fire" | "ice" | "steel", step: 0 | 1 | 2, deg = 45, cy = 60): { name: string; at: Pt } | null {
   return part(
-    `arc:${kind}:${step}`,
+    `arc:${kind}:${step}:${deg}:${cy}`,
     (c) => {
       // A band along an arc from upper left to lower right (fire) or mirrored (ice); it fades by the step.
       const cx = MID;
-      const cy = 60;
       const R = 40;
+      const a = (deg * Math.PI) / 180;
       for (let y = 10; y < GROUND; y++)
         for (let x = 4; x < STRANGER_W - 4; x++) {
-          const dx = kind === "fire" ? x - cx : cx - x;
+          const dx = kind === "ice" ? cx - x : x - cx;
           const dy = y - cy;
-          // (A diagonal crescent: distance from the line y = x through his middle, bowed outward.)
-          const along = (dx + dy) / Math.SQRT2;
-          const across = (dy - dx) / Math.SQRT2 + (along * along) / (2 * R) - 6;
+          // (A crescent: distance from the line at `deg` through his middle (45: y = x), bowed outward.)
+          const along = dx * Math.cos(a) + dy * Math.sin(a);
+          const across = dy * Math.cos(a) - dx * Math.sin(a) + (along * along) / (2 * R) - 6;
           if (Math.abs(along) > 40) continue;
           const w = (1 - Math.abs(along) / 40) * (step === 0 ? 3.2 : step === 1 ? 2.4 : 1.2);
           if (Math.abs(across) > w) continue;
           const core = Math.abs(across) < w * 0.4;
-          const key = kind === "fire" ? (core ? (step === 2 ? "Q" : "y") : step === 2 ? "P" : "q") : core ? (step === 2 ? "v" : "W") : step === 2 ? "S" : "v";
+          const key =
+            kind === "fire" ? (core ? (step === 2 ? "Q" : "y") : step === 2 ? "P" : "q") : kind === "steel" ? (core ? (step === 2 ? "C" : "W") : step === 2 ? "A" : "C") : core ? (step === 2 ? "v" : "W") : step === 2 ? "S" : "v";
           put(c, x, y, key);
         }
     },
@@ -1016,8 +1086,9 @@ const sheatheFrames = (): Frame[] => [
   F("reach", 1, { ms: 110, cue: "sheathe" }),
   F("rest", 2, { ms: 220 }),
 ];
+// (His shout, one of the God King's recorded four at random (Eric, Nov 27), as he winds up every strike: the cue `shout`.)
 const slashFrames = (): Frame[] => [
-  F("windup", 0, { ms: 220, aura: 2 }),
+  F("windup", 0, { ms: 220, cue: "shout", aura: 2 }),
   F("cross", 1, { ms: 70, cue: "slash", aura: 2, over: [...over(arcPart("fire", 0)), ...over(arcPart("ice", 0))], shake: [1, 0] }),
   F("through", 2, { ms: 110, aura: 2, over: [...over(arcPart("fire", 1)), ...over(arcPart("ice", 1))] }),
   F("through", 3, { ms: 120, aura: 2, over: [...over(arcPart("fire", 2)), ...over(arcPart("ice", 2))] }),
@@ -1032,6 +1103,115 @@ const castFrames = (): Frame[] => [
   F("aimTips", 1, { ms: 120, aura: 2, over: over(orbPart(1)) }),
   F("ready", 2, { ms: 200, aura: 2 }),
 ];
+
+/**
+ * Both arcs of a slash at `step`, each by its angle (the ice's mirrored: 45 and 45 his X, 45 and -45 one line, 0 and 0 a sweep), the fire's
+ * `gap` px above `cy` and the ice's as far below.
+ */
+const arcs = (step: 0 | 1 | 2, fireDeg: number, iceDeg: number, cy = 60, gap = 0): Layer[] => [...over(arcPart("fire", step, fireDeg, cy - gap)), ...over(arcPart("ice", step, iceDeg, cy + gap))];
+// The sweep: wound back to our left, then both blades across him to our right, a band of fire over a band of ice.
+const sweepFrames = (): Frame[] => [
+  F("sweepWind", 0, { ms: 220, cue: "shout", aura: 2 }),
+  F("sweepEnd", 1, { ms: 70, cue: "slash", aura: 2, over: arcs(0, 0, 0, 62, 5), shake: [1, 0] }),
+  F("sweepEnd", 2, { ms: 110, aura: 2, over: arcs(1, 0, 0, 62, 5) }),
+  F("sweepEnd", 3, { ms: 120, aura: 2, over: arcs(2, 0, 0, 62, 5) }),
+  F("ready", 0, { ms: 220, aura: 2 }),
+];
+// The rising cut: low at our right, then up across him to high at our left, both blades along one line.
+const riseFrames = (): Frame[] => [
+  F("riseLow", 0, { ms: 220, cue: "shout", aura: 2 }),
+  F("riseHigh", 1, { ms: 70, cue: "slash", aura: 2, over: arcs(0, 45, -45, 60, 4), shake: [0, -1] }),
+  F("riseHigh", 2, { ms: 110, aura: 2, over: arcs(1, 45, -45, 60, 4) }),
+  F("riseHigh", 3, { ms: 120, aura: 2, over: arcs(2, 45, -45, 60, 4) }),
+  F("ready", 0, { ms: 220, aura: 2 }),
+];
+// His swords twirled in his hands at his sides (a full turn each, fire one way and ice the other), then out wide.
+const TWIRL = [-168, -120, -45, 30, 110, 192] as const;
+const twirlFrames = (): Frame[] => [
+  ...TWIRL.map((deg, i) =>
+    F({ ...POSES.ready, swordF: held([41, 79], deg), swordI: held([87, 79], -deg), mouth: "smirk" }, i % 4, { ms: 85, aura: 2, ...(i === 0 ? { cue: "tips" } : {}) }),
+  ),
+  F("flourish", 2, { ms: 260, aura: 2 }),
+  F("ready", 3, { ms: 240, aura: 2 }),
+];
+/** Sparks off his crossed blades as they take the blow (frame px). */
+const SPARKS: readonly Speck[] = [
+  [64, 44, "W"],
+  [61, 41, "y"],
+  [67, 41, "V"],
+  [58, 46, "Q"],
+  [70, 46, "v"],
+  [63, 37, "y"],
+  [66, 36, "W"],
+  [55, 42, "q"],
+  [73, 42, "v"],
+];
+// The block: his swords out fast, crossed before his face; the blow lands (a clang and sparks, his coat flashing), it knocks him back
+// and down a little; he steadies, his guard up, then sheathes them.
+const blockFrames = (): Frame[] => [
+  F("reach", 0, { ms: 80 }),
+  F("pull", 1, { ms: 80, cue: "draw", aura: 2 }),
+  F("guard", 2, { ms: 220, aura: 2 }),
+  F("guardHit", 3, { ms: 90, cue: "clang", aura: 2, shake: [-2, 0], specks: SPARKS, pal: { "1": "#8f86d8", "2": "#b3acf0", "3": "#d8d4ff", "4": "#ffffff" } }),
+  F("guardHit", 0, { ms: 120, aura: 2, shake: [-1, 0], specks: SPARKS.slice(0, 5) }),
+  F("guardHit", 1, { ms: 200, aura: 2 }),
+  F("guard", 2, { ms: 260, aura: 2 }),
+  F("ready", 3, { ms: 200, aura: 2 }),
+];
+/** A hop on or off the board (his finisher; the board moves him along his arc): a crouch, off the ground at upAt, down at landAt. */
+export const STRANGER_HOP = { upAt: 90, landAt: 480, ms: 680 } as const;
+const hopFrames = (): Frame[] => [
+  F("crouch", 0, { ms: 90 }),
+  F("air", 1, { ms: 130 }),
+  F("air", 2, { ms: 130 }),
+  F("air", 3, { ms: 130 }),
+  F("crouch", 0, { ms: 110, cue: "kneel", shake: [0, 1] }),
+  F("rest", 1, { ms: 90 }),
+];
+/** Held in a pose for about `ms`, breathing (frames of about 300 ms). */
+const hold = (pose: PoseName, ms: number): Frame[] => {
+  const n = Math.max(1, Math.round(ms / 300));
+  return Array.from({ length: n }, (_, i) => F(breathe(POSES[pose], i), i, { ms: Math.round(ms / n), aura: 2 }));
+};
+/**
+ * His finishers on the board, each from his landing (at rest, his swords on his back) to his swords home again; their board art plays on
+ * the piece at a cue (components/Stranger.tsx, FINISH): the flame strike's fire sword cut (`slash`); the ice: the tips point (`tips`),
+ * the piece freezes, then his cut (`slash`) shatters it; the clean cut, one white stroke (`slash`) splitting it in two; the frostfire:
+ * his twin-tip cast (`cast`), the ice then the fire.
+ */
+const finFrames: Record<"flame" | "ice" | "cut" | "frostfire", () => Frame[]> = {
+  flame: () => [
+    ...drawFrames(),
+    F("windup", 0, { ms: 240, cue: "shout", aura: 2 }),
+    F("cross", 1, { ms: 70, cue: "slash", aura: 2, over: over(arcPart("fire", 0)), shake: [1, 0] }),
+    F("through", 2, { ms: 110, aura: 2, over: over(arcPart("fire", 1)) }),
+    F("through", 3, { ms: 120, aura: 2, over: over(arcPart("fire", 2)) }),
+    ...hold("ready", 900),
+    ...sheatheFrames(),
+  ],
+  ice: () => [
+    ...drawFrames(),
+    F("aimTips", 0, { ms: 200, cue: "shout", aura: 2 }),
+    F("aimTips", 1, { ms: 120, cue: "tips", aura: 2 }),
+    ...hold("aimTips", 600),
+    F("windup", 0, { ms: 200, aura: 2 }),
+    F("cross", 1, { ms: 70, cue: "slash", aura: 2, over: [...over(arcPart("ice", 0))], shake: [1, 0] }),
+    F("through", 2, { ms: 110, aura: 2, over: over(arcPart("ice", 1)) }),
+    F("through", 3, { ms: 120, aura: 2, over: over(arcPart("ice", 2)) }),
+    ...hold("ready", 300),
+    ...sheatheFrames(),
+  ],
+  cut: () => [
+    ...drawFrames(),
+    F("riseLow", 0, { ms: 280, cue: "shout", aura: 2 }),
+    F("riseHigh", 1, { ms: 60, cue: "slash", aura: 2, over: over(arcPart("steel", 0)), shake: [0, -1] }),
+    F("riseHigh", 2, { ms: 120, aura: 2, over: over(arcPart("steel", 1)) }),
+    F("riseHigh", 3, { ms: 140, aura: 2, over: over(arcPart("steel", 2)) }),
+    ...hold("ready", 900),
+    ...sheatheFrames(),
+  ],
+  frostfire: () => [...drawFrames(), F("aimTips", 0, { ms: 200, cue: "shout", aura: 2 }), ...castFrames().slice(1), ...hold("ready", 900), ...sheatheFrames()],
+};
 
 export const STRANGER_ANIMS: Record<string, Anim> = {
   idle: lazyAnim(idle),
@@ -1051,6 +1231,19 @@ export const STRANGER_ANIMS: Record<string, Anim> = {
   cast: lazyAnim(() => ({ loop: false, frames: castFrames() })),
   // From his rest, swords on his back: draw, the double slash, sheathe (a capture, his strike, a check).
   strike: lazyAnim(() => ({ loop: false, frames: [...drawFrames(), ...slashFrames(), ...sheatheFrames()] })),
+  // (A capture of your pawn: one of three slashes where he stands, by the move: the double slash above, the sweep, the rising cut.)
+  sweep: lazyAnim(() => ({ loop: false, frames: [...drawFrames(), ...sweepFrames(), ...sheatheFrames()] })),
+  rise: lazyAnim(() => ({ loop: false, frames: [...drawFrames(), ...riseFrames(), ...sheatheFrames()] })),
+  // Every few of his moves (Eric: "every few moves he draws his swords"): draw, a twirl, sheathe.
+  flourishAll: lazyAnim(() => ({ loop: false, frames: [...drawFrames(), ...twirlFrames(), ...sheatheFrames()] })),
+  // A piece of his taken (not a pawn): he blocks the blow.
+  block: lazyAnim(() => ({ loop: false, frames: [...blockFrames(), ...sheatheFrames()] })),
+  // On the board (his finisher): the hop, and each finisher.
+  hop: lazyAnim(() => ({ loop: false, frames: hopFrames() })),
+  fin_flame: lazyAnim(() => ({ loop: false, frames: finFrames.flame() })),
+  fin_ice: lazyAnim(() => ({ loop: false, frames: finFrames.ice() })),
+  fin_cut: lazyAnim(() => ({ loop: false, frames: finFrames.cut() })),
+  fin_frostfire: lazyAnim(() => ({ loop: false, frames: finFrames.frostfire() })),
   // From his rest: draw, the twin-tip cast, sheathe (his power's wind-up, wired by his rules).
   castFull: lazyAnim(() => ({ loop: false, frames: [...drawFrames(), ...castFrames(), ...sheatheFrames()] })),
   hit: lazyAnim(() => ({
@@ -1106,7 +1299,8 @@ export const STRANGER_PORTRAIT = { x: 43, y: 9, w: 42, h: 42 };
 
 /**
  * His cues and their sounds (stranger-sounds.ts, sound.ts names): `draw` both swords out, `sheathe` home, `slash` the double slash,
- * `tips` the tips touching, `cast` the cast's release, `hit`, `fall` (a sword's clatter), `kneel`, `hum` (his entrance's nod, only there).
+ * `tips` the tips touching, `cast` the cast's release, `hit`, `fall` (a sword's clatter), `kneel` (and his hop's landing), `hum` (his
+ * entrance's nod, only there), `clang` his blades taking a blow, `shout` a strike's wind-up (the God King's shouts: Eric, Nov 27).
  */
 export const STRANGER_SOUNDS: Record<string, SoundName> = {
   draw: "strangerDraw",
@@ -1118,7 +1312,12 @@ export const STRANGER_SOUNDS: Record<string, SoundName> = {
   fall: "strangerFall",
   kneel: "strangerKneel",
   hum: "strangerHum",
+  // (His blades taking a blow, as he blocks.)
+  clang: "strangerClang",
+  // (Every strike's wind-up: one of the God King's recorded shouts at random, Eric's own, given to him too: Eric, Nov 27.)
+  shout: "gkHyuah",
   // (The board art's: effects/stranger.ts.)
   freeze: "strangerFreeze",
   burn: "strangerBurn",
+  shatter: "strangerShatter",
 };

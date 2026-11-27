@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
+import { bossBeat, type Beat, type BeatResult, type BeatState, type Stage } from "../characters/boss-beats.ts";
 import { BOSS_KITS, artOf, bossKit, bossKitOf, liveKit, placeFacing, type BossKit } from "../characters/kits.ts";
 import { growingRun, resetGrowing } from "./RecluseChild.ts";
 import { figure, onResetBeats, setFigureRun, suit } from "./boss-figure.ts";
@@ -19,6 +19,7 @@ import { prewarmBigBoy } from "./BigBoy.tsx";
 import { prewarmGinger } from "./Ginger.tsx";
 import { prewarmBoingo } from "./Boingo.tsx";
 import { prewarmGrex } from "./Grex.tsx";
+import { prewarmStranger } from "./Stranger.tsx";
 import { prewarmSawyer } from "./Sawyer.tsx";
 import { prewarmPig } from "./Pig.tsx";
 import { prewarmAlfil } from "./Alfil.tsx";
@@ -204,9 +205,12 @@ function frameAt(a: Anim, t: number): number {
   return a.frames.length - 1;
 }
 
+/** The figure's animation for a beat: its kit's pick from the moment (`shot`, BossKit.animOf), else its kit's for the beat, else its own name. */
+export const beatShot = (kit: BossKit, beat: Pick<BeatResult, "anim" | "shot">): string => beat.shot ?? kit.anims[beat.anim] ?? beat.anim;
+
 /** What shows at `now`: the moment's animation once (from `since`), then its loop (by the clock), or its last frame held. */
-export function showing(kit: BossKit, beat: Pick<BeatResult, "anim" | "loop" | "key">, now: number, since: number): { anim: string; frame: number; tag: string } {
-  const shotName = kit.anims[beat.anim] ?? beat.anim;
+export function showing(kit: BossKit, beat: Pick<BeatResult, "anim" | "loop" | "key" | "shot">, now: number, since: number): { anim: string; frame: number; tag: string } {
+  const shotName = beatShot(kit, beat);
   const shot = kit.ch.anims[shotName];
   if (shot && !shot.loop && (now - since < length(shot) || shotName === beat.loop)) {
     const frame = frameAt(shot, now - since);
@@ -265,24 +269,30 @@ function Character({ boss, stage, place, muteFall, yourTurn = false, children }:
   const beat = useMemo(
     () =>
       kit &&
-      bossBeat(kit, {
-        stage,
-        fen: boss.board.fen,
-        seen: seenFen,
-        history: boss.board.history,
-        bases: boss.board.bases,
-        crowdSide: boss.crowdSide,
-        lastMove: boss.lastMove,
-        result: boss.result,
-        victim: boss.justKilled,
-        // (Wrangler's meter full: his line once, then his ready loop until he fires.)
-        ready: boss.powers?.ready ?? null,
-      }),
+      (() => {
+        const state: BeatState = {
+          stage,
+          fen: boss.board.fen,
+          seen: seenFen,
+          history: boss.board.history,
+          bases: boss.board.bases,
+          crowdSide: boss.crowdSide,
+          lastMove: boss.lastMove,
+          result: boss.result,
+          victim: boss.justKilled,
+          // (Wrangler's meter full: his line once, then his ready loop until he fires.)
+          ready: boss.powers?.ready ?? null,
+        };
+        const b = bossBeat(kit, state);
+        // (A kit that picks the animation from the moment: the Stranger's slashes, block and flourish.)
+        const shot = kit.animOf?.(b, state);
+        return shot && kit.ch.anims[shot] ? { ...b, shot } : b;
+      })(),
     [kit, stage, boss.board.fen, boss.board.history.length, boss.result, boss.justKilled, boss.powers?.ready],
   );
   const since = beat ? startOf(beat.key) : 0;
   // (When this beat's one-shot ends, for figureBusy.)
-  const shot = kit && beat ? kit.ch.anims[kit.anims[beat.anim] ?? beat.anim] : undefined;
+  const shot = kit && beat ? kit.ch.anims[beatShot(kit, beat)] : undefined;
   beatEnds.at = shot && !shot.loop ? since + length(shot) : 0;
   // His sounds and his powers' made ahead, in idle moments, so a first play never stalls a slow phone.
   useEffect(() => {
@@ -298,6 +308,8 @@ function Character({ boss, stage, place, muteFall, yourTurn = false, children }:
       if (kit.ch.id === "bigboy") prewarmBigBoy(kit.ch.name, boss.crowdSide === "b" ? "blackPawn" : undefined);
       // (Sawyer's split, cuts and board saw too: the split plays seconds in, after his first move.)
       if (kit.ch.id === "sawyer") prewarmSawyer(kit.ch.name);
+      // (The Stranger's finisher's board art: his square's fire and ice, a piece burning.)
+      if (kit.ch.id === "stranger") prewarmStranger();
       // (Wrangler's leap and lasso too: his long pull comes a move in; then his wind-up and haul.)
       if (kit.ch.id === "pig") prewarmPig(kit.ch.name);
       // (Ginger's ice: its crack, thin ice and thaw.)
@@ -371,7 +383,7 @@ function Character({ boss, stage, place, muteFall, yourTurn = false, children }:
       // (Moo at rest: his idle, then now and then the sit and back: stance.ts. Never over a moment, which has settled into its
       // idle first, and never powered up.)
       if (kit.rest && live === kit && !figure.run && s.anim === (kit.loops?.idle ?? "idle")) {
-        const shot = kit.ch.anims[kit.anims[beat.anim] ?? beat.anim];
+        const shot = kit.ch.anims[beatShot(kit, beat)];
         const rest = stanceAt(kit.ch, kit.rest, now - since - (shot && !shot.loop ? length(shot) : 0));
         if (rest) s = rest;
       }

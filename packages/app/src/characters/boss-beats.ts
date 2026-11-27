@@ -148,6 +148,11 @@ export interface BeatResult {
   /** The moment, the same for every player: an animation plays once per key, and the line is picked from it. */
   key: string;
   line: string | null;
+  /**
+   * The figure's animation for it when its kit picks one from the moment (BossKit.animOf: the Stranger's slash by the move, his block
+   * for a piece of his taken); undefined: the kit's `anims` for the beat, else the beat's own name.
+   */
+  shot?: string;
 }
 
 const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
