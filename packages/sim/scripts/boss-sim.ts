@@ -257,7 +257,7 @@ function summary() {
 /** The judge's and the boss's search in the raid sims (a little under the game's 250,000, for time). */
 const RAID_NODES = 120_000;
 /** Each boss's ultimate, as the raid sim sees it come: a moment as a turn begins, or one the match runner plays. */
-const ULT_EVENTS = new Set(["blizzard", "candle", "boardsaw", "crease", "scramble"]);
+const ULT_EVENTS = new Set(["blizzard", "candle", "boardsaw", "crease", "scramble", "storm"]);
 
 /**
  * A Solo raid with every power, as solo plays one with nobody watching (simulateRest): 50 bots (the Solo raid's own

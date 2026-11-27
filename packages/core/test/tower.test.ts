@@ -36,7 +36,10 @@ const climb = (seed: number, pool: readonly string[], to?: number): TowerRun => 
   return run;
 };
 /** The pool once the bosses in the game for admins first are live (18: Dash, and his `apart` pair with Smudgy, in it). */
-const fullPool = [...towerPool(), ...adminFirstBosses().map((b) => b.id)];
+/** The deck's bosses: the pool but the bosses of their own floors (the Stranger's 10, 30 and 50: his floors are chess stranger.test.ts's). */
+const OWN = Object.values(BATTLE_TOWER.bossFloors);
+const deckPool = towerPool().filter((id) => !OWN.includes(id));
+const fullPool = [...deckPool, ...adminFirstBosses().map((b) => b.id)];
 
 describe("the tower: floors and strength", () => {
   it("the boss count loops 1, 2, 2, 3 over the 99 floors", () => {
@@ -140,19 +143,20 @@ describe("the tower: how Maia's move is drawn by floor (floorDraw; Eric, Nov 26:
 });
 
 describe("the tower: the pool and the deal", () => {
-  it("the pool: every playable boss, never the hidden one nor one in the game for admins first, never one resting", () => {
+  it("the pool: every playable boss, then the bosses of their own floors (the Stranger, live since Nov 27), never the hidden one nor one in the game for admins first, never one resting", () => {
     const pool = towerPool();
-    expect(pool).toEqual(playableBosses().map((b) => b.id));
-    expect(pool.length).toBe(14);
+    expect(pool).toEqual([...playableBosses().map((b) => b.id), ...OWN.filter((id, i) => OWN.indexOf(id) === i)]);
+    expect(pool.length).toBe(15);
     for (const id of [...hiddenBosses(), ...adminFirstBosses()].map((b) => b.id)) expect(pool).not.toContain(id);
     for (const id of pool) expect(BOSS_ROSTER.find((b) => b.id === id)!.powers).not.toBeNull();
     expect(towerPool(["moo", "clown"])).toEqual(pool.filter((id) => id !== "moo" && id !== "clown"));
-    // (Every one resting: the whole pool, as every mode (rosterWithout): the ways in close first.)
-    expect(towerPool(pool)).toEqual(pool);
+    // (Every one resting: the whole deck, as every mode (rosterWithout): the ways in close first. A boss of his own floors resting is left
+    // out all the same: his floors deal from the deck.)
+    expect(towerPool(pool)).toEqual(deckPool);
   });
 
   it("over many seeds: every boss once before any twice, never one on two floors in a row, never an apart pair, each floor's count; the same seed, the same run", () => {
-    for (const pool of [towerPool(), fullPool]) {
+    for (const pool of [deckPool, fullPool]) {
       const problems: string[] = [];
       const runs = new Set<string>();
       for (let seed = 1; seed <= 300; seed++) {

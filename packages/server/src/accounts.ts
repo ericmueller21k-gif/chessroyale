@@ -53,7 +53,7 @@ import { ENGINE_CALLS_SCHEMA } from "./engine-calls.ts";
 import { QUESTS_COLUMNS, QUESTS_SCHEMA, questDeletes } from "./quests.ts";
 import { TOWER_SCHEMA, holdsPartyCopy, towerMoves } from "./tower.ts";
 import { PURCHASES_COLUMNS, PURCHASES_SCHEMA, applySpend } from "./purchases.ts";
-import { isBlockedText } from "./text-filter.ts";
+import { isBlockedText, isReservedName } from "./text-filter.ts";
 import { botPresence, isFriendBot } from "./friend-bot-schedule.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
 import type { ChatBlock } from "@chessroyale/chess";
@@ -600,7 +600,9 @@ export interface User {
 /** A new guest account and a session for it. */
 export async function createGuest(sql: Sql, now: number, name = "Player"): Promise<{ user: User; token: string }> {
   const id = randomToken(12);
-  await sql.run("INSERT INTO users (id, name, created_at, last_seen) VALUES (?, ?, ?, ?)", id, cleanName(name) ?? "Player", now, now);
+  // (A guest is never staff: "HunChess" in its name is refused, Eric Nov 27: isReservedName.)
+  const named = cleanName(name);
+  await sql.run("INSERT INTO users (id, name, created_at, last_seen) VALUES (?, ?, ?, ?)", id, named && !isReservedName(named) ? named : "Player", now, now);
   const token = await createSession(sql, id, now);
   return { user: (await getUser(sql, id))!, token };
 }

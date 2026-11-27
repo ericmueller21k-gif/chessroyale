@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER, towerPool } from "@chessroyale/core";
+import { BATTLE_TOWER, BOSS_ROSTER, towerPool } from "@chessroyale/core";
 import { CLERK_LINES, TOWER_BANTER } from "../src/characters/tower-banter.ts";
 
-/** The tower's bosses: the playable ones (towerPool). The Hidden Boss is never among them. */
-const pool = towerPool();
+/**
+ * The tower's bosses who share floors: the playable ones (towerPool), but a boss of his own floors (the Stranger: alone on 10, 30 and 50,
+ * never beside another, so never in banter). The Hidden Boss is never among them.
+ */
+const pool = towerPool().filter((id) => !Object.values(BATTLE_TOWER.bossFloors).includes(id));
 /** The Hidden Boss's name, read from the roster (never written here). */
 const hidden = BOSS_ROSTER.find((b) => b.id === "recluse")!.name.toLowerCase();
 

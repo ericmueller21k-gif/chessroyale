@@ -22,6 +22,7 @@ import {
   waterAnswer,
   hoopsAnswer,
   creaseAnswer,
+  stormAnswer,
   dashExtraMoveFrom,
   applyMove,
   dodgeTimeline,
@@ -109,7 +110,9 @@ async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "b
   const end = (m.balloon || m.hoops) && !m.funhouse ? await hoopsAnswer(engines, applyMove(m.fen, move), m.hoops ?? null, m.balloon ?? null) : null;
   // (Folio's Crease wanted with its move: the line after it goes with the move.)
   const crease = m.crease && !m.funhouse ? await creaseAnswer(engines, applyMove(m.fen, move), m.crease) : "";
-  return { ...reply(move), ...(beam ? { beam } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}), ...(crease ? { crease } : {}) };
+  // (The Stranger's storm, a turn of it after his move: its pick goes with the move.)
+  const storm = m.storm && !m.funhouse ? await stormAnswer(engines, applyMove(m.fen, move), m.storm) : "";
+  return { ...reply(move), ...(beam ? { beam } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}), ...(crease ? { crease } : {}), ...(storm ? { storm } : {}) };
 }
 
 /** What a battle showed: each crowd turn's position and allowed moves, every power event, the result. */

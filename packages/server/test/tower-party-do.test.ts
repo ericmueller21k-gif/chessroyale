@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BOSS_ADMIN_FIRST, MATCH_SAVE, TOWER_PARTY, TOWN_CHAT, finishFloor, newRun, pausedLine, towerPool } from "@chessroyale/core";
+import { BOSS_ADMIN_FIRST, MATCH_SAVE, TOWER_PARTY, TOWN_CHAT, finishFloor, newRun, pauseVariable, pausedLine, towerPool } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, type PartyServerMessage } from "@chessroyale/chess/squads";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { deleteAccount } from "../src/account-data.ts";
@@ -344,30 +344,27 @@ describe("the floor room's writes (writeTowerEnds; the review of #835, finding 7
   });
 });
 
-describe("the Stranger online: the server's pick gates (the review of #1000, S1)", () => {
-  // (He's in the game for admins first until Eric's ult lands, and the server's raid and party picks pass no admin: so nobody meets
-  // him online on production, unlocked or not. When he goes live, `["stranger"]` meets him here: change these lines then.)
-  it("is admins first, so a raid's ?boss=stranger meets him only on a test's server, and only for a creator who unlocked him", () => {
-    expect(BOSS_ADMIN_FIRST).toContain("stranger");
+describe("the Stranger online: the server's pick gates (the review of #1000, S1 and SF1)", () => {
+  // (Live since his storm landed, Nov 27: a raid's or a party's pick meets him for a creator who unlocked him, on any server; his floors
+  // deal him to everyone. An unlock is still needed: never without one.)
+  it("a raid's ?boss=stranger meets him for a creator who unlocked him, on production and a test's server alike; never without the unlock", () => {
+    expect(BOSS_ADMIN_FIRST).not.toContain("stranger");
     const raid = new URLSearchParams("mode=raid&boss=stranger");
-    for (const unlocked of [[], ["stranger"]]) {
-      // (A player, and an admin whose test switches are on: `test` is never an admin's pick.)
-      expect(lobbyOptions(raid, false, false, unlocked).overrides.bossId).toBeUndefined();
-      expect(lobbyOptions(new URLSearchParams("mode=raid&boss=stranger&rounds=1"), true, false, unlocked).overrides.bossId).toBeUndefined();
+    for (const test of [false, true]) {
+      expect(lobbyOptions(raid, false, test, []).overrides.bossId).toBeUndefined();
+      expect(lobbyOptions(raid, false, test, ["stranger"]).overrides).toMatchObject({ bossId: "stranger", bossPicked: "stranger" });
     }
-    // (A test's server, TEST_SWITCHES on: him, with the creator's unlock only.)
-    expect(lobbyOptions(raid, false, true, []).overrides.bossId).toBeUndefined();
-    expect(lobbyOptions(raid, false, true, ["stranger"]).overrides).toMatchObject({ bossId: "stranger", bossPicked: "stranger" });
   });
 
   it("a Boss Battle party's pick: the same, on the leader's unlock", () => {
     const start = { boss: "stranger", difficulty: "normal" as const };
-    for (const unlocked of [[], ["stranger"]]) expect(bossPartyOverrides(start, unlocked).bossId).toBeUndefined();
-    expect(bossPartyOverrides(start, [], true).bossId).toBeUndefined();
-    expect(bossPartyOverrides(start, ["stranger"], true)).toMatchObject({ bossId: "stranger", bossPicked: "stranger" });
+    for (const test of [false, true]) {
+      expect(bossPartyOverrides(start, [], test).bossId).toBeUndefined();
+      expect(bossPartyOverrides(start, ["stranger"], test)).toMatchObject({ bossId: "stranger", bossPicked: "stranger" });
+    }
   });
 
-  it("a party floor's write (writeTowerEnds) deals his floor 10 as any other without TEST_SWITCHES, him with it", async () => {
+  it("a party floor's write (writeTowerEnds) deals his floor 10 to everyone, with TEST_SWITCHES or without", async () => {
     const floorTen = async (testSwitches: boolean) => {
       const { sql } = memoryDb();
       await ensureSchema(sql);
@@ -386,9 +383,34 @@ describe("the Stranger online: the server's pick gates (the review of #1000, S1)
       const met = await sql.first<{ met: string }>("SELECT met FROM tower_runs WHERE user_id = ? AND kind = 'party'", ann.id);
       return (JSON.parse(met!.met) as { floors: string[][] }).floors[9];
     };
-    const plain = await floorTen(false);
-    expect(plain!.length).toBeGreaterThan(0);
-    expect(plain).not.toContain("stranger");
+    expect(await floorTen(false)).toEqual(["stranger"]);
     expect(await floorTen(true)).toEqual(["stranger"]);
+  });
+
+  it("SF1: the party's plan pool (towerPoolNow): a party regrouping on copies dealt him on floor 10 keeps him, with TEST_SWITCHES or without; resting, re-dealt", async () => {
+    const regroup = async (extra: Record<string, string>) => {
+      const W = await world(extra);
+      const [ann, bo] = [await signedIn(W.sql, "ann@example.com", Date.now()), await signedIn(W.sql, "bo@example.com", Date.now())];
+      await climbedOnce(W.sql, [ann.id, bo.id], Date.now());
+      // (Their copies on floor 10, him dealt there, as the climb that reached it dealt him: they regroup in a new party.)
+      let run = newRun(4, POOL);
+      for (let f = 1; f < 10; f++) run = finishFloor(run, "won", POOL);
+      expect(run.floors[9]).toEqual(["stranger"]);
+      await W.sql.run("UPDATE tower_runs SET floor = 10, met = ?, last = json_set(last, '$.floor', 9), members = json_set(members, '$.party', 10) WHERE kind = 'party'", JSON.stringify({ floors: run.floors, deck: run.deck, decks: run.decks }));
+      const a = await W.join(ann.id, "Ann");
+      const b = await W.join(bo.id, "Bo");
+      expect(b.party()!.party.tower!.plan).toMatchObject({ kind: "continue", floor: 10 });
+      await W.send(b, { t: "ready", on: true });
+      await W.send(a, { t: "start" });
+      expect(W.made).toHaveLength(1);
+      const met = await W.sql.first<{ met: string }>("SELECT met FROM tower_runs WHERE user_id = ? AND kind = 'party' AND status = 'open'", ann.id);
+      return (JSON.parse(met!.met) as { floors: string[][] }).floors[9];
+    };
+    expect(await regroup({})).toEqual(["stranger"]);
+    expect(await regroup({ TEST_SWITCHES: "1" })).toEqual(["stranger"]);
+    // (Resting, his kill switch: the floor re-dealt from the deck, without him.)
+    const off = await regroup({ [pauseVariable("boss:stranger")]: "1" });
+    expect(off!.length).toBeGreaterThan(0);
+    expect(off).not.toContain("stranger");
   });
 });

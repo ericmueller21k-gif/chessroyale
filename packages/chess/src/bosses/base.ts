@@ -590,6 +590,11 @@ export interface BossMoveExtras {
    */
   crease?: string | null;
   creaseLoss?: number | null;
+  /**
+   * The Stranger's storm, its next turn's pick made with this move (stormWanted): the free pieces or marked squares after it (stormCode's;
+   * the host's answer online), checked as it's kept (stormCheck). "" or null: none (that turn is calm).
+   */
+  storm?: string | null;
 }
 
 /** What the judge said of the crowd's move just played (the runner's finishRound), for a boss's afterCrowdMove. */

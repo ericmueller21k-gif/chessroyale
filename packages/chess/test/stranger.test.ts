@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BATTLE_TOWER, BOSS_POWERS, BOSS_ROSTER, adminFirst, adminFirstBosses, bossDef, canPick, chooseBoss, finishFloor, floorBoss, floorUnlocks, isPlayable, menuBosses, mulberry32, newRun, startFloor, towerPool, unlockBosses, unlockFloor, unlockReady, type BossDef, type PowerEvent } from "@chessroyale/core";
-import { FINISHERS, FINISHER_BLOCK_MS, FINISHER_TEST, MatchRunner, POWER_FX, STRANGER_FX, bossRules, bossThinkMs, hisLoss, strangerTurnMs, finisherOf, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
+import { FINISHERS, FINISHER_BLOCK_MS, FINISHER_TEST, MatchRunner, POWER_FX, STORM_SCENE, STRANGER, STRANGER_FX, bossRules, bossThinkMs, hisLoss, strangerTurnMs, finisherOf, firePick, icePick, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, stormCheck, stormCode, stormFair, stormFirst, triggerUltimate, type EngineLike, type MoveScore } from "../src/index.ts";
 import { KIT_OPENING, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 import { powerRoll } from "../src/bosses/base.ts";
 
@@ -87,6 +87,11 @@ describe("the burn on its tile", () => {
     // His e7 knight on the tile, pinned to his e8 king by your e1 rook; him to move: burning it would check him through the gap.
     const fen = "4k3/4n3/8/8/8/8/8/4R1K1 b - - 0 1";
     expect(frostfireOutcome(fen, "e7")).toMatchObject({ piece: "n", side: "b", spared: true, fen });
+  });
+
+  it("spares a piece whose loss would hand him a promotion he didn't have (the review of #1000, SF2: the `handed` guard)", () => {
+    // Your d1 knight stands in front of his d2 pawn; him to move: burning it would open d1 to d2-d1=Q.
+    expect(frostfireOutcome("4k3/8/8/8/8/8/3p4/K2N4 b - - 0 1", "d1")).toMatchObject({ piece: "n", side: "w", spared: true });
   });
 
   it("never strikes your piece on your back rank with his pawn right behind it: the burn would hand him the promotion", () => {
@@ -192,31 +197,219 @@ describe("the strike in a battle: frozen a turn, thawed a turn, then the tile bu
   });
 });
 
-describe("his ultimate: a placeholder that never fires (Eric's comes next)", () => {
-  it("the admins' trigger is taken and waits; no ultimate comes", async () => {
-    const r = battle(9, "w", "strangerult");
-    await untilTurn(r, 4);
-    const t = triggerUltimate(r.boss);
-    expect(t.ok).toBe(true);
-    expect(r.boss!.powers!.ultAt).toBeUndefined();
-    expect(r.boss!.powers!.ults ?? 0).toBe(0);
-    expect(POWER_FX.frostfire).toBeGreaterThan(0);
+describe("his ultimate, the Storm of Two Worlds (Eric, Nov 27; docs/decisions/2026-11-27-stranger-storm.md)", () => {
+  const S = BOSS_POWERS.stranger;
+  const ms = (pairs: [string, number][]): MoveScore[] => pairs.map(([move, expected]) => ({ move, expected }));
+  /** Every legal move scored, the listed ones as given, the rest at `rest` (an engine's top lines over the whole position). */
+  const scored = (fen: string, given: [string, number][], rest = 0.2): MoveScore[] =>
+    legalMoves(fen).map((move) => ({ move, expected: given.find(([m]) => m === move)?.[1] ?? rest })).sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1));
+
+  it("the fairness check: the best move under the storm within fairPawns of the best without it; the next best within decentPawns (or the position's own)", () => {
+    const top = ms([["a", 0.6], ["b", 0.55], ["c", 0.3]]);
+    // (All open: fair.)
+    expect(stormFair(top, (m) => m.expected, 3).fair).toBe(true);
+    // (The best taken away, the next 0.55: 0.2 pawns of log-odds from 0.6, within fairPawns; then c at 0.32, 1.16 pawns: within decentPawns.)
+    expect(stormFair(ms([["a", 0.6], ["b", 0.55], ["c", 0.32]]), (m) => (m.move === "a" ? null : m.expected), 3).fair).toBe(true);
+    // (Its next at 0.3, 1.25 pawns and a hair: past decentPawns.)
+    expect(stormFair(ms([["a", 0.6], ["b", 0.55], ["c", 0.29]]), (m) => (m.move === "b" ? null : m.expected), 3).fair).toBe(false);
+    // (Only the best left: no decent move. Unfair, unless the position has only one legal move.)
+    expect(stormFair(top, (m) => (m.move === "a" ? m.expected : null), 3).fair).toBe(false);
+    expect(stormFair(top, (m) => (m.move === "a" ? m.expected : null), 1).fair).toBe(true);
+    // (The best costs 2 pawns under the storm: unfair.)
+    expect(stormFair(top, (m) => (m.move === "a" ? 0.17 : null), 3).fair).toBe(false);
+    // (A position with one good move of its own: its next best is the bar, not decentPawns.)
+    const sharp = ms([["a", 0.6], ["b", 0.1], ["c", 0.08]]);
+    expect(stormFair(sharp, (m) => (m.move === "b" ? null : m.expected), 3).fair).toBe(true);
+    // (But its next best taken too, the rest far worse: unfair.)
+    expect(stormFair(ms([["a", 0.6], ["b", 0.1], ["c", 0.03]]), (m) => (m.move === "b" ? null : m.expected), 3).fair).toBe(false);
+  });
+
+  it("an ice turn: two of your pieces free, one the piece of the engine's best move, your king never frozen; the check passes on it", () => {
+    // White (you): king e1, rooks a1 and h1, knights b1 and g1, bishops c1 and f1, pawns a2 to h2 (the opening), the engine's best Ng1-f3.
+    const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const top = scored(fen, [["g1f3", 0.56], ["e2e4", 0.55], ["d2d4", 0.55], ["c2c4", 0.54]], 0.48);
+    for (let order = 0; order < 12; order++) {
+      const a = icePick(fen, top, order);
+      expect(a.squares).toContain("g1");
+      expect(a.squares).toHaveLength(S.iceFree);
+      expect(a.squares).not.toContain("e1");
+      const ok = stormCheck(fen, "ice", stormCode(a))!;
+      expect(ok.free).toEqual([...a.squares].sort());
+      // (Frozen: every other piece but the king.)
+      expect(ok.squares).toHaveLength(15 - S.iceFree);
+      expect(ok.squares).not.toContain("e1");
+    }
+    // (The same order, the same pick: solo and online alike.)
+    expect(icePick(fen, top, 5)).toEqual(icePick(fen, top, 5));
+  });
+
+  it("an ice turn whose picks all fail the check: the milder one, the pieces of your top three moves free", () => {
+    const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const top = scored(fen, [["g1f3", 0.56], ["e2e4", 0.55], ["d2d4", 0.55]], 0.48);
+    const a = icePick(fen, top, 3, { ...S, fairPawns: -1 } as unknown as typeof S);
+    expect(a.mild).toBe(true);
+    expect([...a.squares].sort()).toEqual(["d2", "e2", "g1"]);
+    expect(stormCheck(fen, "ice", stormCode(a))).toMatchObject({ mild: true, free: ["d2", "e2", "g1"] });
+  });
+
+  it("a fire turn: 3 or 4 marks, never his pieces or a king, at most one of yours (the piece of the engine's best move), never where that move lands", () => {
+    // You: Ke1, Nd4, pawns a2 b2 g2 h2; him: Ke8, Rd8. The engine's best: the knight off d4 to f5.
+    const fen = "3rk3/8/8/8/3N4/8/PP4PP/4K3 w - - 0 1";
+    const top = scored(fen, [["d4f5", 0.6], ["d4b5", 0.55], ["d4e6", 0.5], ["a2a3", 0.45]], 0.3);
+    const crowdOn = (sq: string) => pieceAt(fen, sq)?.color === "w";
+    let withPiece = 0;
+    for (let order = 0; order < 30; order++) {
+      const a = firePick(fen, top, order);
+      expect(stormCheck(fen, "fire", stormCode(a)), `order ${order}`).not.toBeNull();
+      expect(a.squares.length).toBeGreaterThanOrEqual(a.mild ? 1 : 3);
+      expect(a.squares.length).toBeLessThanOrEqual(4);
+      expect(a.squares).not.toContain("f5");
+      expect(a.squares.some((sq) => pieceAt(fen, sq)?.color === "b" || pieceAt(fen, sq)?.type === "k")).toBe(false);
+      const mine = a.squares.filter(crowdOn);
+      expect(mine.length).toBeLessThanOrEqual(1);
+      if (mine.length) {
+        expect(mine).toEqual(["d4"]);
+        withPiece++;
+      }
+      // (The best move loses nothing to the burn: the knight off its mark, onto none.)
+      expect(burnLoss(fen, "d4f5", a.squares, "w")).toBe(0);
+    }
+    expect(withPiece).toBeGreaterThan(0);
+  });
+
+  it("the server's check refuses what the rules don't allow: his piece, a king, two of your pieces above a pawn, too many, an ice that leaves no move", () => {
+    const fen = "3rk3/8/8/8/3N4/2B5/PP4PP/4K3 w - - 0 1";
+    expect(stormCheck(fen, "fire", "d8 e5 e6")).toBeNull();
+    expect(stormCheck(fen, "fire", "e1 e5 e6")).toBeNull();
+    expect(stormCheck(fen, "fire", "d4 c3 e6")).toBeNull();
+    expect(stormCheck(fen, "fire", "d4 a2 b2 e6")).toEqual({ squares: ["a2", "b2", "d4", "e6"] });
+    expect(stormCheck(fen, "fire", "a3 b3 c4 e5 e6")).toBeNull();
+    expect(stormCheck(fen, "fire", "z9")).toBeNull();
+    expect(stormCheck(fen, "fire", "")).toBeNull();
+    expect(stormCheck(fen, "ice", "e1")).toBeNull();
+    expect(stormCheck(fen, "ice", "d8")).toBeNull();
+    expect(stormCheck(fen, "ice", "d4 c3")).toMatchObject({ free: ["c3", "d4"], squares: ["a2", "b2", "g2", "h2"] });
+    // (Your king boxed in by his rook, the h-pawn's capture your only move: freeing only the blocked a-pawn leaves none.)
+    expect(stormCheck("6k1/8/8/8/p7/P5rp/7P/7K w - - 0 1", "ice", "a3")).toBeNull();
+    expect(stormCheck("6k1/8/8/8/p7/P5rp/7P/7K w - - 0 1", "ice", "h2")).toEqual({ squares: ["a3"], free: ["h2"] });
+  });
+
+  it("from the test switch: the warning, then three turns, Ice and Fire by turns, the first from the seed; the ice holds, the fire burns; his Frostfire waits", async () => {
+    const kinds = new Set<string>();
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const r = battle(seed, "w", "storm");
+      const seen: string[] = [];
+      for (let i = 0; i < 40 && !r.stageComplete() && r.boss!.crowdMoves < 7; i++) {
+        if (r.bossToMove()) {
+          await r.playBoss();
+          continue;
+        }
+        r.deal();
+        const p = r.boss!.powers!;
+        const turn = r.boss!.crowdMoves + 1;
+        const ev = p.events.filter((e) => e.turn === turn);
+        if (turn === 2) expect(ev.map((e) => e.kind)).toContain("warn");
+        if (ev.some((e) => e.kind === "storm")) expect(turn).toBe(3);
+        const fen = fenOf(r);
+        const ice = ev.find((e) => e.kind === "stormIce");
+        const fire = ev.find((e) => e.kind === "stormFire");
+        if (turn >= 3 && turn <= 5) {
+          expect(!!ice !== !!fire, `turn ${turn}`).toBe(true);
+          seen.push(ice ? "ice" : "fire");
+          expect(bossRules(r.boss)!.powerTurn!(r.boss!)).toBe(true);
+          // (No Frostfire strike shares the storm.)
+          expect(ev.some((e) => e.kind === "frostfire")).toBe(false);
+        } else expect(!!ice || !!fire).toBe(false);
+        if (ice) {
+          // Only the king's and the free pieces' moves; the frozen ones drawn as ice.
+          const free = p.stranger!.pick!.free!;
+          const allowed = r.crowdAllowed() ?? legalMoves(fen);
+          expect(allowed.every((m) => free.includes(m.slice(0, 2)) || pieceAt(fen, m.slice(0, 2))?.type === "k")).toBe(true);
+          expect(new Set(icedSquares(r.boss, fen))).toEqual(new Set(ice.squares));
+        }
+        const allowed = r.crowdAllowed() ?? legalMoves(fen);
+        // (On a fire turn, a move onto a mark when there is one: it burns.)
+        const onMark = fire ? allowed.find((m) => fire.squares!.includes(m.slice(2, 4)) && pieceAt(fen, m.slice(0, 2))?.type !== "k") : undefined;
+        await r.score(new Map([["h0", { move: onMark ?? [...allowed].sort()[0]!, thinkMs: 1000 }]]));
+        if (fire) {
+          const burn = r.boss!.powers!.events.find((e) => e.kind === "stormBurn");
+          expect(burn?.squares).toEqual(fire.squares);
+          const after = fenOf(r);
+          for (const b of r.boss!.powers!.stranger!.scorch!.burnt) if (b.piece && !b.spared) expect(pieceAt(after, b.square)).toBeNull();
+          if (onMark) expect(r.boss!.powers!.stranger!.scorch!.burnt.find((b) => b.square === onMark.slice(2, 4))?.side).toBe("w");
+        }
+      }
+      expect(seen).toHaveLength(3);
+      expect(seen[0]).toBe(stormFirst(r.boss!.powers!.seed, 0));
+      expect(seen[1]).not.toBe(seen[0]);
+      expect(seen[2]).toBe(seen[0]);
+      kinds.add(seen[0]!);
+      expect(r.boss!.powers!.ults).toBe(1);
+      expect(r.boss!.powers!.ultAt).toBeUndefined();
+    }
+    // (Sometimes he starts with fire, sometimes with ice.)
+    expect(kinds).toEqual(new Set(["fire", "ice"]));
+  });
+
+  it("up to twice a battle: the trigger brings a second after the first; then it refuses, his meter spent and shown", async () => {
+    const r = battle(4, "w");
+    let storms = 0;
+    for (let i = 0; i < 80 && !r.stageComplete() && r.boss!.crowdMoves < 24; i++) {
+      if (r.bossToMove()) {
+        await r.playBoss();
+        continue;
+      }
+      r.deal();
+      const p = r.boss!.powers!;
+      if (p.events.some((e) => e.kind === "storm" && e.turn === r.boss!.crowdMoves + 1)) storms++;
+      if (r.boss!.crowdMoves >= 3 && p.ultAt === undefined && !p.ultNext && storms < 2) expect(r.triggerUltimate()).toBe(true);
+      await crowdMove(r);
+    }
+    expect(storms).toBe(2);
+    expect(r.boss!.powers!.ults).toBe(2);
+    expect(r.triggerUltimate()).toBe(false);
+    expect(STRANGER.spentMeterShown).toBe(true);
+  });
+
+  it("the storm's ask comes with his move before each of its turns, never during a Frostfire strike; a calm turn without an answer", async () => {
+    const r = battle(6, "w", "storm");
+    await untilTurn(r, 2);
+    await crowdMove(r);
+    // (His move before turn 3: the ask for its first turn.)
+    expect(r.bossToMove()).toBe(true);
+    const ask = r.stormAsk()!;
+    expect(ask.kind).toBe(stormFirst(r.boss!.powers!.seed, 0));
+    // (His move without an answer: the turn calm, nothing frozen or marked, the storm still on.)
+    const fen = fenOf(r);
+    r.applyBossMove(legalMoves(fen).sort()[0]!, false, { storm: "" });
+    r.deal();
+    expect(r.boss!.powers!.stranger!.pick).toMatchObject({ turn: 3, kind: ask.kind, squares: [], calm: true });
+    expect(r.boss!.powers!.events.some((e) => e.kind === "storm")).toBe(true);
+    expect(icedSquares(r.boss, fenOf(r))).toEqual([]);
+  });
+
+  it("its opening scene runs 10 to 12 s from his leap (Eric: \"10 to 12 seconds is actually a pretty good time\"), the same solo and online", () => {
+    expect(STORM_SCENE.ms).toBeGreaterThanOrEqual(10_000);
+    expect(STORM_SCENE.ms).toBeLessThanOrEqual(12_000);
+    expect(POWER_FX.storm).toBe(STORM_SCENE.ms);
+    const order = [STORM_SCENE.upAt, STORM_SCENE.landAt, STORM_SCENE.drawnAt, STORM_SCENE.fireAt, STORM_SCENE.iceAt, STORM_SCENE.gripAt, STORM_SCENE.fullAt, STORM_SCENE.pullAt, STORM_SCENE.leapAt, STORM_SCENE.homeAt, STORM_SCENE.ms];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(STORM_SCENE.healAt + STORM_SCENE.healMs).toBeLessThanOrEqual(STORM_SCENE.ms);
   });
 });
 
 describe("his Battle Tower floors and unlock", () => {
-  it("never at random, never in a deck; on floors 10, 30 and 50 alone for an admin's climb (admins first), else those floors deal as ever", () => {
+  it("never at random, never in a deck; on floors 10, 30 and 50 alone for every climb (live since his storm, Nov 27)", () => {
     const def = bossDef("stranger")!;
     expect(def.kit).toBe("Stranger");
     expect(isPlayable(def)).toBe(false);
     for (let i = 0; i < 40; i++) expect(chooseBoss(i / 40).id).not.toBe("stranger");
-    // (Admins first, Nov 27: a player's climb never meets him, his floors deal as any other.)
-    expect(adminFirst(def)).toBe(true);
-    expect(towerPool()).not.toContain("stranger");
-    expect(floorBoss(10, towerPool())).toBeNull();
-    // An admin's climb: in the pool for his floors only.
-    const pool = towerPool(undefined, undefined, { admin: true });
-    expect(pool).toEqual([...towerPool(), "stranger"]);
+    // (Live: no longer admins first. Everyone's climb meets him on his floors, an admin's the same.)
+    expect(adminFirst(def)).toBe(false);
+    const pool = towerPool();
+    expect(pool).toContain("stranger");
+    expect(floorBoss(10, pool)).toBe("stranger");
+    expect(towerPool(undefined, undefined, { admin: true })).toEqual(pool);
     let run = newRun(77, pool);
     for (let f = 1; f < 52; f++) {
       const ids = run.floors[f - 1]!;
@@ -227,15 +420,15 @@ describe("his Battle Tower floors and unlock", () => {
       run = finishFloor(start.run, "won", pool);
     }
     // Resting (a kill switch): his floor deals two bosses from the deck, as the pattern says.
-    const off = towerPool(["stranger"], undefined, { admin: true });
+    const off = towerPool(["stranger"]);
     let r2 = newRun(77, off);
     for (let f = 1; f < 10; f++) r2 = finishFloor(startFloor(r2, off)!.run, "won", off);
     expect(r2.floors[9]).toHaveLength(2);
     expect(r2.floors[9]).not.toContain("stranger");
   });
 
-  it("admins first: his picker card and Boss alone for an admin only, never one of an admin's plain tiles; a test's server (unfinished) meets him as an admin does", () => {
-    expect(unlockBosses()).toEqual([]);
+  it("his picker card for everyone, locked until won; never one of an admin's plain tiles; a test's server (unfinished) meets him too", () => {
+    expect(unlockBosses().map((b) => b.id)).toEqual(["stranger"]);
     expect(unlockBosses(BOSS_ROSTER, false, true).map((b) => b.id)).toEqual(["stranger"]);
     expect(unlockBosses(BOSS_ROSTER, true).map((b) => b.id)).toEqual(["stranger"]);
     expect(towerPool(undefined, BOSS_ROSTER, { unfinished: true })).toContain("stranger");
@@ -244,7 +437,7 @@ describe("his Battle Tower floors and unlock", () => {
     expect(menuBosses({ admin: true, raid: false }).map((b) => b.id)).not.toContain("stranger");
     // (A floor the tower dealt him, or a pick the unlock allowed: the runner meets him, never a stand-in.)
     expect(chooseBoss(0.5, "stranger").id).toBe("stranger");
-    expect([unlockReady(bossDef("stranger")), unlockReady(bossDef("stranger"), false, true)]).toEqual([false, true]);
+    expect([unlockReady(bossDef("stranger")), unlockReady(bossDef("stranger"), false, true)]).toEqual([true, true]);
   });
 
   it("unlocked only by a floor of his own won with him on it (Eric: \"you have to beat him to unlock him\"); picked only then", () => {
@@ -261,8 +454,9 @@ describe("his Battle Tower floors and unlock", () => {
     // An admin (admins first): his once won, never before.
     expect(canPick(def, [], false, true)).toBe(false);
     expect(canPick(def, floorUnlocks(10, ["stranger"]), false, true)).toBe(true);
-    // Anyone else (and the server's online picks, which pass no admin): not while he's admins first; a test's server, once won.
-    expect(canPick(def, ["stranger"])).toBe(false);
+    // Anyone (and the server's online picks, which pass no admin): once won, as an admin; never before.
+    expect(canPick(def, [])).toBe(false);
+    expect(canPick(def, ["stranger"])).toBe(true);
     expect(canPick(def, ["stranger"], true)).toBe(true);
     expect(canPick(bossDef("gingerbread"), [])).toBe(true);
   });
