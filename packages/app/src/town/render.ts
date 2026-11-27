@@ -3659,10 +3659,64 @@ export class Renderer {
     ctx.drawImage(art, Math.round((fx + (fw - w) / 2) * DPR) / DPR, Math.round((fy + (fh - h) / 2) * DPR) / DPR, w, h);
   }
 
+  /**
+   * (Nov 27) Newcomers' name tags (another player arriving: here-net.ts's answer, Town.tsx `others`) painted ahead, every size, a slice
+   * at a time between frames (an idle callback), not in the frame they first show: 55 arriving at once cost the
+   * busy town's frames 3 ms of painting and 2 of uploads each (the busy town's perf check), and a crowd of more tags than the cache held
+   * painted them again and again. The cache is sized to everyone's tags at every size, twice over.
+   */
+  queueTags(people: readonly Person[]): void {
+    for (const p of people) {
+      if (!p.name || p.home) continue;
+      this.tagQ.push({ name: p.name, kind: p.you ? "you" : isSprite(p.look) ? "sidekick" : "bot" });
+    }
+    this.tagArt.max = Math.max(this.tagArt.max, 2 * this.town.people.length * (TAG_SIZES[1] - TAG_SIZES[0] + 1));
+    if (this.tagQ.length && !this.tagSlicing) this.nextTagSlice();
+  }
+  /** (Tests) Newcomers' tags still to make between frames. */
+  get tagsQueued(): number {
+    return this.tagQ.length;
+  }
+  private readonly tagQ: { name: string; kind: TagKind }[] = [];
+  /** The frame a new tag was last painted in (drawTag: one a frame). */
+  private newTagAt = -1;
+  private tagSlicing = false;
+  private nextTagSlice(): void {
+    this.tagSlicing = true;
+    const ric = (globalThis as { requestIdleCallback?: (f: (d: { timeRemaining(): number; didTimeout: boolean }) => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    // (No idle time for half a second, a busy device: a 4 ms slice anyway.)
+    if (ric) ric((d) => this.tagSlice(d.didTimeout ? 4 : Math.min(4, d.timeRemaining())), { timeout: 500 });
+    else setTimeout(() => this.tagSlice(3), 16);
+  }
+  private tagSlice(budgetMs: number): void {
+    const t0 = performance.now();
+    do {
+      const q = this.tagQ.shift();
+      if (!q) break;
+      // (Painted only: each size goes on the GPU as it's first drawn. Every size of 55 newcomers' tags uploaded at once overfilled the
+      // atlas's spare pages, which started again, and everything on them was uploaded again.)
+      for (let s = TAG_SIZES[0]; s <= TAG_SIZES[1]; s++) this.tagReady(q.name, s, q.kind);
+    } while (performance.now() - t0 < budgetMs);
+    if (this.tagQ.length) this.nextTagSlice();
+    else this.tagSlicing = false;
+  }
+
   /** A name tag over a figure: white for the pawns, gold for you, blue for a boss's sidekick; it shrinks with distance. Stamped from its drawing (`tagArtOf`). */
   private drawTag(text: string, ax: number, ay: number, kind: TagKind, size: number, alpha: number): void {
     const { ctx, DPR } = this;
-    const a = this.tagReady(text, Math.round(size), kind);
+    const s = Math.round(size);
+    // (Nov 27) A tag not made yet (someone just come, or a size not drawn yet): at most one painted a frame; the rest are made between
+    // frames (queueTags) and show from the frame after. 55 players arriving at once painted 275 tags in the frames they first showed.
+    const had = this.tagDpr === DPR ? this.tagArt.find(text, s, kind) : undefined;
+    if (!had || (had.fonts !== -2 && had.fonts !== fontsLoaded)) {
+      if (this.newTagAt === this.frameNo) {
+        if (!this.tagQ.some((q) => q.name === text && q.kind === kind)) this.tagQ.push({ name: text, kind });
+        if (!this.tagSlicing) this.nextTagSlice();
+        return;
+      }
+      this.newTagAt = this.frameNo;
+    }
+    const a = this.tagReady(text, s, kind);
     a.used = this.frameNo;
     this.keepFree(ax - a.w / 2, ay - a.h, a.w, a.h);
     // (On the device's pixel grid, so the drawing lands pixel for pixel.)

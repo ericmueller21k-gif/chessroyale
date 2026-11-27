@@ -5,6 +5,8 @@ import { SAW_SWAP_TEST_CHECK } from "@chessroyale/chess";
 import { BOARD_SEL, asAdmin, test, bossAloneFromHome } from "./helpers.ts";
 import { counts, frameStats, instrument } from "./perf-probe.js";
 import { MOCKUP_LOOK, demoProfile, routeProfile } from "./public-profile-data.ts";
+import { START, walkable } from "../packages/app/src/town/world.ts";
+import { P } from "../packages/app/src/town/frame-report.ts";
 
 /**
  * Lag that grew with the match (.claude/LESSONS.md): a solo boss battle against Ginger, on a phone slowed 4x, stays
@@ -705,6 +707,75 @@ test("Chess Town on a slow phone: a second visit loads the first visit's kept pi
   expect(await sum(), "every picture the paint workers made, as the main thread paints it").toEqual(first);
   console.log(`Chess Town kept pictures (slowed phone): first visit ${Math.round(one.loaded)} ms (${(one.loaded / one.ref).toFixed(1)} x ${Math.round(one.ref)} ms), second ${Math.round(two.loaded)} ms (${(two.loaded / two.ref).toFixed(1)} x ${Math.round(two.ref)} ms; reading and decoding ${Math.round(p2.restoreMs)} ms); ${first.n} pictures kept in ${(saved.saved! / 1048576).toFixed(1)} MB, ${Math.round(saved.saveMs)} ms`);
   expect(two.loaded / two.ref, "a second visit's tap to its first frame, in reference jobs").toBeLessThan(TOWN_KEPT_REFS);
+});
+
+/**
+ * The town busy (Eric, Nov 27: "its not the residents lol, if thats the case the game is dead, imagine 50+ users on"): 55 other players
+ * there, each walking to a new square at every answer of the server's (the town's beat), and a player's chat line every 250 ms, cost our
+ * frame next to nothing more than an empty town on the same walk, and the page next to nothing outside it. Measured with the frame report
+ * (`?report`: our parts a frame; the browser's long frames' other scripts: the presence and chat handling, never in our parts).
+ */
+test("Chess Town busy on a slow phone: 55 other players walking and a chat line every 250 ms cost our frame little more than an empty town's, and the page little outside it (Nov 27)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(5 * 60_000);
+  // (The server's answers: everyone else in the town. 55 players on walkable squares near the start, each a few squares on at every answer.)
+  const spots: [number, number][] = [];
+  for (let d = 1; spots.length < 400 && d < 20; d++)
+    for (let dc = -d; dc <= d; dc++)
+      for (const dr of [-d, d]) for (const [c, r] of [[START.c + dc, START.r + dr], [START.c + dr, START.r + dc]] as const) if (walkable(c, r) && !spots.some(([a, b]) => a === c && b === r)) spots.push([c, r]);
+  let busy = false;
+  let beat = 0;
+  await page.route("**/api/town/here", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    beat++;
+    const others = busy ? Array.from({ length: 55 }, (_, i) => { const [c, r] = spots[(i * 7 + beat * 3) % spots.length]!; return { id: `busy-${i}`, name: `Walker ${i + 1}`, c, r, zzz: false, pawn: i % 2 ? "black" : "white" }; }) : [];
+    await route.fulfill({ json: { others } });
+  });
+  await page.goto(`/town?sky=day&report=120&townroom=busy${Date.now().toString(36)}`);
+  const canvas = page.locator("canvas.town-canvas");
+  await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
+  type W = { __townHush: (on: boolean) => void; __townWalk: (s: readonly [number, number]) => boolean; __townYou: () => { moving: boolean } | null; __townHere: () => { you: boolean; here: boolean }[]; __townSay: (n: string, l: string, k?: string) => void; __townReport: () => { state: string; summary: { frames: number; uploads: number; uploadsBy: [string, number][]; segs: { avg: number[]; mean: number }[]; long: { n: number; ms: number; scripts: number; layout: number; by: [string, number][] } | null } | null } | null; __chat?: number };
+  await page.evaluate(() => (window as unknown as W).__townHush(true));
+  // (A first visit's pictures saved, so their packing isn't in either walk.)
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __townPaint: () => { pictures: { saved?: number } } }).__townPaint().pictures.saved), { timeout: 90_000 }).not.toBeUndefined();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  const walk = async () => {
+    // (Round a square of the street and back, twice: about 15 s, three of the server's answers.)
+    for (const sq of [[START.c + 6, START.r], [START.c + 6, START.r + 6], [START.c, START.r + 6], [START.c, START.r], [START.c + 6, START.r], [START.c + 6, START.r + 6], [START.c, START.r + 6], [START.c, START.r]] as const) {
+      await page.evaluate((s) => (window as unknown as W).__townWalk(s), sq);
+      await page.waitForTimeout(300);
+      await page.waitForFunction(() => !(window as unknown as W).__townYou()?.moving, null, { timeout: 30_000 }).catch(() => undefined);
+    }
+    await page.locator(".tfr-pill").getByRole("button", { name: "Done" }).click();
+    const s = (await page.evaluate(() => (window as unknown as W).__townReport()))!.summary!;
+    // (Ours: every part of a frame but the time outside our code.)
+    const ours = s.segs[0]!.avg.slice(0, P.outside).reduce((a, b) => a + b, 0);
+    await page.locator(".tfr-panel").getByRole("button", { name: "Again" }).click();
+    return { ours, frames: s.frames, mean: s.segs[0]!.mean, long: s.long, parts: s.segs[0]!.avg.slice(0, P.outside).map((x) => +x.toFixed(2)).join(" "), uploads: `${s.uploads} uploads: ${s.uploadsBy.map(([k, n]) => `${k} ${n}`).join(", ")}` };
+  };
+  const empty = await walk();
+  busy = true;
+  await expect.poll(() => page.evaluate(() => (window as unknown as W).__townHere().filter((h) => !h.you && h.here).length), { timeout: 30_000, message: "the other players in the town" }).toBeGreaterThanOrEqual(50);
+  await page.evaluate(() => {
+    const w = window as unknown as W;
+    let k = 0;
+    w.__chat = window.setInterval(() => w.__townSay(`Walker ${(k % 55) + 1}`, `hello everyone, line ${k++}`, "player"), 250);
+  });
+  // (Their name tags made between frames as they came, Nov 27: render.ts queueTags. Once made, the busy town's walk is measured.)
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __townPaint: () => { tagsQueued: number } }).__townPaint().tagsQueued), { timeout: 60_000, message: "newcomers' tags still to make" }).toBe(0);
+  const beats = beat;
+  const full = await walk();
+  await page.evaluate(() => clearInterval((window as unknown as W).__chat));
+  const fmt = (x: typeof empty) => `our parts ${x.ours.toFixed(1)} ms a frame of ${x.mean.toFixed(0)} (${x.frames} frames; ${x.parts}; ${x.uploads})${x.long ? `, the browser's long frames' other scripts ${Math.round(x.long.scripts)} ms (${x.long.by.map(([k, n]) => `${k} ${Math.round(n)}`).join(", ")})` : ""}`;
+  console.log(`Chess Town busy (slowed phone): empty ${fmt(empty)}; with 55 others and a chat line every 250 ms ${fmt(full)}; ${beat - beats} server answers`);
+  expect(beat - beats, "the server's answers while the busy town walked (each moving everyone)").toBeGreaterThan(0);
+  expect(empty.frames, "frames recorded walking the empty town").toBeGreaterThan(20);
+  expect(full.frames, "frames recorded walking the busy town").toBeGreaterThan(20);
+  // (The busy town's frame: 55 more pawns and their tags drawn. Measured Nov 27 (this PR): ... Its budget, a quarter over the empty town's.)
+  expect(full.ours, "our parts a frame, busy, against the empty town's").toBeLessThan(empty.ours * 1.25);
+  // (Outside our frame: the server's answers put in the town and the chat's lines, under 2 ms a frame of the walk.)
+  if (full.long) expect(full.long.scripts / full.frames, "the page's other scripts a frame (ms), busy").toBeLessThan(2);
 });
 
 test("Moo & Moon's Full Moon cinematic on a slow phone: the hop, the field, the close-up, the transformation and the hop back stay within budget, the first time they show (Nov 17)", { tag: "@perf" }, async ({ page }) => {

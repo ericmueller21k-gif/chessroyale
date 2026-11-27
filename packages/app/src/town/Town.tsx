@@ -2782,7 +2782,7 @@ function startTown(
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 } };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 }, tagsQueued: r.tagsQueued };
   };
   /** (Tests) A hash of every picture the loading screen kept, their pixels in order: a later visit's must be the first's. */
   const hookPictureSum = (each = false) => {
@@ -2955,8 +2955,10 @@ function startTown(
      * The server's list put in the town (here-net.ts): a card open on someone who left closes; someone in new clothes is dressed as
      * the bots are (their pictures made once, off the frame loop).
      */
-    others: (left: Person[], dressed: Person[]) => {
+    others: (left: Person[], dressed: Person[], came: Person[] = []) => {
       if (card?.kind === "person" && left.includes(town.people[card.i]!)) setCard(null);
+      // (Newcomers' tags made between frames, Nov 27: render.ts queueTags.)
+      r.queueTags(came);
       for (const p of dressed) {
         r.botArt.delete(p.id);
         r.riders.delete(p.id);

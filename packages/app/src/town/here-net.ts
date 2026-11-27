@@ -41,8 +41,10 @@ const isOther = (o: unknown): o is HereOther => {
  * look and pawn color as said (an empty name: a guest's view, no name tag). Answers those who left, and those whose look or color is
  * new (to dress: Town.tsx `dressPerson`, the bots' way). (Your own pawn is never in the list: the server leaves you out.)
  */
-export function applyHere(t: Town, others: readonly HereOther[], now: number): { gone: Person[]; dressed: Person[] } {
+export function applyHere(t: Town, others: readonly HereOther[], now: number): { gone: Person[]; dressed: Person[]; came: Person[] } {
   const dressed: Person[] = [];
+  // (Nov 27) Those who came in this answer (new, or back after leaving) or changed their name: their name tags are made between frames.
+  const came: Person[] = [];
   const listed = new Set<string>();
   for (const o of others) {
     if (o.c < 0 || o.r < 0 || o.c >= N || o.r >= N || !walkable(o.c, o.r)) continue;
@@ -66,10 +68,12 @@ export function applyHere(t: Town, others: readonly HereOther[], now: number): {
         p.came = now;
       }
       t.all.push(w);
+      came.push(p);
     } else {
       const g = p.walker.goal();
       if (g.c !== sq.c || g.r !== sq.r) walkWalker(p.walker, taken(t, sq.c, sq.r, p.walker) ? (spotNear(t, p.walker, sq, true) ?? sq) : sq);
     }
+    if (p.name !== o.name && !came.includes(p)) came.push(p);
     p.name = o.name;
     p.zzz = o.zzz;
     const wear = o.look ? cleanLook(o.look) : null;
@@ -88,7 +92,7 @@ export function applyHere(t: Town, others: readonly HereOther[], now: number): {
     if (i >= 0) t.all.splice(i, 1);
     gone.push(p);
   }
-  return { gone, dressed };
+  return { gone, dressed, came };
 }
 
 /** What a beat says about you. */
@@ -145,7 +149,7 @@ export function watchAway(o: {
   loading?: () => boolean;
   onState: (s: AwayState) => void;
   onOut: () => void;
-  onOthers?: (gone: Person[], dressed: Person[]) => void;
+  onOthers?: (gone: Person[], dressed: Person[], came: Person[]) => void;
   floor?: boolean;
 }): () => void {
   const limits = awayLimits();
@@ -181,8 +185,8 @@ export function watchAway(o: {
       })
       .then((b: { others?: unknown } | null) => {
         if (done || !b || !Array.isArray(b.others)) return;
-        const { gone, dressed } = applyHere(o.town, b.others.filter(isOther), performance.now());
-        o.onOthers?.(gone, dressed);
+        const { gone, dressed, came } = applyHere(o.town, b.others.filter(isOther), performance.now());
+        o.onOthers?.(gone, dressed, came);
       })
       .catch(() => undefined)
       .finally(() => {
