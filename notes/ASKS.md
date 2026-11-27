@@ -14,7 +14,7 @@
 - Nov 26 · Dash Hang on follow-up: the review's 3 display nits (premoves over the slid-back board; move list row; late join) · queued
 
 ## From the Nov 26 audit (notes/asks-audit-2026-11-26.md): never built / partly done
-- Nov 9-25 · 50 v 50 and Squads get their own ranks (RP from placement + engine score vs the lobby; ladder for all rank modes; a ranked leaver's seat filled by a bot at their level) · NEVER BUILT · queued (ranked, xhigh)
+- Nov 9-25 · 50 v 50 and Squads get their own ranks (RP from placement + engine score vs the lobby; ladder for all rank modes; a ranked leaver's seat filled by a bot at their level) · PR 1 of 5 #993 (design docs/ideas/mode-ranks.md + pure math); PRs 2-5 next (sim; 50v50 recorded, full lane; Squads recorded, full lane; screens)
 - Nov 9-10 · Riders in the regular crates (5 non-boss riders, crate exclusives; the shopping cart) · NEVER BUILT · queued (item-builder)
 - Nov 10 · Auto chess: play against people (unranked, in match history) + a landing page (queue with a bot or search) · NEVER BUILT · ask Eric if still wanted (was parked "only on Eric's word")
 - Nov 12 · Rare items: a gold/diamond tier frame + tap to preview on a pawn (with the rider) · building (claude/rare-frames-preview, restarted 01:25)
