@@ -115,3 +115,21 @@ promotion his move has after a hop that it didn't have before it, by any pawn. T
 with a pawn of his nose to nose, 35,249 hops allowed, **no problem**: none on the last two ranks, none leaving his move a
 promotion it didn't have (the review's run before the fix: 1 allowed hop in 7 did). The rank before the back rank
 refused 9,470 pawn-turns; freeing a pinned pawn never came up at random.
+
+## Turf (Nov 27): on vs off
+
+Turf (docs/decisions/2026-11-27-hopper-turf.md) at its settings (hop-around every 4 of his turns; holds at 32 / 40 / 48) against
+the same battles with it out of reach (`{"powers": {"turfHolds": [99, 99, 99], "turfHopEvery": 9999}}`): the raid sim as above (50
+bots, tier 1600, his Elo 1350, no strikes, his Carrot Patch and Pawn Bounce as usual), one battle a seed, seeds 1 to 16, tags `turfOn`
+and `turfOff` (`reports/boss-sim/raid-turf*.jsonl`; each row's `turf`: hop-arounds, his turns by holds, Long legs moves, Double hops).
+
+| | Battles | His wins / draws / the crowd's | The crowd's score | Crowd moves |
+|---|---|---|---|---|
+| Turf on | 16 | 13 / 2 / 1 | 0.12 (± 0.07) | 42.7 |
+| Turf off | 16 | 14 / 1 / 1 | 0.09 (± 0.07) | 37.9 |
+
+- **His results don't move** (0.12 against 0.09, inside one error): the bots don't fight for squares, and what the holds give him
+  comes late. Fair as set; the thresholds stay Eric's (32 / 40 / 48).
+- **How far he gets:** 32 squares in every battle (his most: 35 to 42), 40 in 8 of 16, 48 in none. Of his 665 turns: no hold 61%,
+  Long legs 36%, Short fuse too 3%, Double hop 0%. Long legs played 69 long steps (about 4 a battle); 161 hop-arounds (one every 4
+  of his turns). Double hop at 48 is out of reach against this crowd: lower it (44 is about his best here) if Eric wants it seen.

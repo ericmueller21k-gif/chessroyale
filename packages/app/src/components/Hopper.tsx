@@ -1,6 +1,6 @@
-import { useLayoutEffect, useMemo, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BOSS_POWERS, HOPPER_NAME } from "@chessroyale/core";
-import { HOPPER_BEATS, POWER_FX, pieceAt, withPiece, withoutPiece } from "@chessroyale/chess";
+import { HOPPER_BEATS, POWER_FX, TURF_HOLDS, pieceAt, turfCount, turfSquare, withPiece, withoutPiece, type TurfHold, type TurfView } from "@chessroyale/chess";
 import { bossKit } from "../characters/kits.ts";
 import { EFFECTS, cueAt } from "../characters/power-art.ts";
 import { renderFrame } from "../characters/sprite.ts";
@@ -29,6 +29,10 @@ import { Cast, PIECE_WORD, SoundAt, casterPoint, hash, type BossUi, type Moment,
  * - **His spin** (the race over, as your turn begins after his move): the race won or lost, then the reel, a row of
  *   prize cards sliding past a line in the board's middle, stopping on what he rolled; the prize pieces drop onto their
  *   squares. His fifth carrot: the battle is his, no spin.
+ * - **Turf** (Nov 27; everywhere but the Battle Tower): his squares carry Chirp's print pair, yours the crowned pawn, both faint,
+ *   under everything else on the board (turfLayer); the count and his three holds in the boss bar (TurfBar: tap a hold for what it
+ *   does); every few turns his hop-around (Chirp hops on his squares and lands on one he claims) on a screen of its own before his
+ *   move; under his third hold, Double hop's banner as his second move lands.
  * The board shows the position as it was until each piece moves (hopperFen).
  */
 
@@ -165,6 +169,207 @@ export function carrotItems(boss: BossView, moments: readonly Moment[], now: num
   return out;
 }
 
+// ---------------- Turf ----------------
+
+/** His short name in the count ("Chub 26 · You 21 · Open 17"). */
+export const TURF_HIS = "Chub";
+/** The town ride's print color (riding-chirp.tsx's SOIL); the bar's cream for the count's marks (the bar is dark). */
+const SOIL = "#3b3a1a";
+const CREAM = "#f3ece0";
+/** Your squares' mark: the app's logo, the crowned pawn (public/icons/icon.svg's <g> paths, no background), in its 512 box. */
+const LOGO_PATHS = ["M150 190 L176 110 L216 160 L256 92 L296 160 L336 110 L362 190 Z", "M226 300 H286 L300 360 H212 Z"] as const;
+const LogoMark = ({ fill }: { fill: string }) => (
+  <g fill={fill}>
+    <path d={LOGO_PATHS[0]} />
+    <rect x="150" y="196" width="212" height="22" rx="6" />
+    <circle cx="256" cy="262" r="40" />
+    <path d={LOGO_PATHS[1]} />
+    <rect x="176" y="362" width="160" height="34" rx="10" />
+  </g>
+);
+/** One of Chirp's three-toed prints pointing along +x (as the town ride's trail draws it: riding-chirp.tsx's printD). */
+const toes = (x: number, y: number) => [[5.2, -2.6], [6.2, 0], [5.2, 2.6]].map(([tx, ty]) => `M ${x + 1.2} ${y} L ${x + tx!} ${y + ty!}`).join(" ");
+/** His print pair, in a box -12 to 12, pointing along +x before it turns (the round-2 mockup's). */
+const PrintPair = ({ color, w }: { color: string; w: number }) => (
+  <>
+    {[[-3.2, -5], [-1.6, 1.8]].map(([x, y]) => (
+      <g key={x}>
+        <path d={toes(x!, y!)} fill="none" stroke={color} stroke-linecap="round" stroke-width={w} />
+        <ellipse cx={x! - 0.6} cy={y} rx={2.2} ry={1.8} fill={color} />
+      </g>
+    ))}
+  </>
+);
+
+const TH = B.turfHop;
+
+/**
+ * When each square of his last hop-around gets its print on screen (ms, wall clock): as Chirp lands on it in the hop-around's
+ * moment (the square he claims has none until then); 0 outside it. Null: not part of a hop-around playing.
+ */
+function hopLandsAt(boss: BossView, moments: readonly Moment[], square: string): number | null {
+  const h = boss.powers?.turf?.hop;
+  const m = find(moments, "turfHop");
+  if (!h || !m) return null;
+  const i = [...h.hops, h.to].indexOf(square);
+  return i < 0 ? null : m.at + TH.dropAt + i * TH.legMs + TH.landAt;
+}
+
+/**
+ * The Turf on the board, under everything else (the board's colors as they are; Eric, Nov 22): his squares Chirp's print pair at 0.32
+ * (his last hop-around's 0.62 through that turn), yours the crowned pawn at 46% of the square, #1b1d22 at 0.16, open nothing. Drawn
+ * again only when the squares, the board's way up or the hop-around's landings change.
+ */
+function TurfLayer({ boss, orientation, moments, now }: { boss: BossView; orientation: Orientation; moments: readonly Moment[]; now: number }) {
+  const t = boss.powers?.turf;
+  const h = t?.hop;
+  const fresh = h && h.at === boss.crowdMoves ? [...h.hops, h.to] : [];
+  // (While his hop-around plays: a square of it shows its fresh print once he has landed on it; the one he claims, none before.)
+  const landed = fresh.map((sq) => { const at = hopLandsAt(boss, moments, sq); return at === null || now >= at ? "1" : "0"; }).join("");
+  return useMemo(() => {
+    if (!t) return null;
+    const yours: preact.JSX.Element[] = [];
+    const his: preact.JSX.Element[] = [];
+    for (let i = 0; i < 64; i++) {
+      const mark = t.owner[i];
+      if (mark === ".") continue;
+      const sq = turfSquare(i);
+      const { x, y } = squareXY(sq, orientation);
+      const left = x / 100 - 0.5;
+      const top = y / 100 - 0.5;
+      if (mark === "c") {
+        yours.push(
+          <g key={sq} transform={`translate(${r2(left + 0.27)} ${r2(top + 0.27)}) scale(${0.46 / 512})`} data-square={sq}>
+            <LogoMark fill="#1b1d22" />
+          </g>,
+        );
+        continue;
+      }
+      const k = fresh.indexOf(sq);
+      if (k >= 0 && landed[k] === "0" && sq === h!.to) continue;
+      his.push(
+        <g key={sq} transform={`translate(${r2(left + 0.5)} ${r2(top + 0.5)}) scale(0.03) rotate(${90 + ((hash(sq) % 41) - 20)})`} opacity={k >= 0 && landed[k] === "1" ? 0.62 : 0.32} data-square={sq}>
+          <PrintPair color={SOIL} w={1.6} />
+        </g>,
+      );
+    }
+    return (
+      <svg class="hp-turf" viewBox="0 0 8 8" aria-hidden="true" data-his={turfCount(t.owner, "b")} data-yours={turfCount(t.owner, "c")}>
+        <g class="hp-turf-yours" opacity="0.16">
+          {yours}
+        </g>
+        <g class="hp-turf-his">{his}</g>
+      </svg>
+    );
+  }, [t?.owner, orientation, fresh.join(), landed]);
+}
+
+/** A hold's words: its name, its short name on the pill, and what it does (its tap text). */
+export const TURF_HOLD_WORDS: Record<TurfHold, { name: string; short: string; does: string }> = {
+  legs: { name: "Long legs", short: "Legs", does: "their pawns step 2 from any square, 3 from their start (never capturing or promoting that way)" },
+  fuse: { name: "Short fuse", short: "Fuse", does: `your move's time is cut by a third` },
+  double: { name: "Double hop", short: "Hop", does: "they move twice each turn (the second a quiet move)" },
+};
+
+/** A hold's tap text: on or off, what it does, and how to switch it off. */
+export function holdText(hold: TurfHold, on: boolean, his: number): string {
+  const i = TURF_HOLDS.indexOf(hold);
+  const w = TURF_HOLD_WORDS[hold];
+  const at = BOSS_POWERS.turfHolds[i]!;
+  return on
+    ? `${w.name} is on. ${TURF_HIS} holds ${his} squares (${at}+): ${w.does}. Take squares back to switch it off.`
+    : `${w.name} at ${at} squares: ${w.does}. ${TURF_HIS} holds ${his}.`;
+}
+
+const HOLD_ICON: Record<TurfHold, preact.JSX.Element> = {
+  legs: <path d="M3 7 L6 4 L9 7 M3 10.5 L6 7.5 L9 10.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />,
+  fuse: (
+    <>
+      <circle cx="6" cy="6.8" r="4.3" fill="none" stroke="currentColor" stroke-width="1.5" />
+      <path d="M6 4.3 V6.9 L7.7 8 M4.6 1.2 H7.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+    </>
+  ),
+  double: <path d="M1 9.5 Q3.3 3 5.6 9.5 M6.4 9.5 Q8.7 3 11 9.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />,
+};
+
+/** His holds on for the turn under way (his turn after the crowd move they were set at, and your turn after it). */
+export const holdsNow = (boss: Pick<BossView, "crowdMoves" | "result"> & { powers?: { turf?: TurfView | null } | null }): number => {
+  const t = boss.powers?.turf;
+  return t && !boss.result && t.holdsAt === boss.crowdMoves ? t.holds : 0;
+};
+
+/**
+ * The boss bar's Turf (its prop slot): the count with each side's mark ("Chub 26 · You 21 · Open 17") and his three holds as pills,
+ * greyed with their threshold until he holds them, lit while he does (nothing hidden). A tap on a pill (a hover on a computer: its
+ * title) opens what it does under the bar, over the board, pushing nothing; another tap, or 6 s, closes it.
+ */
+export function TurfBar({ boss }: { boss: BossView }) {
+  const t = boss.powers?.turf;
+  const [open, setOpen] = useState<TurfHold | null>(null);
+  const tip = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => setOpen(null), 6000);
+    return () => clearTimeout(id);
+  }, [open]);
+  // (Just under the bar, whatever its height: a phone's is tall, his figure in it.)
+  useLayoutEffect(() => {
+    const el = tip.current;
+    const bar = el?.closest(".boss-bar")?.getBoundingClientRect();
+    const from = (el?.offsetParent as HTMLElement | null)?.getBoundingClientRect();
+    if (el && bar && from) el.style.top = `${Math.round(bar.bottom - from.top + 8)}px`;
+  }, [open]);
+  if (!t) return null;
+  const his = turfCount(t.owner, "b");
+  const yours = turfCount(t.owner, "c");
+  const free = 64 - his - yours;
+  const held = holdsNow(boss);
+  const said = `Squares: ${TURF_HIS} ${his}, you ${yours}, open ${free}.`;
+  return (
+    <span class="hp-turfbar" data-holds={held}>
+      <span class="hp-holds">
+        {TURF_HOLDS.map((h, i) => {
+          const on = held > i;
+          const text = holdText(h, on, his);
+          return (
+            <button key={h} type="button" class={`hp-hold${on ? " on" : ""}${open === h ? " open" : ""}`} data-hold={h} aria-pressed={open === h} aria-label={text} title={text} onClick={() => setOpen(open === h ? null : h)}>
+              <svg viewBox="0 0 12 12" aria-hidden="true">
+                {HOLD_ICON[h]}
+              </svg>
+              <span class="hp-hold-name">{TURF_HOLD_WORDS[h].short}</span>
+              <span class="hp-hold-at">{BOSS_POWERS.turfHolds[i]}</span>
+            </button>
+          );
+        })}
+      </span>
+      <span class="hp-count" role="status" aria-label={said} title={said} data-his={his} data-yours={yours} data-open={free}>
+        <span class="hp-count-n">
+          <svg class="hp-count-mark" viewBox="-9 -9 18 18" aria-hidden="true">
+            <g transform="rotate(90)">
+              <PrintPair color={CREAM} w={2.2} />
+            </g>
+          </svg>
+          {TURF_HIS} <b>{his}</b>
+        </span>
+        <span class="hp-count-n">
+          <svg class="hp-count-mark" viewBox="146 88 220 312" aria-hidden="true">
+            <LogoMark fill={CREAM} />
+          </svg>
+          You <b>{yours}</b>
+        </span>
+        <span class="hp-count-n">
+          Open <b>{free}</b>
+        </span>
+      </span>
+      {open && (
+        <span ref={tip} class="hp-hold-tip" role="note">
+          {holdText(open, held > TURF_HOLDS.indexOf(open), his)}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // ---------------- His moments ----------------
 
 /** A piece the moment draws over the board (hopping, dropping), in % of the board: drawn as the board draws pieces. */
@@ -213,6 +418,61 @@ function bounceMoment(props: MomentProps) {
   const b = props.boss.powers?.pawnBounce;
   return pawnArc(props, { cls: "pm-pawn-bounce", title: "BOUNCE!", sub: b ? `Your pawn back to ${b.to}` : undefined, step: b, side: props.boss.crowdSide, beats: B.pawnBounce, lift: 9 });
 }
+
+/** Where Chirp starts and ends his hop-around: over the board's top-left square, just above the board (% of the board). */
+const TURF_CORNER: Pt = { x: 6.25, y: -5 };
+/** His figure on the board in the hop-around: its 84 x 84 frame's width (% of the board), his feet this far below a square's middle. */
+export const TURF_FIGURE = { width: 24, feet: 4, lift: 10 } as const;
+
+/**
+ * Where Chirp is `t` ms into his hop-around (% of the board, his feet) and which leg he's on: from the corner to each square of his he
+ * hops on, to the square he claims, and back (TH: each leg on the ground until its `takeoffAt`, in the air until `landAt`, an arc
+ * `lift` high, then on the next square). Null before he drops or with no hop-around.
+ */
+export function turfHopAt(hop: { hops: readonly string[]; to: string } | null | undefined, t: number, orientation: Orientation): { at: Pt; leg: number; right: boolean; air: boolean } | null {
+  if (!hop || t < TH.dropAt) return null;
+  const pts = [TURF_CORNER, ...[...hop.hops, hop.to].map((sq) => centreOf(sq, orientation)), TURF_CORNER];
+  const legs = pts.length - 1;
+  const into = t - TH.dropAt;
+  const leg = Math.min(legs - 1, Math.floor(into / TH.legMs));
+  const u = into - leg * TH.legMs;
+  const a = pts[leg]!;
+  const b = pts[leg + 1]!;
+  const right = b.x > a.x;
+  if (u < TH.takeoffAt) return { at: a, leg, right, air: false };
+  if (u >= TH.landAt) return { at: b, leg, right, air: false };
+  const v = (u - TH.takeoffAt) / (TH.landAt - TH.takeoffAt);
+  return { at: { x: a.x + (b.x - a.x) * v, y: a.y + (b.y - a.y) * v - TURF_FIGURE.lift * Math.sin(Math.PI * v) }, leg, right, air: true };
+}
+
+/**
+ * "TURF HOP!", then the hop-around: Chirp drops off his corner onto the board, hops on his squares (each print fresh as he lands:
+ * TurfLayer), lands on the square he claims (its print appears) and hops back. His figure is the board's while it plays (his usual
+ * spot empty: styles.css), facing the way he hops, his `leapfrog` once a leg.
+ */
+function turfHopMoment({ boss, moment, t, orientation, banner, kit }: MomentProps) {
+  const h = boss.powers?.turf?.hop;
+  const where = turfHopAt(h, t, orientation);
+  const ch = kit?.ch;
+  const W = TURF_FIGURE.width;
+  const fx = ch ? ch.foot[0] / ch.w : 0.5;
+  const fy = ch ? ch.foot[1] / ch.h : 1;
+  return (
+    <div class="power-moment pm-turf-hop">
+      {banner("TURF HOP!", h ? `Chirp claims ${h.to}` : undefined, "carrot", TH.dropAt)}
+      <div class="hp-layer" aria-hidden="true" data-turf-hop={!where ? "banner" : `${where.leg}:${where.air ? "air" : "ground"}`}>
+        {where && ch && (
+          <span class={`hp-turf-chirp${where.right ? " right" : ""}`} style={{ left: `${r2(where.at.x - (where.right ? 1 - fx : fx) * W)}%`, top: `${r2(where.at.y + TURF_FIGURE.feet - fy * W)}%`, width: `${W}%` }}>
+            <BossMoment key={where.leg} boss={boss.name} anim="leapfrog" since={moment.at + TH.dropAt + where.leg * TH.legMs - TH.animLead} then="idle" />
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Double hop (his third hold): his banner as his second move lands, his figure where it stands. */
+const doubleMoment = ({ banner }: MomentProps) => <div class="power-moment pm-extra pm-double-hop pm-stay">{banner("DOUBLE HOP!", `${HOPPER_NAME} move again`, "carrot")}</div>;
 
 /** The pixel carrot (the dock's icon) as an image, made once. */
 let iconUrl: string | null = null;
@@ -392,7 +652,7 @@ function winMoment({ boss, moment, banner }: MomentProps) {
 }
 
 /** A line from his kit's lines for one of his race's own moments (the same for everyone: by the moment's key). */
-const raceLine = (beat: "carrotHis" | "carrotYours" | "spinBig" | "spinSmall" | "spinEmpty" | "carrotsAll" | "pawnBounce", kit: ReturnType<typeof bossKit>, key: string): string | null => {
+const raceLine = (beat: "carrotHis" | "carrotYours" | "spinBig" | "spinSmall" | "spinEmpty" | "carrotsAll" | "pawnBounce" | "turfHop" | "doubleHop", kit: ReturnType<typeof bossKit>, key: string): string | null => {
   const lines = kit?.lines[beat];
   return lines?.length ? lines[hash(key) % lines.length]! : null;
 };
@@ -402,7 +662,7 @@ const raceLine = (beat: "carrotHis" | "carrotYours" | "spinBig" | "spinSmall" | 
  * the last thing that happened; the bounce with its own line, the hop's animation). The Carrot Patch's moments come as a crowd turn begins, after his turn: the cast (his whole turn), a
  * carrot his move pulled (yours plays as your move lands: yourPulls), his spin, his last carrot.
  */
-const MOMENTS: Record<"hop" | "pawnBounce" | "carrots" | "carrot" | "carrotSpin" | "carrotWin", MomentUi> = {
+const MOMENTS: Record<"hop" | "pawnBounce" | "turfHop" | "doubleHop" | "carrots" | "carrot" | "carrotSpin" | "carrotWin", MomentUi> = {
   hop: { order: 0, kit: "power", own: (boss: BossView) => boss.powers?.events.at(-1)?.kind === "hop" && boss.powers?.hop?.at === boss.crowdMoves, view: hopMoment },
   pawnBounce: {
     order: 0,
@@ -410,6 +670,21 @@ const MOMENTS: Record<"hop" | "pawnBounce" | "carrots" | "carrot" | "carrotSpin"
     line: (kit, m) => raceLine("pawnBounce", kit, m.key),
     own: (boss: BossView) => boss.powers?.events.at(-1)?.kind === "pawnBounce" && boss.powers?.pawnBounce?.at === boss.crowdMoves,
     view: bounceMoment,
+  },
+  // (Turf's hop-around: a screen of its own before his move, as the hop's. Double hop: after his move, as Hollow's extra move.)
+  turfHop: {
+    order: 0,
+    kit: "power",
+    line: (kit, m) => raceLine("turfHop", kit, m.key),
+    own: (boss: BossView) => boss.powers?.events.at(-1)?.kind === "turfHop" && boss.powers?.turf?.hop?.at === boss.crowdMoves,
+    view: turfHopMoment,
+  },
+  doubleHop: {
+    order: 3,
+    kit: "power",
+    line: (kit, m) => raceLine("doubleHop", kit, m.key),
+    own: (boss: BossView) => boss.powers?.turf?.double === "played" && boss.powers.events.some((e) => e.kind === "doubleHop"),
+    view: doubleMoment,
   },
   carrot: { order: 0, kit: "powerHit", line: (kit, m) => raceLine(m.by === "crowd" ? "carrotYours" : "carrotHis", kit, m.key), view: pullMoment },
   carrots: { order: 2, kit: "ultimate", view: castMoment },
@@ -467,9 +742,20 @@ export const HOPPER_UI = {
   ultimate: { name: "Carrot Patch", when: "After your move" },
   moments: MOMENTS,
   noMove: (boss) => (boss.powers?.carrots && boss.powers.carrots.at === boss.crowdMoves && !boss.lastMove ? CAST_LINE : null),
-  // The carrots: in the ground, popping out as they're pulled, the puller's token after (under the pieces).
+  // Turf: the prints and your crowned pawns, under everything else; then the carrots: in the ground, popping out as they're pulled,
+  // the puller's token after (under the pieces, over the Turf).
   board: ({ boss, orientation, moments, now }) => {
     const items = carrotItems(boss, moments, now);
-    return { under: items.length > 0 ? <BoardEffects items={items} orientation={orientation} class="hp-carrots" /> : null, over: null };
+    return {
+      under: (
+        <>
+          {boss.powers?.turf && <TurfLayer boss={boss} orientation={orientation} moments={moments} now={now} />}
+          {items.length > 0 && <BoardEffects items={items} orientation={orientation} class="hp-carrots" />}
+        </>
+      ),
+      over: null,
+    };
   },
+  // Turf's count and his holds, in the bar's free room.
+  barProp: ({ boss }) => <TurfBar boss={boss} />,
 } satisfies BossUi;

@@ -1,6 +1,6 @@
 import { BIRDIE_ULT, DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, strangerTurnMs, bigboyTurnMs, birdieTurnMs, birdieTurnBeats, birdieImpactMs, powerWinShowMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeLeadMs, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushBeats, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, strangerTurnMs, bigboyTurnMs, birdieTurnMs, birdieTurnBeats, birdieImpactMs, powerWinShowMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeLeadMs, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, hopperStepKind, rushBeats, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -161,7 +161,10 @@ export class SoloMatch implements GameView {
 
   /** The match's settings (the move clock can change with Crowd augment votes). */
   get settings(): Settings {
-    return this.runner?.settings ?? this.baseSettings;
+    const s = this.runner?.settings ?? this.baseSettings;
+    // (Chub & Chirp's Short fuse cuts the time your move adds to the bank: the clock on screen counts with it, as online.)
+    const inc = this.runner?.incrementNow();
+    return inc === undefined || inc === s.timeIncrementSeconds ? s : { ...s, timeIncrementSeconds: inc };
   }
   /** Crowd: this round's live picks (bots decided at the start, shown as each finishes thinking). */
   private live: { startsAt: number; times: Record<string, number>; picks: ReadonlyMap<string, string> | null; mine: LivePick | null; rushFrom: number | null } | null = null;
@@ -1494,7 +1497,7 @@ export class SoloMatch implements GameView {
     const [played] = await Promise.all([pick, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
     if (this.stopped) return;
     if (!played) return this.nextRound();
-    const showMs = powerMomentMs([{ kind: this.runner.boss?.id === "dash" ? "rushExtra" : "extra" }]);
+    const showMs = powerMomentMs([{ kind: this.runner.extraMoveKind() }]);
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
     this.nextRoundIn(showMs);
   }
@@ -1562,7 +1565,7 @@ export class SoloMatch implements GameView {
     const hop = this.runner.playHop(this.engines).catch(() => this.runner.applyHop(null));
     const [done] = await Promise.all([hop, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
     if (this.stopped) return;
-    const showMs = done ? powerMomentMs([{ kind: isHop(done) ? "hop" : "pawnBounce" }]) : 0;
+    const showMs = done ? powerMomentMs([{ kind: hopperStepKind(done) }]) : 0;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
     this.nextRoundIn(showMs);
   }

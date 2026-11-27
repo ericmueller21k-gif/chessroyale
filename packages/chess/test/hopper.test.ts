@@ -14,6 +14,8 @@ import {
   gameEndWith,
   hopFrom,
   hopOptions,
+  hopperBattle,
+  hopperStepKind,
   isHop,
   kingAttacked,
   legalMoves,
@@ -92,6 +94,8 @@ const sound = (fen: string) => {
   expect(kingAttacked(fen, sideToMove(fen) === "w" ? "b" : "w")).toBe(false);
 };
 const B = "b" as const;
+/** A step's square it started from (a hop's or a bounce's). */
+const fromOf = (step: unknown) => (step as { from: string }).from;
 const W = "w" as const;
 /** His promotions in a position (him to move). */
 const promotions = (fen: string) => legalMoves(fen).filter((m) => m.length === 5);
@@ -298,7 +302,7 @@ describe("Leapfrog in a battle", () => {
     // (Even when others could still hop: after one of four, three still could, and none comes before his move.)
     const four = from(FOUR);
     await crowd(four, "a1b1");
-    expect(four.applyHop(null)!.from).toBe("a5");
+    expect(fromOf(four.applyHop(null))).toBe("a5");
     expect(hopOptions(fenOf(four), B).options.map((o) => o.from)).toEqual(["d5", "e5", "h5"]);
     expect(four.hopDue()).toBe(false);
     expect(four.applyHop(null)).toBeNull();
@@ -328,16 +332,16 @@ describe("Leapfrog in a battle", () => {
     expect(r.hopNeedsEngine()).toBe(true);
     const c = r.hopCandidates();
     expect(c).toHaveLength(4);
-    expect(r.applyHop(c[2]!)!.from).toBe("e5");
+    expect(fromOf(r.applyHop(c[2]!))).toBe("e5");
     for (const pick of ["e2e4", "", null]) {
       const s = from(FOUR);
       await crowd(s, "a1b1");
-      expect(s.applyHop(pick)!.from).toBe("a5");
+      expect(fromOf(s.applyHop(pick))).toBe("a5");
     }
     // This device's engines: the one best for him (hopFrom).
     const best = from(FOUR, { engine: fakeEngine((f) => (pieceAt(f, "h3") ? 0.9 : 0.4)) });
     await crowd(best, "a1b1");
-    expect((await best.playHop())!.from).toBe("h5");
+    expect(fromOf(await best.playHop())).toBe("h5");
   });
 
   it("at most hopMax (2) a battle: nose to nose after that, nothing", async () => {
@@ -355,10 +359,10 @@ describe("Leapfrog in a battle", () => {
         continue;
       }
       const could = hopOptions(fenOf(r), "b").options.length > 0;
-      if (r.hopDue()) {
-        await r.playHop();
-        hops++;
-      } else if (could && hops === 2) stopped++;
+      // (Turf's hop-around shares the step: only a hop counts.)
+      const step = r.hopDue() ? await r.playHop() : null;
+      if (step && isHop(step)) hops++;
+      else if (could && hops === 2) stopped++;
       expect(r.boss!.powers!.hops ?? 0).toBeLessThanOrEqual(2);
       if (r.bossToMove()) await r.playBoss();
     }
@@ -447,6 +451,9 @@ describe("the Pawn Bounce (Eric, Nov 22): the crowd's first double push knocked 
     expect(r.hopDue()).toBe(true);
     expect(r.hopCandidates()).toEqual([]);
     expect(r.hopNeedsEngine()).toBe(false);
+    // (Its cap from the settings it's given: none at pawnBounceMax 0, review of #883.)
+    const battle = (r as unknown as { battle: Parameters<typeof hopperBattle.due>[0] }).battle;
+    expect(hopperBattle.due(battle, { ...BOSS_POWERS, pawnBounceMax: 0 })).toBe(false);
     const plies = r.boards.get(0)!.history.length;
     const step = r.applyHop(null)!;
     expect(step).toEqual({ at: 1, from: "e4", to: "e3" });
@@ -458,6 +465,8 @@ describe("the Pawn Bounce (Eric, Nov 22): the crowd's first double push knocked 
     expect(pieceAt(board.fen, "e3")).toEqual({ color: "w", type: "p" });
     expect(pieceAt(board.fen, "e4")).toBeNull();
     expect(board.fen.split(" ")[3]).toBe("-");
+    // (The last move shown is the bounce: your pawn is no longer where the push put it; review of #883.)
+    expect(board.lastMove).toBe("e4e3");
     sound(board.fen);
     const p = r.boss!.powers!;
     expect(p.pawnBounce).toEqual(step);
@@ -566,22 +575,33 @@ describe("Leapfrog: the ground rules, over many battles (a fuzz, as #267's revie
           expect(legalMoves(board.fen).length).toBeGreaterThan(0);
           expect(fenAtPly(board.history, board.history.length, board.bases)).toBe(board.fen);
           expect(gameEndWith(board.history, board.bases)).toBeNull();
-          expect(board.fen.split(" ")[3]).toBe("-");
           expect(board.fen.split(" ")[5]).toBe(before.split(" ")[5]);
           // (No instant queen either way: every promotion his move has now, he had before.)
           for (const m of promotions(board.fen)) expect(promotions(before)).toContain(m);
-          expect(kingAttacked(board.fen, his)).toBe(false);
           expect(r.bossToMove()).toBe(true);
           // (One a turn: nothing more before his move.)
           expect(r.hopDue()).toBe(false);
-          if (!isHop(step)) {
+          const kind = hopperStepKind(step);
+          // (Turf's hop-around: nothing on the board moves; the square he lands on is his, with no piece on it.)
+          if (kind === "turfHop") {
+            const hop = step as { hops: string[]; to: string };
+            counts.turfHops = (counts.turfHops ?? 0) + 1;
+            expect(board.fen).toBe(before);
+            expect(pieceAt(board.fen, hop.to)).toBeNull();
+            expect(r.boss!.powers!.turf!.owner[hop.to.charCodeAt(0) - 97 + 8 * (Number(hop.to[1]) - 1)]).toBe("b");
+          } else {
+            expect(board.fen.split(" ")[3]).toBe("-");
+            expect(kingAttacked(board.fen, his)).toBe(false);
+          }
+          if (kind === "pawnBounce") {
+            const bounce = step as { from: string; to: string };
             // (The Pawn Bounce: the crowd's pawn its double push brought one square back, from the move just played.)
             counts.bounces = (counts.bounces ?? 0) + 1;
-            expect(board.history.at(-1)).toBe(`${step.from[0]}${Number(step.from[1]) + (his === "b" ? -2 : 2)}${step.from}`);
-            expect(Math.abs(Number(step.to[1]) - Number(step.from[1]))).toBe(1);
-            expect(pieceAt(board.fen, step.to)).toEqual({ color: r.boss!.crowdSide, type: "p" });
-            expect(pieceAt(board.fen, step.from)).toBeNull();
-          } else {
+            expect(board.history.at(-1)).toBe(`${bounce.from[0]}${Number(bounce.from[1]) + (his === "b" ? -2 : 2)}${bounce.from}`);
+            expect(Math.abs(Number(bounce.to[1]) - Number(bounce.from[1]))).toBe(1);
+            expect(pieceAt(board.fen, bounce.to)).toEqual({ color: r.boss!.crowdSide, type: "p" });
+            expect(pieceAt(board.fen, bounce.from)).toBeNull();
+          } else if (isHop(step)) {
             const hop = step;
             counts.hops = (counts.hops ?? 0) + 1;
             expect(Number(hop.to[1])).not.toBe(his === "b" ? 1 : 8);
@@ -602,5 +622,6 @@ describe("Leapfrog: the ground rules, over many battles (a fuzz, as #267's revie
     // (Enough hops to mean something: the test switch's battles alone bring one each. And bounces: the crowd pushes pawns often.)
     expect(counts.hops).toBeGreaterThanOrEqual(6);
     expect(counts.bounces).toBeGreaterThanOrEqual(5);
+    expect(counts.turfHops).toBeGreaterThanOrEqual(5);
   }, 90_000);
 });

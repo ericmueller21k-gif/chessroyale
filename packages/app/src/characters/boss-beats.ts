@@ -71,6 +71,9 @@ export type Beat =
   | "carrotsAll"
   // Chub & Chirp's Pawn Bounce (Nov 22): your double-pushed pawn knocked back a square, before his move.
   | "pawnBounce"
+  // Chub & Chirp's Turf (Nov 27): his hop-around (Chirp claims a square), and Double hop (his second move).
+  | "turfHop"
+  | "doubleHop"
   // Smudgy's hidden rook revealed by his move (the rules' moment `unmask`; not `strike`, the boss's periodic strike on a
   // piece), and the crowd taking it.
   | "camoStrike"

@@ -5,7 +5,7 @@ import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
 import type { LastStandRound } from "./runner.ts";
 import type { JudgeJob, JudgeReport, JudgeRules } from "./judge.ts";
 import type { CarrotRace } from "./bosses/carrots.ts";
-import type { CarrotView } from "./bosses/hopper.ts";
+import type { CarrotView, TurfView } from "./bosses/hopper.ts";
 import type { CamoView } from "./bosses/smudgy.ts";
 import type { GardenView, WaterAsk } from "./bosses/gardener.ts";
 import type { BalloonAsk, HoopsAsk, TigerView } from "./bosses/tiger.ts";
@@ -499,6 +499,12 @@ export interface NetBossPowers {
    * prize rolled, the prize he got after any step down, where it went). Null: not cast.
    */
   carrots?: CarrotView | null;
+  /**
+   * Their Turf (Nov 27; missing for other bosses, on a Battle Tower floor and from older servers; an older app ignores it): who holds
+   * each square (64 letters, a1 to h8: `b` his, `c` the crowd's, `.` open), his holds (0-3) and the crowd move they're for, his
+   * last hop-around, and Double hop's second move this turn.
+   */
+  turf?: TurfView | null;
   /**
    * Smudgy (missing for other bosses and from older servers; an older app ignores them): his Camouflage (the side of his
    * forced moves and how many are played, whether it's off this battle, the hidden rook's square now: draw a pawn there,
@@ -1076,6 +1082,11 @@ export type ServerMessage = { now: number } & (
        * drag after it when no showdown comes (`drag`); `seed` orders the engine's candidates (never the battle's own seed).
        */
       pull?: string[];
+      /**
+       * Chub & Chirp's Long legs (Turf's first hold): his pawns' long steps, written from to ("c3c5"): answer one as `move` when it's
+       * sound (legsFrom), else his ordinary move. An older app ignores it and plays an ordinary move, as ever.
+       */
+      legs?: string[];
       drag?: true;
       showdown?: "try" | "test";
       seed?: number;

@@ -18385,6 +18385,148 @@ img.qicon {
   bottom: 0;
   border-bottom-color: #f2c14e;
 }
+/* Turf (Nov 27; Hopper.tsx TurfLayer): his prints and your crowned pawns, one SVG under everything on the board (z-index 1, before the
+   carrots, which draw over it; the last move, check, the move dots and the pieces, z-index 2, over both). The board's colors as they are. */
+.board-wrap > .hp-turf {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+/* The hop-around: Chirp on the board (his 84 x 84 frame, TURF_FIGURE), over the pieces, facing the way he hops (drawn facing left). */
+.hp-turf-chirp {
+  position: absolute;
+  aspect-ratio: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 0.6cqw 0 rgba(0, 0, 0, 0.28));
+}
+.hp-turf-chirp.right {
+  transform: scaleX(-1);
+}
+/* The bar's Turf (TurfBar), in its free room: his holds as pills at the top right, the count under them; one row on a computer. */
+.hp-turfbar {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+.hp-holds {
+  display: flex;
+  gap: 4px;
+}
+.hp-hold {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 10px;
+  font: 800 10px/1 system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: rgba(243, 236, 224, 0.45);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+/* (A bigger tap area than the pill drawn: a finger finds it.) */
+.hp-hold::after {
+  content: "";
+  position: absolute;
+  inset: -7px -2px;
+}
+.hp-hold svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+.hp-hold-at {
+  font-weight: 700;
+  opacity: 0.85;
+}
+.hp-hold.on {
+  color: #1b150e;
+  background: #f79a3d;
+  box-shadow: 0 0 0 1px #ffc97e, 0 0 8px rgba(247, 154, 61, 0.7);
+}
+.hp-hold.open {
+  box-shadow: inset 0 0 0 1px #f79a3d;
+}
+.hp-hold.on.open {
+  box-shadow: 0 0 0 2px #ffe2b8, 0 0 8px rgba(247, 154, 61, 0.7);
+}
+.hp-count {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 700 11.5px/1 system-ui, -apple-system, sans-serif;
+  color: #f3ece0;
+  white-space: nowrap;
+}
+.hp-count-n {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hp-count b {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.hp-count-mark {
+  display: block;
+  width: 13px;
+  height: 13px;
+  flex: none;
+  overflow: visible;
+}
+/* A hold's tap text: under the bar, over the board, pushing nothing. */
+.hp-hold-tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  width: 236px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #1f1a14;
+  color: #f3ece0;
+  font: 500 12.5px/1.35 system-ui, -apple-system, sans-serif;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), 0 0 0 1px #f79a3d;
+}
+/* (Under 360 px a pill keeps its icon and number.) */
+@media (max-width: 359px) {
+  .hp-hold-name {
+    display: none;
+  }
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .hp-turfbar {
+    top: auto;
+    bottom: 2px;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+  .hp-count {
+    order: -1;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .hp-hold-tip {
+    width: 260px;
+  }
+}
 .hp-reel-note {
   position: absolute;
   z-index: 9;

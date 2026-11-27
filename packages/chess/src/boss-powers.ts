@@ -69,6 +69,7 @@ export * from "./bosses/recluse.ts";
 export * from "./bosses/recluse-phase2.ts";
 export * from "./bosses/alfil.ts";
 export * from "./bosses/hopper.ts";
+export * from "./bosses/turf.ts";
 export * from "./bosses/carrots.ts";
 export * from "./bosses/smudgy.ts";
 export * from "./bosses/gardener.ts";

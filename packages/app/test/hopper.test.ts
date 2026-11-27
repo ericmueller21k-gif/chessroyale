@@ -50,8 +50,8 @@ describe("Chub & Chirp are live", () => {
   it("say every line of the draft (CHC-*), as written, each at most 42 characters", () => {
     const all = Object.values(HOPPER_LINES).flat();
     const select = SELECT_LINES.hopper!;
-    // (60 in the draft, and the Pawn Bounce's one, Nov 22.)
-    expect(all.length + select.length).toBe(61);
+    // (60 in the draft, the Pawn Bounce's one, Nov 22, and Turf's hop-around's and Double hop's, Nov 27.)
+    expect(all.length + select.length).toBe(63);
     for (const l of [...all, ...select]) expect(l.length, l).toBeLessThanOrEqual(42);
     expect(HOPPER_LINES.power).toContain("Leapfrog!");
     expect(HOPPER_LINES.ultimate).toContain("Carrot Patch! Race you!");
@@ -63,6 +63,8 @@ describe("Chub & Chirp are live", () => {
     expect(HOPPER_LINES.carrotsAll).toHaveLength(2);
     expect(HOPPER_LINES.kingAttack).toHaveLength(3);
     expect(HOPPER_LINES.pawnBounce).toEqual(["Boing! Back you go!"]);
+    expect(HOPPER_LINES.turfHop).toEqual(["Hop, hop, hop… mine!"]);
+    expect(HOPPER_LINES.doubleHop).toEqual(["Again, Chirp! Again!"]);
   });
 
   it("have a sound of their own for every cue but none of a piece's, each quieter than a move and the same every time", () => {
@@ -103,6 +105,11 @@ describe("Chub & Chirp are live", () => {
     expect(text).toContain(`At most ${BOSS_POWERS.hopMax} hops a battle`);
     expect(text).toContain("**Pawn Bounce** (**once a battle**): when you push a pawn two squares, Chirp hops down and knocks it back one square");
     expect(BOSS_BLOCKS.hopper!({ ...BOSS_POWERS, pawnBounceMax: 2 }, def)).toContain("**Pawn Bounce** (**2 times a battle**)");
+    expect(text).toContain("- **Turf** (everywhere but the Battle Tower): each side starts with its own 16 squares");
+    expect(text).toContain(`**Long legs** at ${BOSS_POWERS.turfHolds[0]}`);
+    expect(text).toContain(`**Short fuse** at ${BOSS_POWERS.turfHolds[1]} (your move's time cut by a third`);
+    expect(text).toContain(`**Double hop** at ${BOSS_POWERS.turfHolds[2]}`);
+    expect(BOSS_BLOCKS.hopper!({ ...BOSS_POWERS, turfHopEvery: 5 }, def)).toContain("Every 5 turns of theirs");
     expect(text).toContain("**Carrot Patch** (ultimate, **once a battle**)");
     expect(text).toContain("| 1 | a pawn 50%, nothing 50% | 0.5 |");
     expect(text).toContain("| 3 | a knight 40%, a bishop 40%, a rook 15%, a queen 5% | 3.6 |");
@@ -115,10 +122,18 @@ describe("Chub & Chirp are live", () => {
 
 describe("their moments, timed by their animations' cues", () => {
   it("the moments' lengths are the beats' (the server waits for them)", () => {
-    expect(HOPPER_FX).toEqual({ hop: B.hop.total, pawnBounce: B.pawnBounce.total, carrots: B.carrots.total, carrot: B.carrot.total, carrotSpin: B.carrotSpin.total, carrotWin: B.carrotWin.total });
-    for (const k of ["hop", "pawnBounce", "carrots", "carrot", "carrotSpin", "carrotWin"] as const) expect(POWER_FX[k]).toBe(HOPPER_FX[k]);
+    expect(HOPPER_FX).toEqual({ hop: B.hop.total, pawnBounce: B.pawnBounce.total, turfHop: B.turfHop.total, doubleHop: B.doubleHop.total, carrots: B.carrots.total, carrot: B.carrot.total, carrotSpin: B.carrotSpin.total, carrotWin: B.carrotWin.total });
+    for (const k of ["hop", "pawnBounce", "turfHop", "doubleHop", "carrots", "carrot", "carrotSpin", "carrotWin"] as const) expect(POWER_FX[k]).toBe(HOPPER_FX[k]);
     // (The Pawn Bounce plays on the hop's own beats: his `leapfrog` animation, checked below.)
     expect(B.pawnBounce).toEqual(B.hop);
+  });
+
+  it("Turf's hop-around: each leg his `leapfrog`, its `takeoff` and `land` the leg's; every leg (his hops, the square he claims, back) inside the moment", () => {
+    const T = B.turfHop;
+    expect(cueAt(A.leapfrog!, "takeoff")! - T.animLead).toBe(T.takeoffAt);
+    expect(cueAt(A.leapfrog!, "land")! - T.animLead).toBe(T.landAt);
+    expect(T.landAt).toBeLessThan(T.legMs);
+    expect(T.dropAt + (BOSS_POWERS.turfHops + 2) * T.legMs).toBeLessThanOrEqual(T.total);
   });
 
   it("Leapfrog: the banner's end is his `takeoff` (the pawn leaves its square), his `land` the pawn's landing; his hop inside the moment", () => {

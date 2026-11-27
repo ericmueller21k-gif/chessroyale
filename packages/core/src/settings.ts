@@ -1918,6 +1918,27 @@ export const BOSS_POWERS = {
    */
   pawnBounceMax: 1,
   /**
+   * Chub & Chirp's Turf (Eric, Nov 22 and 27; docs/decisions/2026-11-27-hopper-turf.md), everywhere but the Battle Tower. Each side
+   * starts with its own 16 squares (its first two ranks), 32 open; a square becomes a side's when one of its pieces ends a move there.
+   * Every turfHopEvery of his turns, at the start of his turn (free, as Leapfrog; one step a turn: the bounce, then the hop, then
+   * this), Chirp hops on turfHops of his empty squares and lands on an open one (else one of yours), claiming it.
+   * His holds, each while he held at least that many squares as his turn began (`turfHolds`, in order): Long legs (his pawns step 2
+   * from any square, 3 from their start: every square passed empty, no capture, no promotion, never check; played when it costs at
+   * most turfLegsMaxLoss pawns against his best ordinary move, each searched at turfLegsNodes), Short fuse (your next move's clock,
+   * and on Boss Battle's bank its increment, cut by turfFuseCut, never under turfFuseMin seconds), Double hop (after his move, the
+   * turn passes back and he plays a quiet second move: no capture, check or promotion; his best within turfDoubleGain points).
+   */
+  turfHopEvery: 4,
+  turfHops: 3,
+  // (Eric, Nov 27: 48 was never reached in the sim (his best 42), "lower it to 40": Double hop at 40, Short fuse at 36 so the three
+  // stay stepped. Was 32 / 40 / 48.)
+  turfHolds: [32, 36, 40] as readonly number[],
+  turfLegsMaxLoss: 0.25,
+  turfLegsNodes: 30_000,
+  turfFuseCut: 1 / 3,
+  turfFuseMin: 5,
+  turfDoubleGain: 100,
+  /**
    * Chub & Chirp's Carrot Patch (their ultimate, once a battle; Eric, Oct 18; docs/decisions/2026-10-18-carrot-patch.md).
    * The cast is his whole turn: carrotCount carrots on empty squares, at least one on each half, no two touching. Where
    * they go (the math): each side's fewest moves to end a move on each square, from the position as it stands, give each

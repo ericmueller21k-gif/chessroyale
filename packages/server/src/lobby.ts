@@ -37,7 +37,7 @@ import {
   landsAfterHisMove,
   PASS_WAIT,
   powerMomentMs,
-  isHop,
+  hopperStepKind,
   lastStandMs,
   queenSlain,
   legalMoves,
@@ -2577,7 +2577,7 @@ export class LobbyCore {
       ...(checker ? { check: true as const } : {}),
       // (His own move and the funhouse's: the seed the host and the checker both play it with.)
       ...(c?.draw ? { draw: c.draw } : {}),
-      ...(asks ? { ...(asks.pull && !only ? { pull: asks.pull } : {}), ...(asks.drag && !bare ? { drag: true as const } : {}), ...(asks.showdown && !bare ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
+      ...(asks ? { ...(asks.pull && !only ? { pull: asks.pull } : {}), ...(asks.legs && !only ? { legs: asks.legs } : {}), ...(asks.drag && !bare ? { drag: true as const } : {}), ...(asks.showdown && !bare ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
       ...(land ? { land: land.map((x) => ({ ...x })) } : {}),
       ...(race ? { race } : {}),
       ...(lock ? { lock } : {}),
@@ -2869,7 +2869,7 @@ export class LobbyCore {
       const picked = this.r.bounceCandidates?.includes(move) ? move : null;
       this.r.bounceCandidates = undefined;
       const hop = this.runner!.applyHop(picked);
-      const until = this.io.now() + (hop ? powerMomentMs([{ kind: isHop(hop) ? "hop" : "pawnBounce" }]) : 0);
+      const until = this.io.now() + (hop ? powerMomentMs([{ kind: hopperStepKind(hop) }]) : 0);
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
@@ -2877,7 +2877,7 @@ export class LobbyCore {
       // His extra move: not the crowd's, so nothing is scored; its banner plays out, then the crowd's turn.
       this.r.bossKind = undefined;
       const played = this.runner!.applyExtraMove(move || null);
-      const until = this.io.now() + (played ? powerMomentMs([{ kind: this.runner!.boss?.id === "dash" ? "rushExtra" : "extra" }]) : 0);
+      const until = this.io.now() + (played ? powerMomentMs([{ kind: this.runner!.extraMoveKind() }]) : 0);
       if (played) this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
@@ -3194,7 +3194,7 @@ export class LobbyCore {
         ...(watching ? { watching: true } : {}),
         // This move's clock and the time control's increment (the clock vote sets both), for the clock on screen.
         moveClock: runner.moveClock(),
-        increment: runner.settings.timeIncrementSeconds,
+        increment: runner.incrementNow(),
         ...(bossNow ? { boss: bossNow } : {}),
       });
       if (final) this.send(h.id, { t: "final", final: runner.finalView()!, standings: st, slots: this.slots() }, !inRound.has(h.id));
