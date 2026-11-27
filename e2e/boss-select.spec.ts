@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { adminFirstBosses, playableBosses } from "@chessroyale/core";
+import { adminFirstBosses, playableBosses, unlockBosses } from "@chessroyale/core";
 import { asAdmin, named, openBossRaid, openSoloBoss, test } from "./helpers.ts";
 import { SAY_AT, SAY_AT_DEFAULT } from "../packages/app/src/characters/boss-select.ts";
 
@@ -311,8 +311,9 @@ for (const admin of [false, true]) {
       await page.setViewportSize({ width: w, height: h });
       await page.goto("/");
       await openSoloBoss(page);
-      // (Counted from the roster, as the boss rows below are: each new boss is admins-first, so the admin count grows with it.)
-      await expect(page.locator(".bs-tile")).toHaveCount(playableBosses().length + (admin ? adminFirstBosses().length : 0) + 2);
+      // (Counted from the roster, as the boss rows below are: each new boss is admins-first, so the admin count grows with it; a boss
+      // unlocked by a win, the Stranger, has his own card, an admin's while he's admins first.)
+      await expect(page.locator(".bs-tile")).toHaveCount(playableBosses().length + (admin ? adminFirstBosses().length : 0) + unlockBosses(undefined, false, admin).length + 2);
       await tile(page, "Grex").click();
       // (After its drop, which squashes it a little wider for a moment.)
       await page.waitForTimeout(500);
