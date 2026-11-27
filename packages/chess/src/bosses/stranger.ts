@@ -555,7 +555,10 @@ export const STRANGER: BossRules = {
   id: "stranger",
   // (The trigger waits for his move: each storm turn's pick comes with it.)
   triggerAtHisTurn: true,
-  ultimateMax: BOSS_POWERS.stranger.stormMax,
+  // At most stormMax storms a battle (Eric, Nov 27: "up to 2 times a game"): after the last his meter stays empty, shown dimmed.
+  get ultimateMax() {
+    return Math.round(BOSS_POWERS.stranger.stormMax);
+  },
   spentMeterShown: true,
   // (A strike left from another turn, past its burn: gone. Only afterCrowdMove burns. A pick for a turn gone by: gone.)
   wearOff(next, t) {
@@ -588,8 +591,8 @@ export const STRANGER: BossRules = {
     }
     return t.turn > next.warnAt && ready && !busy ? land() : false;
   },
-  // While its turns run, the meter stays empty.
-  ultimateRunning: (p, turn, s) => stormOn(p.stranger, turn, s.stranger),
+  // While its turns run, the meter stays empty; after his last, for the rest of the battle (none come).
+  ultimateRunning: (p, turn, s) => (p.ults ?? 0) >= Math.round(s.stranger.stormMax) || stormOn(p.stranger, turn, s.stranger),
   // Each storm turn as it begins: its pick (made with his move before it; none, or the wrong kind: calm), its frozen pieces still there.
   everyTurn(next, t) {
     const st = next.stranger;

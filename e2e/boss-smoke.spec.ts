@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOSS_ROSTER, adminFirst, isPlayable, type PowerEventKind, type PowerId } from "@chessroyale/core";
+import { BOSS_ROSTER, adminFirst, isPlayable, unlockReady, type PowerEventKind, type PowerId } from "@chessroyale/core";
 import { asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
 
 /**
@@ -37,9 +37,8 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
 
 // (A boss in the game for admins first, Timber and Dash, is checked too: the test plays as an admin.)
 // (Admins-first bosses too, but not an admin-only one: the Hidden Boss joined admins first for his town building, Nov 13; e2e/recluse.spec.ts covers him.)
-/** A boss's ultimate (for the one still to come). */
-const powersOf = (b: (typeof BOSS_ROSTER)[number]) => b.powers?.ultimate ?? null;
-const PLAYABLE = BOSS_ROSTER.filter((b) => (adminFirst(b) && !b.adminOnly) || isPlayable(b));
+// (And a boss unlocked by a win, the Stranger: `?boss=` meets him as his won floor would.)
+const PLAYABLE = BOSS_ROSTER.filter((b) => (adminFirst(b) && !b.adminOnly) || isPlayable(b) || unlockReady(b));
 /**
  * A boss whose ultimate needs a position the usual start doesn't give: his own test switch's start instead of his
  * passive's. Smudgy's Repaint can't come while the crowd has all eight pawns (a ninth is a position the engine refuses),
@@ -100,9 +99,6 @@ async function playOne(page: Page, done: Set<string>, first: string[] = []): Pro
 PLAYABLE.forEach((def, i) => {
   test(`${def.name} (${def.id}): his tile, a battle, his passive and his ultimate, no page errors`, async ({ page }) => {
     test.skip(desktop() && i > 0, "the computer runs the first boss only");
-    // (The Stranger, Nov 27: admins first while his ultimate is a placeholder that never fires, `strangerult`; his card and Frostfire are
-    // stranger.spec.ts's. Eric's ultimate takes this line out and gives him the smoke as every boss.)
-    test.skip(powersOf(def) === "strangerult", "his ultimate is still to come (Eric's)");
     test.setTimeout(90_000);
     const powers = def.powers!;
     const passive = PASSIVE_EVENTS[powers.passive];

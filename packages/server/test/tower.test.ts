@@ -417,7 +417,7 @@ describe("the Stranger's unlock (Eric, Nov 27: \"you have to beat him to unlock 
     expect(await towerUnlocks(sql, ann.id)).toEqual(["stranger"]);
   });
 
-  it("beaten on a later floor of his (30) after a life spent on 10: unlocked; his floor dealt to others (a player's climb while he's admins first) and won: nothing", async () => {
+  it("beaten on a later floor of his (30) after a life spent on 10: unlocked; his floor dealt to others (while he rests, his kill switch) and won: nothing", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     const bo = await signedIn(sql, "bo@example.com");
@@ -428,8 +428,9 @@ describe("the Stranger's unlock (Eric, Nov 27: \"you have to beat him to unlock 
     const thirty = await play(sql, ann.id, "won", T0);
     expect([thirty.floor, thirty.bosses]).toEqual([30, ["stranger"]]);
     expect(await towerUnlocks(sql, ann.id)).toEqual(["stranger"]);
-    // Bo climbs where he isn't there (a player's pool while he's admins first): his floor 10 deals others, and winning it unlocks nothing.
-    const ten = await play(sql, bo.id, "won", await toTen(sql, bo.id, T0, POOL), POOL);
+    // Bo climbs where he isn't there (a pool with him resting): his floor 10 deals others, and winning it unlocks nothing.
+    const resting = towerPool(["stranger"]);
+    const ten = await play(sql, bo.id, "won", await toTen(sql, bo.id, T0, resting), resting);
     expect(ten.floor).toBe(10);
     expect(ten.bosses).not.toContain("stranger");
     expect(await best(sql, bo.id)).toBe(10);
@@ -696,7 +697,7 @@ describe("the API", () => {
     expect(await quick("ann@example.com")).toMatchObject({ status: 409, body: { message: "That floor only just began." } });
   });
 
-  it("the Stranger while he's admins first (Nov 27): an admin's climb meets him on floor 10 and a win there unlocks him; a player's climb on the same server deals floor 10 as any other, and its win unlocks nothing", async () => {
+  it("the Stranger, live since his storm (Nov 27): every climb meets him on floor 10, an admin's and a player's alike, and a win there unlocks him", async () => {
     const { sql, d1 } = await world();
     const env = { ADMIN_EMAILS: "eric@example.com" };
     /** The floor under way won through the routes (its start set back past BATTLE_TOWER.soloWinMinSeconds: no wait). */
@@ -721,10 +722,9 @@ describe("the API", () => {
     expect(await win(eric.cookie, eric.uid)).toEqual({ floor: 10, bosses: ["stranger"] });
     expect((await call(d1, eric.cookie, "/api/tower", undefined, env)).body.unlocked).toEqual(["stranger"]);
     const ann = await toTen("ann@example.com");
-    expect(ann.ten.floor).toBe(10);
-    expect(ann.ten.bosses).not.toContain("stranger");
-    expect((await win(ann.cookie, ann.uid)).bosses).not.toContain("stranger");
-    expect((await call(d1, ann.cookie, "/api/tower", undefined, env)).body.unlocked).toEqual([]);
+    expect(ann.ten).toMatchObject({ floor: 10, bosses: ["stranger"] });
+    expect(await win(ann.cookie, ann.uid)).toEqual({ floor: 10, bosses: ["stranger"] });
+    expect((await call(d1, ann.cookie, "/api/tower", undefined, env)).body.unlocked).toEqual(["stranger"]);
   });
 
   it("a boss resting (its kill switch) is never dealt", async () => {
