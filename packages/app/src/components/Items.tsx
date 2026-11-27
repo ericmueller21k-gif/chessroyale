@@ -78,12 +78,17 @@ function Snowman({ p, side }: { p: Paint; side: "w" | "b" }) {
  * and its second color, which the item's seed gives (`secondColor`). Drawn upright here, tilted in its group.
  */
 export const TUBE = { x0: 78, x1: 86, top: 16, bottom: 100 };
-/** The tube's stripes, [white, first color, second color]: bands `BAND` tall that climb `RISE` across the tube. */
-export const TUBE_STRIPES = (() => {
-  const BAND = 4.6;
-  const RISE = 6;
+/** The stripes' heights: each band `BAND` tall climbs `RISE` across the tube; the three repeat every `TUBE_TWIST` (white, first, second). */
+const BAND = 4.6;
+const RISE = 6;
+export const TUBE_TWIST = 3 * BAND;
+/**
+ * One turn of the tube's stripes, [white, first color, second color], from 0 to `TUBE_TWIST` down (the bands cut at its top and
+ * bottom, Sutherland-Hodgman): the tube is this cell drawn again every `TUBE_TWIST` from just above its top (`TUBE_TILES`), so its
+ * stripes can scroll up it like a barber's pole (Eric, Nov 27) and loop without a seam.
+ */
+export const TUBE_CELL = (() => {
   const out: string[][] = [[], [], []];
-  /** One edge of a band, cut where it leaves the tube's top or bottom (Sutherland-Hodgman, two horizontal lines). */
   const cut = (poly: number[][], y: number, keepBelow: boolean) => {
     const inside = (q: number[]) => (keepBelow ? q[1]! >= y : q[1]! <= y);
     const res: number[][] = [];
@@ -94,19 +99,22 @@ export const TUBE_STRIPES = (() => {
     });
     return res;
   };
-  let k = 0;
-  for (let y = TUBE.top - BAND; y < TUBE.bottom + RISE; y += BAND, k++) {
+  // (Bands from two above the cell, whose low corners reach into it, to the last that starts in it; band j takes color j mod 3.)
+  for (let j = -2; j * BAND < TUBE_TWIST + RISE; j++) {
+    const y = j * BAND;
     const band = [
       [TUBE.x0, y],
       [TUBE.x1, y - RISE],
       [TUBE.x1, y - RISE + BAND],
       [TUBE.x0, y + BAND],
     ];
-    const poly = cut(cut(band, TUBE.top, true), TUBE.bottom, false);
-    if (poly.length >= 3) out[k % 3]!.push(`M${poly.map((q) => q.map((n) => +n.toFixed(2)).join(" ")).join(" L")} Z`);
+    const poly = cut(cut(band, 0, true), TUBE_TWIST, false);
+    if (poly.length >= 3) out[((j % 3) + 3) % 3]!.push(`M${poly.map((q) => q.map((n) => +n.toFixed(2)).join(" ")).join(" L")} Z`);
   }
   return out;
 })();
+/** Where each cell starts: from one band above the tube's top (white first, as it always was) to one turn past its bottom. */
+export const TUBE_TILES = Array.from({ length: Math.ceil((TUBE.bottom - TUBE.top + BAND + TUBE_TWIST) / TUBE_TWIST) }, (_, k) => +(TUBE.top - BAND + k * TUBE_TWIST).toFixed(2));
 /**
  * Item animations (Nov 25, built from the approved Nov 24 mockup; Eric: "anything that's a mythic needs to have some slight
  * animation to it ... not obnoxiously"). CSS only, on transforms and opacity (styles.css, the `ia-` classes): no frame loop,
@@ -131,9 +139,13 @@ const sparkle = (x: number, y: number, r: number) =>
 /**
  * The Gift-Wrap Tube (Nov 25, the mockup's v2; Eric: "I see the confetti coming out. Yeah, I like that more"): every 5.5 s a small
  * puff of confetti bursts from its tip, five bits in its two colors, white and gold, which tumble up and left and fade.
+ * The twist (Eric, Nov 27: "This item is supposed to twist animation like a barber shop pole"): its stripes scroll up it on a loop,
+ * one turn (`TUBE_TWIST`) every 1.5 s, wherever it's drawn (not only where it's the focus, like a shiny item's shine; never with
+ * reduced motion): one group of the stripes moves (`ia-twist`, a CSS transform), clipped to the tube; the outline and the confetti
+ * stay. Each cell is drawn with its own blemish and shine (the same in every cell, so the loop has no seam).
  */
 function GiftTube({ p, p2 }: { p: Paint; p2: Paint }) {
-  const [white, first, second] = TUBE_STRIPES;
+  const [white, first, second] = TUBE_CELL;
   // [how far it flies (x, y), how far it turns, its color]: up and to the left, so it stays on the pawn's square.
   const bits: [number, number, number, string][] = [
     [-13, -5, -160, p.hex],
@@ -142,14 +154,30 @@ function GiftTube({ p, p2 }: { p: Paint; p2: Paint }) {
     [-5, -14, 200, "#fbfbf8"],
     [-15, 3, -140, p2.hex],
   ];
+  // (A cell's own box, so its shine rolls across it as it did across the whole tube.)
+  const cell: [number, number, number, number] = [TUBE.x0, 0, TUBE.x1 - TUBE.x0, TUBE_TWIST];
+  const c1 = { ...p, box: cell };
+  const c2 = { ...p2, box: cell };
+  const tube = { x: TUBE.x0, y: TUBE.top, width: TUBE.x1 - TUBE.x0, height: TUBE.bottom - TUBE.top, rx: "1.2" };
   return (
     <g transform="rotate(16 82 58)">
-      {white!.map((d) => (
-        <path key={d} d={d} fill="#fbfbf8" />
-      ))}
-      <Region p={p} name="stripes" d={first!} outline={false} />
-      <Region p={p2} name="stripes2" d={second!} outline={false} />
-      <rect x={TUBE.x0} y={TUBE.top} width={TUBE.x1 - TUBE.x0} height={TUBE.bottom - TUBE.top} rx="1.2" fill="none" {...LINE} {...lw(2.4)} />
+      <clipPath id={`${p.id}-tube`}>
+        <rect {...tube} />
+      </clipPath>
+      <g clip-path={`url(#${p.id}-tube)`}>
+        <g class="ia-twist">
+          {TUBE_TILES.map((y, k) => (
+            <g key={y} transform={`translate(0 ${y})`}>
+              {white!.map((d) => (
+                <path key={d} d={d} fill="#fbfbf8" />
+              ))}
+              <Region p={c1} name={`stripes-${k}`} d={first!} outline={false} />
+              <Region p={c2} name={`stripes2-${k}`} d={second!} outline={false} />
+            </g>
+          ))}
+        </g>
+      </g>
+      <rect {...tube} fill="none" {...LINE} {...lw(2.4)} />
       {bits.map(([dx, dy, r, c], i) => (
         <Pivot key={i} x={82 + (i - 2) * 1.2} y={16.6} cls="ia-confetti" style={`--dx:${dx}px;--dy:${dy}px;--r:${r}deg`}>
           <rect x={80.4 + (i - 2) * 1.2} y={14.8} width="3.2" height="3.6" rx="0.5" fill={c} stroke="#1d1d1f" {...lw(0.7)} />
