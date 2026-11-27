@@ -2435,9 +2435,11 @@ export class LobbyCore {
     const better = sign * sa >= sign * sb ? ia : ib;
     const worse = better === ia ? ib : ia;
     const gap = Math.abs(sa - sb);
-    // (Not on a battle drawn looser than BOSS_BRAIN (a tower floor's first floors, drawLooser): throwLoss was set above an honest
-    // Maia's worst at BOSS_BRAIN's draw, and an older app draws that way, not the floor's. The better still plays; only the strike goes.)
-    const thrown = gap >= BOSS_CHECK.throwLoss && !drawLooser(this.r.bossBrain?.draw) ? worse : null;
+    // (Not on a battle drawn looser than BOSS_BRAIN (a tower floor's first floors, drawLooser) when a Maia answer is one of the two:
+    // throwLoss was set above an honest Maia's worst at BOSS_BRAIN's draw, and an older app draws that way, not the floor's. The better
+    // still plays; only the strike goes. Two fallbacks (no Maia) are struck as ever. Today an online floor is a party room, which has
+    // no checker (its host's move alone, unvouched), so this guards a checked floor for later: the second review of #991.)
+    const thrown = gap >= BOSS_CHECK.throwLoss && !(drawLooser(this.r.bossBrain?.draw) && (a.by || b.by)) ? worse : null;
     const maiaOf = !!a.by !== !!b.by ? (a.by ? ia : ib) : null;
     const pick = maiaOf && (maiaOf === better || gap <= BOSS_CHECK.maiaGap) ? maiaOf : better;
     console.log(`boss move in ${this.r.code}: the engine server's scores ${ia} ${sa.toFixed(3)}, ${ib} ${sb.toFixed(3)}: ${pick}'s plays${maiaOf ? " (Maia's against a fallback)" : ""}`);

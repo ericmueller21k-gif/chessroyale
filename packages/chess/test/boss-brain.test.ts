@@ -500,6 +500,8 @@ describe("never a gift on a Battle Tower floor (giftedMaterial, humanBrainMove's
       ["r6k/6pp/7N/8/2Q5/8/8/6K1 w - - 0 1", "c4g8", 0],
       // (The same queen onto g8 with no knight to mate: simply lost, a gift.)
       ["r6k/6pp/8/8/2Q5/8/8/6K1 w - - 0 1", "c4g8", 9],
+      // (Only when every capture lets the mate in: Nxc4 allows Re8#, Rxc4 just wins the queen (the second review of #991).)
+      ["6k1/5ppp/3n4/8/r7/8/2Q2PPP/4R1K1 w - - 0 1", "c2c4", 9],
     ];
     for (const [fen, move, lost] of cases) expect([fen, move, giftedMaterial(fen, move)]).toEqual([fen, move, lost]);
     expect(isGift("4k3/8/8/4p3/8/8/8/3QK3 w - - 0 1", "d1d4")).toBe(true);

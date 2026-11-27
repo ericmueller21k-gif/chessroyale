@@ -8,4 +8,4 @@
   rook move that's simply lost (3+ pawns, a chess.js static exchange, no engine) is drawn again (`giftPieces`, `giftLoss`). Rooks
   too: a rook for nothing reads as a gift. The plan carries the draw, so solo and online agree. The climb from 10 is unchanged: the
   sim doesn't show floors 10 to 30 too easy (reports/tower-sim.md). The gift check is `maia-raw`'s only (an admin's guarded brain
-  is already guarded). Online, a looser draw gets no throw strike (`drawLooser`, the director's call); the better move still plays.
+  is already guarded). Online, a looser draw gets no throw strike when a Maia answer is one of two (`drawLooser`, the director's call); the better move still plays. Today an online floor is a party room, which has no checker: its host's move alone, unvouched, as any party's battle; the skip guards a checked floor for later.

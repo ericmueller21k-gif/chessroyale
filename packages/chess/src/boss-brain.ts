@@ -32,20 +32,25 @@ function cheapestTake(c: Chess, sq: Square): Move | null {
   return takes.length ? takes.reduce((a, b) => (WORTH[b.piece]! < WORTH[a.piece]! ? b : a)) : null;
 }
 
-/** After the other side's cheapest capture on `sq`, the mover has a mate in one (a sacrifice that mates: chess.js's "#"). */
+/**
+ * After every legal capture on `sq` by the other side, the mover has a mate in one (a sacrifice that mates: chess.js's "#"). Every one,
+ * not only the cheapest (the second review of #991: Nxc4 allows Re8# but Rxc4 just wins the queen, a gift all the same).
+ */
 function matesAfterTake(c: Chess, sq: Square): boolean {
-  const take = cheapestTake(c, sq);
-  if (!take) return false;
-  c.move(take);
-  const mate = c.moves().some((san) => san.endsWith("#"));
-  c.undo();
-  return mate;
+  const takes = c.moves({ verbose: true }).filter((m: Move) => m.to === sq && (!m.promotion || m.promotion === "q"));
+  if (!takes.length) return false;
+  return takes.every((take) => {
+    c.move(take);
+    const mate = c.moves().some((san) => san.endsWith("#"));
+    c.undo();
+    return mate;
+  });
 }
 
 /**
  * How much a move gives away with the piece it moves (BATTLE_TOWER's gift check, no engine): when it moves one of `pieces` (a queen or
  * rook), what the other side wins taking it on its new square (exchangeOn), less what the move itself took; 0 for any other piece, a
- * mate, a sacrifice that mates (a mate in one after the cheapest capture on its square: matesAfterTake), or a position chess.js can't
+ * mate, a sacrifice that mates (a mate in one after every capture on its square: matesAfterTake), or a position chess.js can't
  * read. A piece left hanging elsewhere isn't counted (a missed threat is allowed).
  */
 export function giftedMaterial(fen: string, move: string, pieces: readonly string[] = BATTLE_TOWER.giftPieces): number {
