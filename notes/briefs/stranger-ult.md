@@ -59,3 +59,6 @@ restore the board and kind of return to the actual way the game looked, and the 
   ends up being way too quick if it's shorter than that."), the same timing solo and online (a moment the runner holds, as other bosses' ults), phone frame rate checked with
   real taps, every frame whole on screen. Reuse: his `draw`/`strike`/`castFull` poses and aura, the board-crack/ripple as one
   overlay effect; simple beats flashy.
+
+**Eric, Nov 27 ~07:35: "send me a gif of his ult when it finishes".** Stills must include one GIF of the whole ult on a phone (390x844):
+the opening scene from his leap to his return, then a Fire turn and an Ice turn (marks and freezes shown, a burn landing). Real speed.
