@@ -2610,7 +2610,7 @@ function startTown(
     if (kind === "square") return testSwitchesAllowed() && Array.isArray(id) && r.squareAt(id[0]!, id[1]!, out) ? out : null;
     // (Round 4: where a tap on the square reaches it, clear of whatever stands over its middle on screen.)
     if (kind === "tap-square") return testSwitchesAllowed() && Array.isArray(id) && r.tapSquareAt(id[0]!, id[1]!, out) ? out : null;
-    if (kind === "player") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.uid === id), out) ? out : null;
+    if (kind === "player") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.uid === id && !p.home), out) ? out : null;
     if (kind === "bot") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.bot === TOWN_BOTS[Number(id)]), out) ? out : null;
     if (kind === "table") return testSwitchesAllowed() && r.tapPoint("table", Number(id), out) ? out : null;
     if (kind === "lamp") return testSwitchesAllowed() && r.lampAt(Number(id), out) ? out : null;
