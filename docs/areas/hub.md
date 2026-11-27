@@ -39,7 +39,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 - **The first-time walkthrough** (`components/Walkthrough.tsx`, slides in `tutorial.ts`): 13 slides; each lights every visible
   `data-tour` element (a computer's side menu and home button both; PLAY's slide only PLAY since the side menu's Play became Home, Nov 22). Only the last slide has OK and "Don't show me this again";
-  `?tour=1` reopens it. Decision: [2026-11-07-walkthrough-v2.md](../decisions/2026-11-07-walkthrough-v2.md).
+  `?tour=1` reopens it. Its last slide's crates: "Level 5" and "25 games", a guest's both "Sign in". While it's open, the Welcome Crate's
+  notice waits under it (`onOpenChange`, Nov 27). Decision: [2026-11-07-walkthrough-v2.md](../decisions/2026-11-07-walkthrough-v2.md).
 
 - **Kill switches and the maintenance banner** ([ops.md](ops.md) "Kill switches"): a mode, Solo and Boss alone, or
   Squads resting disables its way in on the home screen with its line ("Squads is resting for a bit. Back soon.": under
