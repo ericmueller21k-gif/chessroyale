@@ -34,3 +34,9 @@ you are on floor whatever, and then it actually does a full reload onto that thi
   clerk), never via the plaza and never twice. Prove: a test that the town/tower loads once; a memory number before/after on a slowed
   phone profile (heap and decoded images) across battle → tower → walk, twice in a row.
 Effort high. The ranked tables job is paused for this.
+
+**Eric, ~22:50:** both times he'd left mid-battle (app switch; then a full browser close). The cold load resumed straight into the
+battle (good). He finished, "Back to Battle Tower" showed the tower, and on his FIRST tap to walk the game reloaded. Suspect: a page that
+cold-loaded into a battle never set the town up, and the return is a shortcut assuming it. Eric's call (and the director's): "Back to
+Battle Tower" is a clean, verified entry (tear down, load the tower fresh like a cold load into it, show it when ready; a real page
+navigation if that's simplest), plus fix the first-tap reload's cause. e2e: that exact sequence.
