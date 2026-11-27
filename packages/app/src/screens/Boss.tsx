@@ -431,7 +431,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // Chandy's queen lock: the piece his round hits on its square until the round reaches it.
   // (The Stranger's finisher, while he thinks: his move on the board from the moment it kills your piece, until his move shows.)
   const fenChandy = chandyFen(own("chandy"), moments, now, fenBurnt);
-  const stranger = strangerBoard(own("stranger"), moments, now, fenChandy);
+  const stranger = strangerBoard(own("stranger"), moments, now, fenChandy, orientation);
   const fenShown = stranger?.fen ?? fenChandy;
   const lastShown = funMove?.move ? (funPlayed ? funMove.move : null) : introLast;
   // The Big Bounce: the board before it, less the pieces up in the air, then the new position as they come down; the

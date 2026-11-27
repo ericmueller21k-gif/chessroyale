@@ -246,7 +246,7 @@ describe("his ultimate, the Storm of Two Worlds (Eric, Nov 27; docs/decisions/20
   it("an ice turn whose picks all fail the check: the milder one, the pieces of your top three moves free", () => {
     const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     const top = scored(fen, [["g1f3", 0.56], ["e2e4", 0.55], ["d2d4", 0.55]], 0.48);
-    const a = icePick(fen, top, 3, { ...S, fairPawns: -1 });
+    const a = icePick(fen, top, 3, { ...S, fairPawns: -1 } as unknown as typeof S);
     expect(a.mild).toBe(true);
     expect([...a.squares].sort()).toEqual(["d2", "e2", "g1"]);
     expect(stormCheck(fen, "ice", stormCode(a))).toMatchObject({ mild: true, free: ["d2", "e2", "g1"] });

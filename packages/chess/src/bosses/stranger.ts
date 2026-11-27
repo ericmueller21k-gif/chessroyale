@@ -41,7 +41,7 @@ type StrangerSettings = BossPowerSettings["stranger"];
  * both hilts at `gripAt` (his red and blue aura, the charge building), the full swirl at `fullAt`; the swords out at `pullAt`; off the
  * board at `leapAt`, home at `homeAt`; the cracks heal and the pieces slide back over `healAt` to `healAt + healMs`; the end, `ms`.
  */
-export const STORM_SCENE = { upAt: 120, landAt: 760, nudgeAt: 620, nudgeMs: 260, drawnAt: 1500, fireAt: 1900, iceAt: 2800, gripAt: 5400, fullAt: 8200, pullAt: 8800, leapAt: 9300, homeAt: 9940, healAt: 9800, healMs: 700, ms: 11000 } as const;
+export const STORM_SCENE = { upAt: 90, landAt: 480, nudgeAt: 400, nudgeMs: 240, drawnAt: 1240, fireAt: 1900, iceAt: 2700, gripAt: 5000, fullAt: 8000, pullAt: 8600, leapAt: 9200, homeAt: 9680, healAt: 9700, healMs: 800, ms: 11000 } as const;
 
 /**
  * How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts): the strike (his banner, the swords' tips together,
@@ -86,10 +86,11 @@ export function hisLoss(board: { fen: string; history: readonly string[]; bases?
 
 /**
  * How long his thinking lasts at least for his block (ms; the server's thinkMinAt and solo's bossTurn add it, as each boss's turn moments):
- * FINISHER_BLOCK_MS when a piece of his that isn't a pawn was just lost (hisLoss 3 or more), else 0.
+ * FINISHER_BLOCK_MS when a piece of his that isn't a pawn was just lost (hisLoss 3 or more); a storm's fire turn's burn as the crowd's
+ * move landed, at least its moment (STRANGER_FX.stormBurn); else 0.
  */
-export const strangerTurnMs = (boss: { id?: string; crowdSide: Side; board: { fen: string; history: readonly string[]; bases?: readonly Base[] | null } } | null | undefined): number =>
-  boss?.id === "stranger" && hisLoss(boss.board, boss.crowdSide) >= 3 ? FINISHER_BLOCK_MS : 0;
+export const strangerTurnMs = (boss: { id?: string; crowdSide: Side; board: { fen: string; history: readonly string[]; bases?: readonly Base[] | null }; powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): number =>
+  boss?.id !== "stranger" ? 0 : Math.max(hisLoss(boss.board, boss.crowdSide) >= 3 ? FINISHER_BLOCK_MS : 0, boss.powers?.events?.some((e) => e.kind === "stormBurn") ? STRANGER_FX.stormBurn : 0);
 
 const finisherTest = (test: string): { on: boolean; kind: number } => ({ on: test === "finisher" || test.startsWith("finisher-"), kind: test.startsWith("finisher-") ? FINISHERS.indexOf(test.slice(9) as Finisher) : -1 });
 export const finisherOf = (pick: number | undefined): Finisher => FINISHERS[(((pick ?? 0) % FINISHERS.length) + FINISHERS.length) % FINISHERS.length]!;

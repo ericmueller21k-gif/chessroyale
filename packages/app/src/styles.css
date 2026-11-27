@@ -29633,3 +29633,82 @@ piece.bd-smashed {
     opacity: 0;
   }
 }
+
+/* ---------------- The Stranger's Storm of Two Worlds (components/Stranger.tsx) ---------------- */
+
+/* The storm's ring: one small canvas, scaled up as pixel art, the board and RING.margin (12%) past it each side, over the pieces (its band
+   reaches onto the edge squares a little), never taking a tap. Cut only by the screen's own edges. */
+.power-board .sg-storm {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * -0.12);
+  top: calc(var(--board-size, 100%) * -0.12);
+  width: calc(var(--board-size, 100%) * 1.24);
+  height: calc(var(--board-size, 100%) * 1.24);
+  image-rendering: pixelated;
+  pointer-events: none;
+  z-index: 3;
+}
+/* The board's cracks and the swords' ripples, in % of the board (the SVG's units), under his figure and the nudged pieces. */
+.sg-cracks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  z-index: 2;
+}
+.sg-crack {
+  fill: none;
+  stroke: #120b14;
+  stroke-width: 0.55;
+  stroke-linejoin: bevel;
+}
+.sg-glow {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linejoin: bevel;
+  opacity: 0.85;
+}
+.sg-glow.sg-fire {
+  stroke: #ff6a1e;
+}
+.sg-glow.sg-ice {
+  stroke: #5fd3ff;
+}
+.sg-ripple {
+  fill: none;
+  stroke-width: 0.9;
+}
+.sg-ripple.sg-fire {
+  stroke: #ff7a2a;
+}
+.sg-ripple.sg-ice {
+  stroke: #7fdcff;
+}
+/* His red and blue aura as he charges, his grip on both hilts (a glow by turns, on his own small box). */
+.sg-fig.sg-charge {
+  animation: sg-charge 0.36s steps(2, jump-none) infinite;
+}
+@keyframes sg-charge {
+  from {
+    filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3)) drop-shadow(-1.2cqw 0 1.6cqw rgba(255, 90, 30, 0.85));
+  }
+  to {
+    filter: drop-shadow(0 0.8cqw 0 rgba(0, 0, 0, 0.3)) drop-shadow(1.2cqw 0 1.6cqw rgba(95, 211, 255, 0.85));
+  }
+}
+/* His banner, fire into ice. */
+.fight-banner.power-cut.storm .fb-band {
+  background: linear-gradient(90deg, #1a0700, #9a3412 24%, #3b1d4f 50%, #0c4a6e 76%, #04121c);
+  border-color: #e9d5ff;
+  box-shadow: 0 0 0 3px #0b0b1a, -14px 0 26px rgba(251, 146, 60, 0.55), 14px 0 26px rgba(125, 211, 252, 0.55), 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.fight-banner.power-cut.storm .kc-label {
+  color: #f3e8ff;
+}
+.fight-banner.power-cut.storm .kc-text {
+  text-shadow:
+    5px 5px 0 #0b0b1a,
+    -6px 0 var(--fb-glow, 24px) rgba(253, 186, 116, 0.9),
+    6px 0 var(--fb-glow, 24px) rgba(186, 230, 253, 0.9);
+}

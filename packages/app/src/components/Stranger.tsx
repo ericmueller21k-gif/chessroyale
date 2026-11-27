@@ -1,8 +1,9 @@
-import { STRANGER_FX, applyMove, finisherOf, pieceAt, type Finisher } from "@chessroyale/chess";
+import { STORM_SCENE, STRANGER_FX, applyMove, finisherOf, pieceAt, stormOn, type Finisher } from "@chessroyale/chess";
+import { useLayoutEffect, useRef } from "preact/hooks";
 import { EFFECTS, animLength, cueAt } from "../characters/power-art.ts";
 import { STRANGER, STRANGER_HOP } from "../characters/stranger.ts";
 import type { BossView } from "../game.ts";
-import { BoardEffects, BossMoment, SpriteAnim, prewarm, type BoardItem } from "./BossEffect.tsx";
+import { BoardEffects, BossMoment, SpriteAnim, onEachFrame, prewarm, type BoardItem } from "./BossEffect.tsx";
 import { FREEZE } from "./Ginger.tsx";
 import { BURN, FireBurn } from "./Grex.tsx";
 import { squareXY } from "./GodKing.tsx";
@@ -247,14 +248,28 @@ export function strangerTurnMoments(boss: BossView, now = Date.now()): Moment[] 
  * piece) his move on it (the moment's `move`), his piece sliding onto the square as any move slides, the move marked; until then the
  * board as it is, held still. When his held move shows, the board already matches it, so nothing moves twice. Null: no finisher now.
  */
-export function strangerBoard(boss: Pick<BossView, "id">, moments: readonly Moment[], now: number, fen: string): { fen: string; still: boolean; lastMove?: string } | null {
+export function strangerBoard(boss: Pick<BossView, "id">, moments: readonly Moment[], now: number, fen: string, orientation: Orientation = "white"): { fen: string; still: boolean; lastMove?: string } | null {
   if (boss.id !== "stranger") return null;
+  // (His storm's scene: the pieces his landing nudges aside are drawn by the scene from their nudge to their way back; the board draws
+  // the rest, held still, so nothing moves twice. As the scene ends they're on their squares, and the board draws them again.)
+  const scene = moments.find((x) => x.kind === "storm");
+  if (scene && now >= scene.at + STORM_SCENE.nudgeAt && now < scene.at + STORM_SCENE.healAt + STORM_SCENE.healMs) return { fen: withoutSquares(fen, nudged(fen, orientation).map((n) => n.square)), still: true };
   const m = moments.find((x) => x.kind === "finisher");
   if (!m?.square) return null;
   if (now < m.at + finishTimeline(finisherOf(m.pick)).goneAt) return { fen, still: true };
   const after = m.move ? played(fen, m.move) : null;
   return after ? { fen: after, still: false, lastMove: m.move } : { fen, still: true };
 }
+/** `fen`'s placement with `squares` emptied (a drawing only: never played, nor read by chess.js). */
+function withoutSquares(fen: string, squares: readonly string[]): string {
+  if (!squares.length) return fen;
+  const [place, ...rest] = fen.split(" ");
+  const rows = place!.split("/").map((row) => [...row].flatMap((ch) => (/\d/.test(ch) ? Array<string>(Number(ch)).fill("1") : [ch])));
+  for (const sq of squares) rows[8 - Number(sq[1])]![sq.charCodeAt(0) - 97] = "1";
+  const packed = rows.map((r) => r.join("").replace(/1+/g, (ones) => String(ones.length))).join("/");
+  return [packed, ...rest].join(" ");
+}
+
 /** `fen` with `move` played, or null when it can't be (a stale event); the last one kept, as the board draws it every frame. */
 let last: { fen: string; move: string; after: string | null } | null = null;
 function played(fen: string, move: string): string | null {
@@ -269,26 +284,319 @@ function played(fen: string, move: string): string | null {
   return after;
 }
 
+// ---------------- His storm (Eric, Nov 27: the Storm of Two Worlds) ----------------
+
+/** A number from a particle's index and a salt, in [0, 1) (the same every frame: the ring is drawn from the clock alone). */
+const hash = (i: number, k: number): number => {
+  let h = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(k + 7, 0x85ebca6b);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d);
+  h ^= h >>> 12;
+  return (h >>> 0) / 4294967296;
+};
+const ease = (u: number) => 1 - (1 - clamp01(u)) ** 2;
+const lerp = (a: number, b: number, u: number) => a + (b - a) * clamp01(u);
+
+/** The ring's canvas: its pixels (pixel art, scaled up), and how far past the board it reaches each side (a share of the board). */
+export const RING = { px: 168, margin: 0.12, swirl: 140, chaos: 70 } as const;
+const FIRE = ["#6b1606", "#c2380f", "#ff6a1e", "#ffb040", "#fff0a0"];
+const ICE = ["#14305e", "#2a78c8", "#5fd3ff", "#b8f0ff", "#ffffff"];
+
+/**
+ * How strong the storm is at `now` (`u`: how many of its particles, how wide its band; `chaos`: the charge's wild layer and wobble): during
+ * its opening scene (`scene`: the moment's start, its own clock) it gathers from the fire sword's slam, builds from his grip to the full
+ * swirl, and eases back as he leaves; through its turns, steady.
+ */
+export function stormLevel(scene: number | null, now: number): { u: number; chaos: number } {
+  if (scene === null) return { u: 0.72, chaos: 0 };
+  const t = now - scene;
+  const S = STORM_SCENE;
+  const u = t < S.fireAt ? 0 : t < S.gripAt ? lerp(0.05, 0.45, (t - S.fireAt) / (S.gripAt - S.fireAt)) : t < S.fullAt ? lerp(0.45, 1, (t - S.gripAt) / (S.fullAt - S.gripAt)) : t < S.pullAt ? 1 : lerp(1, 0.72, (t - S.pullAt) / (S.homeAt - S.pullAt));
+  const chaos = t < S.gripAt ? 0 : t < S.fullAt ? ease((t - S.gripAt) / (S.fullAt - S.gripAt)) : t < S.pullAt ? 1 : 1 - ease((t - S.pullAt) / (S.leapAt - S.pullAt));
+  return { u, chaos };
+}
+
+/** One frame of the ring: fire swirling one way round the board, ice the other, a rounded square's band from its edge squares outward. */
+function paintRing(g: CanvasRenderingContext2D, now: number, level: { u: number; chaos: number }): void {
+  const W = RING.px;
+  g.clearRect(0, 0, W, W);
+  if (level.u <= 0) return;
+  const S = W / (1 + 2 * RING.margin);
+  const c = W / 2;
+  const sec = now / 1000;
+  const dot = (i: number, k: number, fast: boolean) => {
+    const fire = i % 2 === 0;
+    const pal = fire ? FIRE : ICE;
+    const dir = fire ? 1 : -1;
+    const w = (fast ? 1.5 + 0.6 * hash(i, 1) : 0.45 + 0.35 * hash(i, 1)) * dir;
+    const th = hash(i, 2) * Math.PI * 2 + w * sec - w * 0.045 * k;
+    const band = (-0.05 + 0.2 * hash(i, 3)) * (0.55 + 0.45 * level.u) + level.chaos * 0.035 * Math.sin(sec * (3 + 5 * hash(i, 4)) + 6.28 * hash(i, 5));
+    const cs = Math.cos(th);
+    const sn = Math.sin(th);
+    const r = 0.5 / (cs ** 4 + sn ** 4) ** 0.25 + band;
+    const x = Math.round(c + cs * r * S);
+    const y = Math.round(c + sn * r * S);
+    const lit = Math.min(4, Math.max(0, Math.floor(hash(i, 6) * 3 + 2 * Math.sin(sec * 7 + i) ** 2 - k)));
+    g.globalAlpha = (band < 0 ? 0.7 : 1) * (k ? 0.6 / k : 1);
+    g.fillStyle = pal[lit]!;
+    const size = k === 0 && hash(i, 7) > 0.7 ? 2 : 1;
+    g.fillRect(x, y, size, size);
+  };
+  for (let i = 0; i < RING.swirl; i++) if (hash(i, 8) < level.u) for (let k = 2; k >= 0; k--) dot(i, k, false);
+  for (let i = 0; i < RING.chaos; i++) if (hash(i + 1000, 8) < level.chaos) for (let k = 2; k >= 0; k--) dot(i + 1000, k, true);
+  g.globalAlpha = 1;
+}
+
+/**
+ * The storm's ring round the board (Eric: "he shrouds around the board ... this fire and ice storm around the board, and it even can kind
+ * of move onto the board a little bit. It's like a circle kind of formation"): one small canvas, scaled up as pixel art, drawn every frame
+ * from the clock alone on the shared frame loop (a screen drawn again carries on where it was; nothing kept). `scene`: its opening
+ * scene's start (it gathers through it), or null (steady).
+ */
+function StormRing({ scene }: { scene: number | null }) {
+  const cv = useRef<HTMLCanvasElement>(null);
+  const at = useRef(scene);
+  at.current = scene;
+  useLayoutEffect(() => {
+    const g = cv.current?.getContext("2d");
+    if (!g) return;
+    const draw = () => paintRing(g, Date.now(), stormLevel(at.current, Date.now()));
+    draw();
+    return onEachFrame(draw);
+  }, []);
+  return <canvas ref={cv} class="sg-storm" width={RING.px} height={RING.px} aria-hidden="true" data-storm={scene === null ? "on" : "scene"} />;
+}
+
+/** Where he stands for the storm's scene (% of the board): his feet a little below its middle, his head on it. */
+const STORM_STAND: Pt = { x: 50, y: 56 };
+/** His swords' points in the board as they go in (% of the board): either side of his feet, at the ground line. */
+const swordPoints = (): { fire: Pt; ice: Pt } => {
+  const dx = (FIG_W * 12) / STRANGER.w;
+  return { fire: { x: STORM_STAND.x - dx, y: STORM_STAND.y }, ice: { x: STORM_STAND.x + dx, y: STORM_STAND.y } };
+};
+
+/** The cracks from one sword's point (% of the board), from the seed of its side: a few jagged branches, each a list of points. */
+function cracksFrom(p: Pt, salt: number): Pt[][] {
+  const out: Pt[][] = [];
+  for (let b = 0; b < 6; b++) {
+    let a = (b / 6) * Math.PI * 2 + hash(b, salt) * 0.9;
+    let at = { ...p };
+    const pts = [at];
+    const n = 4 + Math.floor(hash(b, salt + 1) * 3);
+    for (let k = 0; k < n; k++) {
+      a += (hash(b * 10 + k, salt + 2) - 0.5) * 1.1;
+      const len = 2.2 + hash(b * 10 + k, salt + 3) * 2.6;
+      at = { x: r2(at.x + Math.cos(a) * len), y: r2(at.y + Math.sin(a) * len * 0.8) };
+      pts.push(at);
+    }
+    out.push(pts);
+  }
+  return out;
+}
+const CRACKS = { fire: cracksFrom(swordPoints().fire, 11), ice: cracksFrom(swordPoints().ice, 23) };
+
+/** The board's cracks and the swords' ripples (one SVG in % of the board): each crack opening from its sword's slam, healing at the end. */
+function Cracks({ t }: { t: number }) {
+  const S = STORM_SCENE;
+  const heal = t < S.healAt ? 1 : 1 - clamp01((t - S.healAt) / S.healMs);
+  const pts = swordPoints();
+  const charge = t >= S.gripAt && t < S.pullAt;
+  const period = charge ? lerp(700, 280, (t - S.gripAt) / (S.fullAt - S.gripAt)) : 700;
+  const rings = (from: number, at: Pt, cls: string) => {
+    if (t < from || t >= S.pullAt + 400) return [];
+    return [0, 1, 2].flatMap((k) => {
+      const age = (t - from - k * (period / 3)) % period;
+      if (age < 0 || t - from < k * (period / 3)) return [];
+      const u = age / period;
+      return [<circle key={`${cls}${k}`} class={cls} cx={at.x} cy={at.y} r={r2(2 + u * 30)} style={{ opacity: String(r2((1 - u) * 0.8)) }} />];
+    });
+  };
+  const line = (side: "fire" | "ice", from: number) => {
+    const open = clamp01((t - from) / 260);
+    if (open <= 0 || heal <= 0) return null;
+    return CRACKS[side].map((b, i) => {
+      const shown = b.slice(0, Math.max(2, Math.ceil(b.length * open)));
+      const d = shown.map((q) => `${q.x},${q.y}`).join(" ");
+      return (
+        <g key={`${side}${i}`} style={{ opacity: String(r2(heal)) }}>
+          <polyline class={`sg-glow sg-${side}`} points={d} />
+          <polyline class="sg-crack" points={d} />
+        </g>
+      );
+    });
+  };
+  return (
+    <svg class="sg-cracks" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      {line("fire", S.fireAt)}
+      {line("ice", S.iceAt)}
+      {rings(S.fireAt, pts.fire, "sg-ripple sg-fire")}
+      {rings(S.iceAt, pts.ice, "sg-ripple sg-ice")}
+    </svg>
+  );
+}
+
+/** The pieces his landing nudges aside (drawn only: the position never changes): those near where he lands, and how far each goes. */
+export function nudged(fen: string, o: Orientation): { square: string; code: string; dx: number; dy: number }[] {
+  const out: { square: string; code: string; dx: number; dy: number }[] = [];
+  for (const f of "cdef")
+    for (const r of [3, 4, 5, 6]) {
+      const square = `${f}${r}`;
+      const pc = pieceAt(fen, square);
+      if (!pc) continue;
+      const c = centreOf(square, o);
+      const vx = c.x - STORM_STAND.x;
+      const vy = c.y - (STORM_STAND.y - 6);
+      const d = Math.max(1, Math.hypot(vx, vy));
+      const push = Math.max(0, (24 - d) / 24) * 6.5;
+      if (push < 0.5) continue;
+      out.push({ square, code: `${COLOR[pc.color as "w" | "b"]} ${PIECE_WORD[pc.type] ?? "pawn"}`, dx: r2((vx / d) * push), dy: r2((vy / d) * push) });
+    }
+  return out;
+}
+/** How far the nudged pieces are out at `t` (0 on their squares, 1 all the way): out as he lands, back as the board heals. */
+const nudgeAt = (t: number): number => {
+  const S = STORM_SCENE;
+  if (t < S.nudgeAt) return 0;
+  if (t < S.healAt) return ease((t - S.nudgeAt) / S.nudgeMs);
+  return 1 - ease((t - S.healAt) / S.healMs);
+};
+
+/**
+ * The storm's opening scene (STORM_SCENE): his leap from his place to the board's middle, the pieces there nudged aside; his swords out,
+ * the fire sword then the ice sword slammed in, the board cracking round each and rippling its color as the storm gathers round the
+ * board (the ring, drawn by the board layer); his grip on both hilts, his red and blue aura, the charge building to the full swirl; then
+ * the swords pulled out, his leap back, the cracks healing and the pieces sliding back to their squares.
+ */
+function stormMoment({ boss, moment, t, orientation }: MomentProps) {
+  const S = STORM_SCENE;
+  const computer = onComputer();
+  const CORNER = cornerOf(computer);
+  const flight = STRANGER_HOP.landAt - STRANGER_HOP.upAt;
+  const rise = hopHeight(CORNER, STORM_STAND, computer);
+  const hop = (a: Pt, b: Pt, from: number): Pt => (t < from + STRANGER_HOP.upAt ? a : arc(a, b, rise, clamp01((t - from - STRANGER_HOP.upAt) / flight)));
+  const going = t >= S.leapAt;
+  const feet = going ? hop(STORM_STAND, CORNER, S.leapAt) : hop(CORNER, STORM_STAND, 0);
+  const anim = going ? { anim: "hop", since: S.leapAt } : t < STRANGER_HOP.ms ? { anim: "hop", since: 0 } : t < S.gripAt ? { anim: "stormPlant", since: STRANGER_HOP.ms } : t < S.pullAt ? { anim: "stormCharge", since: S.gripAt } : { anim: "stormPull", since: S.pullAt };
+  const h = (FIG_W * STRANGER.h) / STRANGER.w;
+  const airborne = (t >= STRANGER_HOP.upAt && t < STRANGER_HOP.landAt) || (t >= S.leapAt + STRANGER_HOP.upAt && t < S.leapAt + STRANGER_HOP.landAt);
+  const out = nudgeAt(t);
+  const stage = t < S.landAt ? "leap" : t < S.fireAt ? "draw" : t < S.gripAt ? "swords" : t < S.pullAt ? "charge" : t < S.leapAt ? "pull" : t < S.homeAt ? "back" : "heal";
+  return (
+    <div class="power-moment pm-storm" data-stage={stage}>
+      <div class="hb-pieces pg-layer" aria-hidden="true">
+        <Cracks t={t} />
+        {nudged(boss.board.fen, orientation).map((n) => {
+          const c = centreOf(n.square, orientation);
+          return <piece key={n.square} class={`pg-piece sg-nudge ${n.code}`} data-square={n.square} style={{ left: `${r2(c.x - 6.25 + n.dx * out)}%`, top: `${r2(c.y - 6.25 + n.dy * out)}%` }} />;
+        })}
+        {airborne && <span class="pg-shadow" style={{ left: `${r2(going ? CORNER.x : STORM_STAND.x)}%`, top: `${r2(going ? CORNER.y : STORM_STAND.y)}%`, width: "14%", height: "4%" }} />}
+        <span
+          class={`pg-pig sg-fig${t >= S.gripAt && t < S.pullAt ? " sg-charge" : ""}`}
+          style={{
+            left: `${r2(feet.x - FIG_W * (STRANGER.foot[0] / STRANGER.w))}%`,
+            top: `${r2(feet.y - h * (STRANGER.foot[1] / STRANGER.h))}%`,
+            width: `${FIG_W}%`,
+            aspectRatio: `${STRANGER.w} / ${STRANGER.h}`,
+          }}
+          data-anim={anim.anim}
+        >
+          <BossMoment key={`${moment.key}:${anim.anim}:${anim.since}`} boss={boss.name} anim={anim.anim} since={moment.at + anim.since} then={anim.anim === "stormCharge" ? undefined : "idle"} />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** The storm's scene's banner and figure (its view) come with its moment; this is its whole view. */
+function stormView(p: MomentProps) {
+  return (
+    <>
+      {p.banner("STORM OF TWO WORLDS!", "Three turns of ice and fire", "storm long")}
+      {stormMoment(p)}
+    </>
+  );
+}
+
+/** An ice turn's start: a cold burst on each piece the storm freezes (the ice itself is the board layer's, Ginger's), one after another. */
+const ICE_STEP = 45;
+const iceFrom = (m: Moment, square: string): number | undefined => {
+  const i = m.squares?.indexOf(square) ?? -1;
+  return i < 0 ? undefined : m.at + 200 + i * ICE_STEP;
+};
+function stormIceMoment({ moment, t, orientation }: MomentProps) {
+  return (
+    <div class="power-moment pm-stay pm-storm-ice">
+      {(moment.squares ?? []).map((sq, i) => {
+        const at = 200 + i * ICE_STEP;
+        return t >= at - 60 && t < at + 900 ? <span key={sq} class="pw-frost" style={{ ...onSquare(sq, orientation), animationDelay: `${at - 60 - t}ms` }} /> : null;
+      })}
+    </div>
+  );
+}
+/** A fire turn's start: each marked square bursts alight (its tile is the board layer's, Grex's), one after another. */
+const FIRE_STEP = 160;
+const fireFrom = (m: Moment, square: string): number | undefined => {
+  const i = m.squares?.indexOf(square) ?? -1;
+  return i < 0 ? undefined : m.at + 250 + i * FIRE_STEP;
+};
+function stormFireMoment({ moment, t, orientation }: MomentProps) {
+  const items: BoardItem[] = (moment.squares ?? []).flatMap((square, i) => (t >= 250 + i * FIRE_STEP && t < 250 + i * FIRE_STEP + 500 ? [{ square, name: "strangerSquare" as const, anim: "ignite", since: moment.at + 250 + i * FIRE_STEP }] : []));
+  return <div class="power-moment pm-stay pm-storm-fire">{items.length > 0 && <BoardEffects items={items} orientation={orientation} class="pw-fire-board" />}</div>;
+}
+/** A fire turn's burn as your move lands: Grex's burn on each marked square (his own burn sound, quiet: Grex's poof is Grex's). */
+function stormBurnMoment({ boss, moment, now, orientation }: MomentProps) {
+  const sc = boss.powers?.stranger?.scorch;
+  const burnt = (sc?.burnt ?? []).map((b) => ({ square: b.square, ...(b.piece && !b.spared ? { piece: b.piece } : {}), ...(b.spared ? { fizzled: true } : {}) }));
+  return (
+    <div class="power-moment pm-stay pm-storm-burn">
+      <FireBurn burnt={burnt} since={moment.at} now={now} orientation={orientation} quiet />
+    </div>
+  );
+}
+
+/** The storm's opening scene, if it's playing now: its start (its own clock), for the ring and the board (null: none). */
+const sceneOf = (moments: readonly Moment[], now: number): number | null => {
+  const m = moments.find((x) => x.kind === "storm");
+  return m && now >= m.at - (m.lead ?? 0) && now < m.at + m.ms ? m.at : null;
+};
+
 export const STRANGER_UI = {
   id: "stranger",
-  // (A placeholder until Eric's ultimate lands: the hook never fires, so its warning never shows.)
-  ultimate: { name: "his ultimate" },
+  ultimate: { name: "the Storm of Two Worlds" },
   moments: {
     frostfire: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + FREEZE.iceAt : undefined), view: strikeMoment },
     frostfireBurn: { order: 0, kit: "power", dock: (m) => (m.fizzled?.length ? "The fire spared the piece there." : m.shape ? "The square burnt." : "The square burnt empty."), view: burnMoment },
     // (His finisher, while he still thinks: strangerTurnMoments. No banner: his move is an ordinary capture.)
     finisher: { order: 2, dock: (m) => `Your ${PIECE_WORD[m.shape ?? "n"] ?? "piece"} falls.`, view: finisherMoment },
+    // His storm: its opening scene (his banner, his leap, the swords in the board), then each of its turns as it begins, and a fire
+    // turn's burn as your move lands.
+    storm: { order: 1, kit: "ultimate", lineAt: STORM_SCENE.fireAt, view: stormView },
+    stormIce: { order: 2, appearAt: iceFrom, dock: (m) => (m.squares?.length ? "Ice: only your king and two pieces can move this turn." : "The storm swirls. Nothing froze."), view: stormIceMoment },
+    stormFire: { order: 2, appearAt: fireFrom, dock: (m) => (m.squares?.length ? "Fire: whatever stands on a burning square after your move burns." : "The storm swirls. Nothing caught fire."), view: stormFireMoment },
+    stormBurn: { order: 0, dock: (m) => (m.fizzled?.length ? "The fire spared a piece." : "The marked squares burnt."), view: stormBurnMoment },
   },
   // The frozen piece's ice (the characters' iceOverlay, as Ginger's freeze), and on the flee turn its tile ablaze, its countdown 1.
-  board: ({ boss, p, board, orientation, now, appearAt }) => {
+  board: ({ boss, p, board, orientation, now, appearAt, moments }) => {
     const crowd = (sq: string) => pieceAt(board, sq)?.color === boss.crowdSide;
     const iced = p.iced.filter(crowd);
     const fx = EFFECTS.iceOverlay;
     const st = p.stranger?.strike ?? null;
     const flee = st && p.turn > st.frozenUntil && p.turn <= st.burnAt ? st.square : null;
+    // (His storm: its ring while its turns run (and through its opening scene), and a fire turn's marked squares ablaze.)
+    const scene = sceneOf(moments, now);
+    const storm = scene !== null || (!!p.stranger?.storm && stormOn(p.stranger, p.turn));
+    const pick = p.stranger?.pick;
+    const marks = pick?.kind === "fire" && pick.turn === p.turn ? pick.squares.filter((sq) => now >= appearAt(sq)) : [];
     return {
       over: (
         <>
+          {storm && <StormRing scene={scene} />}
+          {marks.length > 0 && <BoardEffects items={marks.map((square) => ({ square, name: "fireTile" as const, anim: "stage3", since: 0 }))} orientation={orientation} class="pw-fire-board" />}
+          {marks.map((sq) => (
+            <span key={`storm-${sq}`} class="pw-fire stage-3 pw-storm-fire" style={onSquare(sq, orientation)} data-square={sq} data-stage={3}>
+              <b class="pw-count">1</b>
+            </span>
+          ))}
           {flee && <BoardEffects items={[{ square: flee, name: "fireTile", anim: "stage3", since: 0 }]} orientation={orientation} class="pw-fire-board" />}
           {flee && (
             <span key={`frostfire-${flee}`} class="pw-fire stage-3 pw-frostfire" style={onSquare(flee, orientation)} data-square={flee} data-stage={3}>
