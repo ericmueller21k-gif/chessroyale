@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, childRating, hiddenRoomSettings, levelForMaia, maiaTopRating, modeSettings, mulberry32, recluseChildFirst, recluseNextForm, type FairMove, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, childRating, hiddenRoomSettings, levelForMaia, maiaTopRating, modeSettings, mulberry32, recluseChildFirst, recluseFormsBeaten, recluseNextForm, type FairMove, type Settings } from "@chessroyale/core";
 import { START_FEN, applyMove, bankLeft, legalMoves, phase2Standings, slowJudgeMs, type BoardScore, type MatchRunner, type MoveScore, type Phase2Board, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type PartyLobby } from "../src/lobby.ts";
 import { mateFirst, phase2NoResult, phase2NoResultFor, phase2Unvouched, pick, quickMove, withMates, type Phase2SearchRequest } from "../src/bosses/recluse.ts";
@@ -163,6 +163,10 @@ describe("his forms: a list in settings, the child form to go first without touc
     expect(recluseNextForm("adult")).toBe("four");
     expect(recluseNextForm("four")).toBeNull();
     expect(recluseNextForm("adult", ["adult", "four"])).toBe("four");
+    // (The profile's match history, Nov 26: a fight won beat all three; else the forms before the one it ended in; a device's number held to 0-2.)
+    expect(["child", "adult", "four"].map((f) => recluseFormsBeaten(false, f as "child"))).toEqual([0, 1, 2]);
+    expect(recluseFormsBeaten(true, "child")).toBe(3);
+    expect([-1, 0.4, 2, 3, 99, Number.NaN].map((n) => recluseFormsBeaten(false, n))).toEqual([0, 0, 2, 2, 2, 0]);
     // (Where he's fought, the settings follow the list: his room's fight and the Crowd's final start as the child.)
     expect(recluseChildFirst()).toBe(true);
     expect(recluseChildFirst(["adult", "four"])).toBe(false);
@@ -255,6 +259,23 @@ describe("his child form online (Nov 13: RECLUSE_CHILD, the first of his forms)"
     expect(F.last("p1", "boss")!.toPhase2).toBe(true);
     F.advance(F.p2().cutAt - F.now);
     expect(F.core.record.phase).toBe("phase2");
+  });
+
+  it("each result keeps the forms its fight beat (results.forms_beaten, the profile's match history, Nov 26): a resign as the child, none; in his adult form, one", () => {
+    const F = roomFight(3, 1, { child: true });
+    F.core.message("p1", { t: "maiaReady" });
+    F.advance(1000);
+    F.advance(60_000);
+    playOn(F, 4, 3);
+    F.core.message("p3", { t: "resign" });
+    expect(F.core.record.left!.find((l) => l.id === "p3")!.result).toMatchObject({ teamWon: false, formsBeaten: 0 });
+    expect(F.core.winFormTrigger("p1", true)).toBe(true);
+    playOn(F, 99, 2);
+    F.advance(RECLUSE_CHILD.fallMs);
+    playOn(F, 2, 2);
+    expect(F.runner().boss!.form).toBeUndefined();
+    F.core.message("p2", { t: "resign" });
+    expect(F.core.record.left!.find((l) => l.id === "p2")!.result).toMatchObject({ teamWon: false, formsBeaten: 1 });
   });
 
   it("the Crowd's final starts him as the child too (its settings, from his forms)", () => {
@@ -422,6 +443,8 @@ describe("the four boards online: the server runs them", () => {
     const res = F.last("p1", "results")!;
     expect(res.bossResult).toBe("crowd");
     expect(res.simul).toEqual({ won: 4, of: 4 });
+    // (Each result keeps the forms beaten: all three.)
+    expect(F.core.humanResults().map((r) => [r.teamWon, r.formsBeaten])).toEqual([[true, 3]]);
 
     // A board lost (your clock run out), the rest won: he wins, 3 of 4.
     // (An engine server that answers as time goes on: his moves come, and nothing pauses the clocks. Your bank cut to 2 s, so your
@@ -441,6 +464,8 @@ describe("the four boards online: the server runs them", () => {
     expect(G.p2().done).toMatchObject({ beaten: false, won: 3, of: 4 });
     G.advance(RECLUSE_PHASE2.endMs + 10);
     expect(G.last("p1", "results")).toMatchObject({ bossResult: "boss", simul: { won: 3, of: 4 } });
+    // (Lost on the four boards: the child and the man beaten.)
+    expect(G.core.humanResults().map((r) => [r.teamWon, r.formsBeaten])).toEqual([[false, 2]]);
   });
 });
 
@@ -668,6 +693,7 @@ describe("leaving and disconnects in phase 2: a seat gone, its bot plays the boa
     const left = F.core.record.left!.find((l) => l.id === "p2")!;
     expect(left.how).toBe("resigned");
     expect(left.result?.teamWon).toBe(false);
+    expect(left.result?.formsBeaten).toBe(2);
     expect(F.core.record.phase).toBe("phase2");
   });
 

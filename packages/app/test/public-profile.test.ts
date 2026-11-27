@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { RANKED_1V1, rankView, type ItemLook, type RankedRecentGame } from "@chessroyale/core";
 import type { PublicProfile } from "../src/account.ts";
 import { WORN_ORDER } from "../src/components/FrontDoor.tsx";
-import { RANKED_MODES, RECENT_SHOWN, ago, hasOwnIcon, joinedText, levelLine, nth, peakLine, rankedState, recentRows, recordText, rpChange, seenLine, streakText, tierTitle, tileWeight, winRate, wornTiles } from "../src/public-profile.ts";
+import { RANKED_MODES, RECENT_SHOWN, ago, hasOwnIcon, joinedText, levelLine, nth, peakLine, rankedState, recentRows, recluseFormsShown, recordText, rpChange, seenLine, streakText, tierTitle, tileWeight, winRate, wornTiles } from "../src/public-profile.ts";
 
 /** The public profile's words and numbers (docs/decisions/2026-10-28-public-profile.md). */
 
@@ -142,6 +142,20 @@ describe("Recent Matches", () => {
     expect(lost).toMatchObject({ pill: { text: "LOSS", tone: "loss" }, face: { kind: "boss", id: "clown" } });
     // (Standing at the end isn't a win: the boss has to fall.)
     expect(lost!.title.startsWith("vs. ")).toBe(true);
+  });
+
+  it("a fight against the Hidden Boss: his three forms, the ones beaten grayed, in the RP change's place (Eric, Nov 13; results.forms_beaten)", () => {
+    const his = (patch: Partial<PublicProfile["recent"][number]>) => other({ mode: "boss", bossId: "recluse", won: false, ...patch });
+    const rows = recentRows([], [his({ formsBeaten: 1, playedAt: before(1) }), his({ won: true, formsBeaten: 3, playedAt: before(2) }), his({ formsBeaten: 0, playedAt: before(3) })], NOW);
+    expect(rows.map((r) => r.forms)).toEqual([1, 3, 0]);
+    expect(rows[0]).toMatchObject({ pill: { text: "LOSS" }, face: { kind: "boss", id: "recluse" } });
+    expect(rows[1]!.pill.text).toBe("WIN");
+    // (A row of his from before the count was kept: a win beat all three; else none known, none grayed. Every other row: none.)
+    expect([his({ won: true }), his({ won: false }), his({ won: null, formsBeaten: null })].map(recluseFormsShown)).toEqual([3, 0, 0]);
+    expect(recluseFormsShown(his({ formsBeaten: 7 }))).toBe(3);
+    expect(recluseFormsShown(other({ mode: "boss", bossId: "gingerbread", won: true }))).toBeNull();
+    expect(recluseFormsShown(other({ mode: "crowd", bossId: "recluse", won: true, formsBeaten: 2 }))).toBeNull();
+    expect(recentRows([], [other({ mode: "boss", bossId: "gingerbread", won: true })], NOW)[0]!.forms).toBeUndefined();
   });
 
   it("a raid from before bosses had identities keeps the tier's old name; one with nothing says 'Boss Battle'", () => {
