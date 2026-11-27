@@ -48,8 +48,9 @@ function useSession(s: { subscribe(fn: () => void): () => void }, running: boole
 
 // ---------------- The stage: the search, then the versus moment ----------------
 
-/** The stage's title: the mode, as the search always said it. */
-const stageHead = (
+/** The stage's title: the mode, as the search always said it. (Made at each render: a module's constant vnodes keep the screen they last
+ * showed in alive, TowerHearts.tsx.) */
+const stageHead = () => (
   <>
     <h2>1 v 1</h2>
     <p class="muted dv-sub">Classic chess</p>
@@ -83,7 +84,7 @@ function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => 
           <button type="button" class="dv-st-home" onClick={onAway} aria-label="Home: keep searching while you look around">
             <span aria-hidden="true">‹</span> Home
           </button>
-          {stageHead}
+          {stageHead()}
         </>
       }
       waiting={
@@ -128,7 +129,7 @@ export function versusStage(snap: DuelSnapshot) {
       label={there ? "Opponent found" : "Opponent found…"}
       you={side(you)}
       them={there ? side(other(you)) : null}
-      head={stageHead}
+      head={stageHead()}
       waiting={<span class="dv-st-finding">Opponent found…</span>}
     >
       <p class={`dv-st-line${there ? "" : " dv-st-hold"}`}>You play {SIDE_NAME[you]}</p>
@@ -291,7 +292,7 @@ export function DuelFront({
     if (s.kind === "refused")
       return frame(
         <div class="dv-stage dv-refused" role="alert">
-          <header class="dv-st-head">{stageHead}</header>
+          <header class="dv-st-head">{stageHead()}</header>
           <p>{s.message}</p>
           <button type="button" class="btn btn-primary" onClick={onCancel}>
             Back

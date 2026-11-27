@@ -127,6 +127,11 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   street town reloads once (`/town`, the same query); failing again within 2 minutes of that (`RETRY_WINDOW_MS`, the time kept in
   the tab's session storage), the town's box shows the loading card's look with "The town didn't load. Please retry." and a
   **Retry** button, nothing else (`.town-broken`). No WebGL 2 at all: "Chess Town can't run on this device.", no button, no reload.
+- **Straight into a building, and the last town spot** (Nov 27, [decision](../decisions/2026-11-27-town-return.md)): back from a tower
+  floor, or with a building kept as your last spot (`town/spot.ts`: set as a room shows, let go on the street; this device's, by account),
+  the town opens inside it (the tower in front of its clerk), the street not loaded (`startTown`'s `defer`) until you go out (`wake`, its
+  loading card up). A table's seat, a challenge's stand or a deploy's reload still win. Stockfish's workers end while the town is open
+  (TownPage, `pauseEngines`). Hooks: `__townLoads`. Memory: the tower's @perf test (`e2e/mem-probe.js`).
 - **A deploy while the town is open** (Nov 15, [decision](../decisions/2026-11-15-stale-tab.md)): its rooms' and intros' code comes
   from the tab's own version's files, which the service worker keeps while the tab is open ([ops.md](ops.md), "A deploy and the tabs
   already open"). Where it can't (no worker yet), `stale.ts` loads the page again and the town comes back where you were: your square
