@@ -148,7 +148,7 @@ export async function dressedPawn(look: ItemLook | null | undefined, pawn: HTMLC
         break;
       }
     const art: YouArt = { img: c, pad: PAD, top: Math.floor(first / 4 / S) / S };
-    if (spec && frameLayers.length) art.loop = { frames: frameLayers.map((l) => upName(compose(l), "dressed pawn frame")), loopMs: spec.loopMs, fromMs: spec.fromMs, toMs: spec.toMs };
+    if (spec && frameLayers.length) art.loop = { ...patches(d, frameLayers.map(compose), S), loopMs: spec.loopMs, fromMs: spec.fromMs, toMs: spec.toMs };
     return art;
   } catch {
     return null;
@@ -156,6 +156,56 @@ export async function dressedPawn(look: ItemLook | null | undefined, pawn: HTMLC
     render(null, host);
     host.remove();
   }
+}
+
+/**
+ * A loop's frames as patches over the still picture (`still`, its pixels): the box round every pixel any frame changes, and each frame cut to
+ * it, the pixels it leaves as the still has them cleared (drawn over the still they'd darken its soft edges). A patch is a few percent of
+ * the whole picture (the tube's stripes, the strand round the cane), so many looks' frames fit the atlas's spare pages.
+ */
+function patches(still: Uint8ClampedArray, frames: HTMLCanvasElement[], S: number): { frames: HTMLCanvasElement[]; x: number; y: number } {
+  const px = frames.map((f) => art2d(f).getImageData(0, 0, S, S).data);
+  let x0 = S;
+  let y0 = S;
+  let x1 = -1;
+  let y1 = -1;
+  for (const d of px)
+    for (let j = 0; j < d.length; j += 4)
+      if (d[j] !== still[j] || d[j + 1] !== still[j + 1] || d[j + 2] !== still[j + 2] || d[j + 3] !== still[j + 3]) {
+        const x = (j >> 2) % S;
+        const y = ((j >> 2) / S) | 0;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+  // (No frame differs from the still: one empty patch, never drawn.)
+  if (x1 < 0) return { frames: [], x: 0, y: 0 };
+  const w = x1 - x0 + 1;
+  const h = y1 - y0 + 1;
+  return {
+    x: x0,
+    y: y0,
+    frames: px.map((d) => {
+      const out = new ImageData(w, h);
+      const o = out.data;
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          const j = ((y0 + y) * S + x0 + x) * 4;
+          if (d[j] === still[j] && d[j + 1] === still[j + 1] && d[j + 2] === still[j + 2] && d[j + 3] === still[j + 3]) continue;
+          const k = (y * w + x) * 4;
+          o[k] = d[j]!;
+          o[k + 1] = d[j + 1]!;
+          o[k + 2] = d[j + 2]!;
+          o[k + 3] = d[j + 3]!;
+        }
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      art2d(c).putImageData(out, 0, 0);
+      return upName(c, "dressed pawn frame");
+    }),
+  };
 }
 
 /** The player asks for less motion: no item plays (the CSS animations don't either). */

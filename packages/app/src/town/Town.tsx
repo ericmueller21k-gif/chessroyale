@@ -2754,11 +2754,12 @@ function startTown(
         tag: tagged.has(i),
       }));
   };
-  // (Nov 27, `item`: your item's loop as the last frame drew it: how many frames it has, the one drawn (-1: the still picture), null: none.)
+  // (Nov 27, `item`: your item's loop as the last frame drew it: how many frames it has, the one drawn (-1: the still alone), each patch's
+  // size (px), null: none.)
   const hookYou = () => {
     if (!testSwitchesAllowed()) return null;
     const lp = r.youArt?.loop;
-    const item = lp ? { frames: lp.frames.length, drawn: lp.frames.indexOf(r.youDrawn!) } : null;
+    const item = lp ? { frames: lp.frames.length, drawn: lp.frames.indexOf(r.youDrawn!), w: lp.frames[0]?.width ?? 0, h: lp.frames[0]?.height ?? 0 } : null;
     return { ...standOf(town.you.walker), moving: town.you.walker.moving(), way: [town.you.walker.wdc, town.you.walker.wdr], item };
   };
   // ... `__townWalk([c, r])`: you walk to that square (or the free one nearest it) as a tap on it would, the camera following (to measure

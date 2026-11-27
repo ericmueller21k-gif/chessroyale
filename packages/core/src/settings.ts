@@ -4772,16 +4772,17 @@ export const RIDES = {
  * Animated items playing in Chess Town (Eric, Nov 27: "it needs to be playing in the town. That's how people like to show off ... just
  * drawn at the start as a few frames ... that loop"; docs/decisions/2026-11-27-town-item-frames.md). A figure wearing an item listed here
  * has its picture painted `n` times once, as it's dressed (town/you-look.ts), the item's own CSS animations (styles.css, the `ia-` classes
- * in `play`) stopped at `n` evenly spaced moments of the stretch `fromMs` to `toMs` of its `loopMs` loop; the town picks the frame by one
- * shared clock each draw (nothing painted or uploaded per frame). Outside the stretch, its still picture (the item at rest). The rest of
- * its animations rest. One item a figure plays: the first worn in this table's order. Not with reduced motion.
+ * in `play`) stopped at `n` evenly spaced moments of the stretch `fromMs` to `toMs` of its `loopMs` loop, each kept as a patch (only the
+ * pixels the loop changes) drawn over the still; the town picks the frame by one shared clock each draw (nothing painted or uploaded per
+ * frame). Outside the stretch, the still alone (the item at rest). The rest of its animations rest. One item a figure plays: the first
+ * worn in this table's order. Not with reduced motion, on a ride, or in the far band.
  * - Gift-Wrap Tube: the twist (one turn, 13.8 units of its stripes, every 1.5 s; its confetti rests).
  * - Candy Cane: the strand's climb, its motes and the sparkle at the tip (all over by 2.6 s of its 6.5 s; then it rests).
  * Next, a line each: the crown's flames, the parrot's flap, the tommy gun's notch and puff, the tube's confetti.
  *
- * `othersLooks`: how many different looks (the same items and colors share one set of frames) of the players and bots in the town play at
- * once; one more than that stands still, so the atlas's spare pages hold them (a look's frames: n + 1 pictures of 208 x 208 px, about 81 an
- * atlas page). Yours always plays.
+ * `othersLooks`: how many different looks (the same pawn, items and colors share one set of frames) of the players and bots in the town
+ * play; one more stands still, so the atlas's spare pages (2, 16 MB each) hold them with the tags. A look's patches: the tube's 8 of 45 x
+ * 129 px, the cane's 12 of 52 x 130 (about 0.05 and 0.09 megapixels, padding in), so 6 looks take about a tenth of a page. Yours always plays.
  */
 export const TOWN_ITEM_FRAMES = {
   items: {

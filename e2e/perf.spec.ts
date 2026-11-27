@@ -770,7 +770,7 @@ async function busyTown(page: Page, wearing: boolean) {
     // (Ours: every part of a frame but the time outside our code.)
     const ours = s.segs[0]!.avg.slice(0, P.outside).reduce((a, b) => a + b, 0);
     await page.locator(".tfr-panel").getByRole("button", { name: "Again" }).click();
-    return { ours, frames: s.frames, mean: s.segs[0]!.mean, long: s.long, parts: s.segs[0]!.avg.slice(0, P.outside).map((x) => +x.toFixed(2)).join(" "), uploads: `${s.uploads} uploads: ${s.uploadsBy.map(([k, n]) => `${k} ${n}`).join(", ")}`, frameUps: s.uploadsBy.find(([k]) => k === "dressed pawn frame")?.[1] ?? 0, resets: s.resets };
+    return { ours, frames: s.frames, mean: s.segs[0]!.mean, long: s.long, parts: s.segs[0]!.avg.slice(0, P.outside).map((x) => +x.toFixed(2)).join(" "), uploads: `${s.uploads} uploads: ${s.uploadsBy.map(([k, n]) => `${k} ${n}`).join(", ")}`, frameUps: s.uploadsBy.filter(([k]) => k.startsWith("dressed pawn frame")).reduce((a, [, n]) => a + n, 0), resets: s.resets };
   };
   const empty = await walk();
   busy = true;

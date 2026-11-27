@@ -295,14 +295,25 @@ export interface YouArt {
    * (Nov 27) An item that plays in the town: its loop's frames, painted once as it was dressed (you-look.ts), each the size of `img`; they
    * cover `fromMs` to `toMs` of every `loopMs`, the still `img` the rest (TOWN_ITEM_FRAMES).
    */
-  loop?: { frames: HTMLCanvasElement[]; loopMs: number; fromMs: number; toMs: number };
+  loop?: ItemLoop;
 }
-/** The picture of a dressed pawn to draw at `now` (one clock for everyone): its loop's frame then, or its still. Nothing made. */
-export function artAt(a: YouArt, now: number): HTMLCanvasElement {
-  const l = a.loop;
-  if (!l) return a.img;
+/**
+ * (Nov 27) An item's loop as patches over the still picture (you-look.ts `patches`): each frame only the box of pixels the loop changes, at
+ * (`x`, `y`) px of `img`, the rest cleared; they cover `fromMs` to `toMs` of every `loopMs`, the still alone the rest (TOWN_ITEM_FRAMES).
+ */
+export interface ItemLoop {
+  frames: HTMLCanvasElement[];
+  x: number;
+  y: number;
+  loopMs: number;
+  fromMs: number;
+  toMs: number;
+}
+/** The patch to draw over a dressed pawn's still at `now` (one clock for everyone), or null: the still alone. Nothing made. */
+export function loopAt(l: ItemLoop | undefined, now: number): HTMLCanvasElement | null {
+  if (!l?.frames.length) return null;
   const u = ((now % l.loopMs) + l.loopMs) % l.loopMs;
-  if (u < l.fromMs || u >= l.toMs) return a.img;
+  if (u < l.fromMs || u >= l.toMs) return null;
   return l.frames[Math.min(l.frames.length - 1, Math.floor(((u - l.fromMs) / (l.toMs - l.fromMs)) * l.frames.length))]!;
 }
 const pawnCache = new Map<string, HTMLCanvasElement>();
@@ -1693,7 +1704,7 @@ export class Renderer {
           this.youRide.anim = "";
           if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, wview, f.youSquares, now, this.youRide);
           else {
-            this.drawSprite(it, (this.youDrawn = art ? artAt(art, now) : null) ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
+            this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares, (this.youDrawn = loopAt(art?.loop, now)), art?.loop);
             this.soonBox(it, this.soonOf(person), wview, f.youSquares);
           }
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, TAG_SIZES[0], TAG_SIZES[1]), this.fade, it.i);
@@ -1719,7 +1730,7 @@ export class Renderer {
             const rider = this.riders.get(person.id);
             if (rider && !table) this.drawRider(it, rider, pose, facing, wview, f.botSquares, now + it.i * 577);
             else {
-              this.drawSprite(it, art ? artAt(art, now) : pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
+              this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares, loopAt(art?.loop, now), art?.loop);
               this.soonBox(it, this.soonOf(person), wview, f.botSquares);
             }
           }
@@ -3427,7 +3438,7 @@ export class Renderer {
    * lifts. Fills the item's box; its head is `head` of the way down the box; the pawn is `base` of the box's width (less
    * than 1 when the box has a margin for items).
    */
-  private drawSprite(it: Item, img: CanvasImageSource, sq: number, fx: number, fy: number, aspect: number, lift: number, tilt: number, flip: number, shadow: number, head = 0, pawn = false, base = 1, body = sq): void {
+  private drawSprite(it: Item, img: CanvasImageSource, sq: number, fx: number, fy: number, aspect: number, lift: number, tilt: number, flip: number, shadow: number, head = 0, pawn = false, base = 1, body = sq, patch: HTMLCanvasElement | null = null, at: ItemLoop | undefined = undefined): void {
     const { ctx, view: v, p } = this;
     if (!proj(v, it.dx, it.dz, 0, p)) return;
     const h = sq * p.k;
@@ -3478,7 +3489,14 @@ export class Renderer {
     // Pixel art stays crisp when it's drawn bigger than its pixels, smooth when smaller.
     ctx.imageSmoothingEnabled = h < (img as HTMLCanvasElement).height * 1.5;
     if (s > 0.02) this.blitSoft(img, x0, y0, w, h, s, 0.75 * s);
-    else ctx.drawImage(img, x0, y0, w, h);
+    else {
+      ctx.drawImage(img, x0, y0, w, h);
+      // (Nov 27: an item's loop frame, a patch over the still in the same place; in the far band, softened, the still alone.)
+      if (patch && at) {
+        const k = w / (img as HTMLCanvasElement).width;
+        ctx.drawImage(patch, x0 + at.x * k, y0 + at.y * k, patch.width * k, patch.height * k);
+      }
+    }
     ctx.restore();
     this.cover(img, x0, y0, w, h, alpha, flip, tilt, p.x, p.y, this.sitting ? seat : Infinity);
     this.box(it, p.depth, x0, y0, x0 + w, y0 + h, p.x, p.y, y0 + head * h);
