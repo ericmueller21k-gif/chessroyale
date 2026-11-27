@@ -55,6 +55,7 @@ restore the board and kind of return to the actual way the game looked, and the 
   while the storm begins to gather round the board; (4) he grips both hilts, a red-and-blue aura, the charge builds faster and wilder
   until the full, chaotic swirl; (5) he pulls them out (board still cracked), leaps back to his place; the cracks heal, the nudged
   pieces slide back to their squares, the board looks as it did; the storm ring keeps circling for its 3 turns, then clears.
-- About 6-8 s, the same timing solo and online (a moment the runner holds, as other bosses' ults), phone frame rate checked with
+- **10-12 s from the moment he jumps down** (Eric, ~06:00: "10 to 12 seconds is actually a pretty good time for these kind of things. It
+  ends up being way too quick if it's shorter than that."), the same timing solo and online (a moment the runner holds, as other bosses' ults), phone frame rate checked with
   real taps, every frame whole on screen. Reuse: his `draw`/`strike`/`castFull` poses and aura, the board-crack/ripple as one
   overlay effect; simple beats flashy.
