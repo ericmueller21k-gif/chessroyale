@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Packs the storm's rendered frames (render.py) into what the game ships: one sheet (every frame's fire cell and ice cell side by side,
-COLS frames a row) and the still frost, both WebP with transparency.
+Packs the storm's rendered frames into what the game ships (lossless WebP: few colors, hard edges, exact and small):
 
-  python3 scripts/storm-art/pack.py <cells-dir> <out-dir> [quality=72|lossless] [unpack-dir]
+  stranger-storm.webp   the ring: every frame's fire cell and ice cell side by side, COLS frames a row; after the last frame, one
+                        more cell pair whose ice cell is the still frost (render.py's frost.png)
+  stranger-rift.webp    the rift's sheet as rift.py lays it out (each stage's loop, then the opening's frames)
 
-lossless: for the GBA pass (few colors, hard edges: exact and still small).
-
-unpack-dir: the shipped files cut back into frames (as the game will show them, after compression), for preview.py.
+  python3 scripts/storm-art/render.py <cells-dir> 36 250 all gba
+  python3 scripts/storm-art/rift.py <rift-dir>
+  python3 scripts/storm-art/pack.py <cells-dir> <rift-dir> packages/app/src/characters
 """
 import glob
 import os
@@ -19,35 +20,24 @@ COLS = 6
 
 
 def main():
-    cells, out = sys.argv[1], sys.argv[2]
-    exact = len(sys.argv) > 3 and sys.argv[3] == "lossless"
-    quality = 72 if exact or len(sys.argv) <= 3 else int(sys.argv[3])
+    cells, rift, out = sys.argv[1:4]
     fire = [Image.open(p).convert("RGBA") for p in sorted(glob.glob(os.path.join(cells, "fire-*.png")))]
     ice = [Image.open(p).convert("RGBA") for p in sorted(glob.glob(os.path.join(cells, "ice-*.png")))]
     assert len(fire) == len(ice) and fire, "render the frames first"
     w, h = fire[0].size
-    rows = (len(fire) + COLS - 1) // COLS
+    pairs = list(zip(fire, ice)) + [(Image.new("RGBA", (w, h), (0, 0, 0, 0)), Image.open(os.path.join(cells, "frost.png")).convert("RGBA"))]
+    rows = (len(pairs) + COLS - 1) // COLS
     sheet = Image.new("RGBA", (COLS * 2 * w, rows * h), (0, 0, 0, 0))
-    for i, (f, c) in enumerate(zip(fire, ice)):
+    for i, (f, c) in enumerate(pairs):
         x, y = (i % COLS) * 2 * w, (i // COLS) * h
         sheet.paste(f, (x, y))
         sheet.paste(c, (x + w, y))
     os.makedirs(out, exist_ok=True)
-    how = dict(lossless=True, quality=100, method=6) if exact else dict(quality=quality, alpha_quality=60, method=6)
-    sheet.save(os.path.join(out, "storm.webp"), "WEBP", **how)
-    Image.open(os.path.join(cells, "frost.png")).save(os.path.join(out, "frost.webp"), "WEBP", **(how if exact else dict(quality=82, alpha_quality=80, method=6)))
-    for name in ("storm.webp", "frost.webp"):
+    sheet.save(os.path.join(out, "stranger-storm.webp"), "WEBP", lossless=True, quality=100, method=6)
+    Image.open(os.path.join(rift, "sheet.png")).save(os.path.join(out, "stranger-rift.webp"), "WEBP", lossless=True, quality=100, method=6)
+    for name in ("stranger-storm.webp", "stranger-rift.webp"):
         print(name, Image.open(os.path.join(out, name)).size, os.path.getsize(os.path.join(out, name)) // 1024, "KB")
-    print(f"frames {len(fire)}, cell {w} x {h}, {COLS} a row")
-    if len(sys.argv) > 4:
-        back = sys.argv[4]
-        os.makedirs(back, exist_ok=True)
-        got = Image.open(os.path.join(out, "storm.webp")).convert("RGBA")
-        for i in range(len(fire)):
-            x, y = (i % COLS) * 2 * w, (i // COLS) * h
-            got.crop((x, y, x + w, y + h)).save(os.path.join(back, f"fire-{i:02d}.png"))
-            got.crop((x + w, y, x + 2 * w, y + h)).save(os.path.join(back, f"ice-{i:02d}.png"))
-        Image.open(os.path.join(out, "frost.webp")).convert("RGBA").save(os.path.join(back, "frost.png"))
+    print(f"ring: {len(fire)} frames, cell {w} x {h}, {COLS} a row, the frost in frame {len(fire)}'s ice cell")
 
 
 if __name__ == "__main__":

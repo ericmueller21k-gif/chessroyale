@@ -2,6 +2,8 @@ import { STORM_SCENE, STRANGER_FX, applyMove, finisherOf, pieceAt, stormOn, type
 import { useLayoutEffect, useRef } from "preact/hooks";
 import { EFFECTS, animLength, cueAt } from "../characters/power-art.ts";
 import { STRANGER, STRANGER_HOP } from "../characters/stranger.ts";
+import riftUrl from "../characters/stranger-rift.webp?url";
+import stormUrl from "../characters/stranger-storm.webp?url";
 import type { BossView } from "../game.ts";
 import { BoardEffects, BossMoment, SpriteAnim, onEachFrame, prewarm, type BoardItem } from "./BossEffect.tsx";
 import { FREEZE } from "./Ginger.tsx";
@@ -221,6 +223,9 @@ export function prewarmStranger(): void {
   // (His storm's: Grex's fire tile on its marks, Ginger's ice on the pieces it freezes.)
   prewarm("fireTile", fx("fireTile"));
   prewarm("iceOverlay", fx("iceOverlay"));
+  // (His storm's ring and rift: their sheets fetched and decoded now, not at boot and not as the storm begins.)
+  sheetOf("storm");
+  sheetOf("rift");
 }
 
 /** When this device first saw each finisher (it plays from then), by battle, turn and square. */
@@ -302,122 +307,177 @@ function played(fen: string, move: string): string | null {
 
 // ---------------- His storm (Eric, Nov 27: the Storm of Two Worlds) ----------------
 
-/** A number from a particle's index and a salt, in [0, 1) (the same every frame: the ring is drawn from the clock alone). */
-const hash = (i: number, k: number): number => {
-  let h = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(k + 7, 0x85ebca6b);
-  h ^= h >>> 15;
-  h = Math.imul(h, 0x2c1b3c6d);
-  h ^= h >>> 12;
-  return (h >>> 0) / 4294967296;
-};
 const ease = (u: number) => 1 - (1 - clamp01(u)) ** 2;
 const lerp = (a: number, b: number, u: number) => a + (b - a) * clamp01(u);
 
-/** The ring's canvas: its pixels (pixel art, scaled up), how far past the board it reaches each side (a share of the board), its particles. */
-export const RING = { px: 168, margin: 0.12, swirl: 340, chaos: 180, haze: 70 } as const;
-const FIRE = ["#6b1606", "#c2380f", "#ff6a1e", "#ffb040", "#fff0a0"];
-const ICE = ["#14305e", "#2a78c8", "#5fd3ff", "#b8f0ff", "#ffffff"];
+/**
+ * The storm's art (Eric, Nov 27: "a realistic blend of shards of fire and ice tornado ... it should be a fairly quick loop ... like a GIF
+ * basically"; then "a bit more Game Boy Advance style, but still keep the details"): drawn once, offline (scripts/storm-art: render.py,
+ * rift.py, pack.py), and only played back here. Nothing is drawn per particle: a frame is a few image draws on one small canvas.
+ *
+ * The ring's sheet (`stranger-storm.webp`): `frames` frames, `cols` a row, each a fire cell then an ice cell (`cell` x `px`); the fire cell
+ * is the frame's left `cell` pixels, the ice cell its right `cell`; the still frost is the ice cell of one more frame after the last.
+ * `margin`: how far past the board the ring's frame reaches each side (a share of the board; the CSS's 12%). `see`: the storm's own
+ * opacity over what it overlaps, `dim` the soft dim round the board (both in the CSS, here for the record).
+ */
+export const STORM_ART = { px: 250, cell: 170, frames: 36, cols: 6, fps: 12, margin: 0.12, see: 0.88, dim: 0.22 } as const;
+/**
+ * The rift's sheet (`stranger-rift.webp`, `cols` frames a row of `px` x `px`): each heal stage's loop (`loop` frames at `loopFps`), then
+ * the opening's frames (`openA` from the fire sword's slam, `openB` from the ice sword's, at `openFps`), ending on stage 1.
+ */
+export const RIFT_ART = { px: 202, cols: 8, stages: 3, loop: 4, loopFps: 6, openA: 9, openB: 10, openFps: 12 } as const;
+
+/** A sheet, fetched and decoded ahead as his battle shows (prewarmStranger): `src` once it can be drawn. */
+type Sheet = { src: CanvasImageSource | null };
+const sheets: { storm?: Sheet; rift?: Sheet } = {};
+function sheetOf(which: "storm" | "rift"): Sheet {
+  const had = sheets[which];
+  if (had) return had;
+  const sheet: Sheet = { src: null };
+  sheets[which] = sheet;
+  if (typeof Image === "undefined") return sheet;
+  const img = new Image();
+  const ready = () => {
+    sheet.src = img;
+    // (Kept decoded, so no frame's draw waits on a decode.)
+    if (typeof createImageBitmap === "function") createImageBitmap(img).then((b) => (sheet.src = b), () => undefined);
+  };
+  img.onload = ready;
+  img.src = which === "storm" ? stormUrl : riftUrl;
+  return sheet;
+}
 
 /**
- * How strong the storm is at `now` (`u`: how many of its particles, how wide its band; `chaos`: the charge's wild layer and wobble): during
- * its opening scene (`scene`: the moment's start, its own clock) it gathers from the fire sword's slam, builds from his grip to the full
- * swirl, and eases back as he leaves; through its turns, steady.
+ * How strong the storm is at `now`: `fire` and `ice`, each element's strength (0 none, 1 whole); `chaos`, the charge's wild layer. During
+ * its opening scene (`scene`: the moment's start, its own clock) the fire rises from the fire sword's slam and the ice from the ice
+ * sword's, both whole by his grip; the charge builds to the full swirl and eases back as he leaves; through its turns, steady.
  */
-export function stormLevel(scene: number | null, now: number): { u: number; chaos: number } {
-  if (scene === null) return { u: 0.75, chaos: 0 };
+export function stormLevel(scene: number | null, now: number): { fire: number; ice: number; chaos: number } {
+  if (scene === null) return { fire: 1, ice: 1, chaos: 0 };
   const t = now - scene;
   const S = STORM_SCENE;
-  const u = t < S.fireAt ? 0 : t < S.gripAt ? lerp(0.1, 0.5, (t - S.fireAt) / (S.gripAt - S.fireAt)) : t < S.fullAt ? lerp(0.5, 1, (t - S.gripAt) / (S.fullAt - S.gripAt)) : t < S.pullAt ? 1 : lerp(1, 0.75, (t - S.pullAt) / (S.homeAt - S.pullAt));
+  const rise = (from: number) => (t < from ? 0 : lerp(0.25, 1, (t - from) / (S.gripAt - S.iceAt)));
   const chaos = t < S.gripAt ? 0 : t < S.fullAt ? ease((t - S.gripAt) / (S.fullAt - S.gripAt)) : t < S.pullAt ? 1 : 1 - ease((t - S.pullAt) / (S.leapAt - S.pullAt));
-  return { u, chaos };
+  return { fire: rise(S.fireAt), ice: rise(S.iceAt), chaos };
 }
 
+/** The ring's frame at `now` (the clock alone; twice as fast through the thick of the charge). */
+export const ringFrame = (now: number, chaos: number): number => Math.floor((now / 1000) * STORM_ART.fps * (chaos > 0.5 ? 2 : 1)) % STORM_ART.frames;
+
 /**
- * The ring's particles, made once: each one's side (fire even, ice odd), its color, where it starts round the ring, its speed, its place
- * across the band, its wobble and when it shows (`show`: drawn while the storm's strength is above it). Sorted by color, so a frame sets
- * each color once.
+ * One frame of the ring: the frost, then each element's cell in its place, the turn's own element (`lead`) whole and doubled (a second
+ * copy half a loop on) with the other fainter behind it; through the charge both doubled.
  */
-type Grain = { fire: boolean; color: string; th: number; w: number; band: number; wob: number; ph: number; show: number; big: boolean; haze: boolean };
-let grains: Grain[] | null = null;
-function grainsOf(): Grain[] {
-  if (grains) return grains;
-  const out: Grain[] = [];
-  const add = (i: number, kind: "swirl" | "chaos" | "haze") => {
-    const fire = i % 2 === 0;
-    const pal = fire ? FIRE : ICE;
-    const fast = kind === "chaos";
-    const dir = fire ? 1 : -1;
-    out.push({
-      fire,
-      color: kind === "haze" ? pal[1]! : pal[1 + Math.floor(hash(i, 6) * 4)]!,
-      th: hash(i, 2) * Math.PI * 2,
-      w: (fast ? 1.4 + 0.7 * hash(i, 1) : kind === "haze" ? 0.25 + 0.15 * hash(i, 1) : 0.45 + 0.4 * hash(i, 1)) * dir,
-      band: -0.04 + 0.18 * hash(i, 3),
-      wob: 3 + 5 * hash(i, 4),
-      ph: 6.28 * hash(i, 5),
-      show: kind === "chaos" ? hash(i, 8) + 1 : hash(i, 8),
-      big: hash(i, 7) > 0.6,
-      haze: kind === "haze",
-    });
+function paintRing(g: CanvasRenderingContext2D, img: CanvasImageSource, now: number, level: { fire: number; ice: number; chaos: number }, lead: "fire" | "ice" | null): void {
+  const A = STORM_ART;
+  g.clearRect(0, 0, A.px, A.px);
+  const f = ringFrame(now, level.chaos);
+  const far = (f + A.frames / 2) % A.frames;
+  const cell = (i: number, ice: boolean, alpha: number) => {
+    if (alpha <= 0.01) return;
+    g.globalAlpha = Math.min(1, alpha);
+    g.drawImage(img, (i % A.cols) * 2 * A.cell + (ice ? A.cell : 0), Math.floor(i / A.cols) * A.px, A.cell, A.px, ice ? A.px - A.cell : 0, 0, A.cell, A.px);
   };
-  for (let i = 0; i < RING.swirl; i++) add(i, "swirl");
-  for (let i = 0; i < RING.chaos; i++) add(i + 1000, "chaos");
-  for (let i = 0; i < RING.haze; i++) add(i + 2000, "haze");
-  grains = out.sort((a, b) => (a.color < b.color ? -1 : a.color > b.color ? 1 : 0));
-  return grains;
-}
-
-/**
- * One frame of the ring: fire swirling one way round the board, ice the other, along a rounded square's band from its edge squares
- * outward; a colored haze under it, the charge's fast wild layer over it, each grain with a short trail.
- */
-function paintRing(g: CanvasRenderingContext2D, now: number, level: { u: number; chaos: number }): void {
-  const W = RING.px;
-  g.clearRect(0, 0, W, W);
-  if (level.u <= 0) return;
-  const S = W / (1 + 2 * RING.margin);
-  const c = W / 2;
-  const sec = now / 1000;
-  const all = grainsOf();
-  for (const k of [3, 2, 1, 0]) {
-    let color = "";
-    for (const q of all) {
-      // (Haze: no trail. The charge's grains (show above 1) come in with its chaos.)
-      if ((q.haze && k > 0) || (q.show >= 1 ? q.show - 1 >= level.chaos : q.show >= level.u)) continue;
-      const th = q.th + q.w * (sec - 0.04 * k);
-      const band = q.band * (0.6 + 0.4 * level.u) + level.chaos * 0.04 * Math.sin(sec * q.wob + q.ph);
-      const cs = Math.cos(th);
-      const sn = Math.sin(th);
-      const r = 0.5 / (cs ** 4 + sn ** 4) ** 0.25 + band;
-      const size = q.haze ? 7 : k === 0 ? (q.big ? 3 : 2) : k === 1 ? 2 : 1;
-      const x = Math.round(c + cs * r * S - size / 2);
-      const y = Math.round(c + sn * r * S - size / 2);
-      if (q.color !== color) g.fillStyle = color = q.color;
-      g.globalAlpha = q.haze ? 0.16 : (band < 0 ? 0.55 : 1) * (k === 0 ? 1 : 0.55 / k);
-      g.fillRect(x, y, size, size);
-    }
+  const own = (el: "fire" | "ice") => (lead === null ? 0.9 : lead === el ? 1 : 0.8) * level[el];
+  const twice = (el: "fire" | "ice") => Math.max(lead === el ? 0.6 : 0, 0.6 * level.chaos) * level[el];
+  cell(A.frames, true, level.ice * (lead === "fire" ? 0.75 : 1));
+  for (const el of lead === "fire" ? (["ice", "fire"] as const) : (["fire", "ice"] as const)) {
+    cell(far, el === "ice", twice(el));
+    cell(f, el === "ice", own(el));
   }
   g.globalAlpha = 1;
 }
 
+/** What the storm's canvases last drew (the tests' read: the ring's frame, the rift's sheet frame; -1 nothing yet). */
+const drawn = { ring: -1, rift: -1 };
+if (typeof window !== "undefined") (window as unknown as { __stormArt?: typeof drawn }).__stormArt = drawn;
+
 /**
  * The storm's ring round the board (Eric: "he shrouds around the board ... this fire and ice storm around the board, and it even can kind
- * of move onto the board a little bit. It's like a circle kind of formation"): one small canvas, scaled up as pixel art, drawn every frame
- * from the clock alone on the shared frame loop (a screen drawn again carries on where it was; nothing kept). `scene`: its opening
- * scene's start (it gathers through it), or null (steady).
+ * of move onto the board a little bit"): fire up the left and across the top, frost wind, shards and icicles down the right and along the
+ * bottom. One small canvas, scaled up as pixels, a frame of its sheet blitted from the clock alone on the shared frame loop (a screen
+ * drawn again carries on where it was; nothing kept). `scene`: its opening scene's start (it gathers through it), or null (steady);
+ * `lead`: the turn's element.
  */
-function StormRing({ scene }: { scene: number | null }) {
+function StormRing({ scene, lead }: { scene: number | null; lead: "fire" | "ice" | null }) {
   const cv = useRef<HTMLCanvasElement>(null);
-  const at = useRef(scene);
-  at.current = scene;
+  const at = useRef({ scene, lead });
+  at.current = { scene, lead };
   useLayoutEffect(() => {
     const g = cv.current?.getContext("2d");
     if (!g) return;
-    const draw = () => paintRing(g, Date.now(), stormLevel(at.current, Date.now()));
+    g.imageSmoothingEnabled = false;
+    const sheet = sheetOf("storm");
+    const draw = () => {
+      if (!sheet.src) return;
+      const now = Date.now();
+      const level = stormLevel(at.current.scene, now);
+      paintRing(g, sheet.src, now, level, at.current.lead);
+      drawn.ring = level.fire > 0 ? ringFrame(now, level.chaos) : -1;
+    };
     draw();
-    return onEachFrame(draw);
+    const stop = onEachFrame(draw);
+    return () => {
+      stop();
+      drawn.ring = -1;
+    };
   }, []);
-  return <canvas ref={cv} class="sg-storm" width={RING.px} height={RING.px} aria-hidden="true" data-storm={scene === null ? "on" : "scene"} />;
+  return <canvas ref={cv} class="sg-storm" width={STORM_ART.px} height={STORM_ART.px} aria-hidden="true" data-storm={scene === null ? "on" : "scene"} />;
+}
+
+/**
+ * The rift's frame in its sheet at `now`, or -1 (nothing). In the opening scene (`scene`: its start): nothing until the fire sword's
+ * slam, then the opening's frames (the lava fissure tearing out, held; from the ice sword's slam, the ice fissure), then stage 1's
+ * loop on the scene's clock. Through the storm's turns: `stage`'s loop (0 whole, then closing each turn), by the clock.
+ */
+export function riftFrame(scene: number | null, stage: number, now: number): number {
+  const R = RIFT_ART;
+  const S = STORM_SCENE;
+  if (scene !== null) {
+    const t = now - scene;
+    if (t < S.fireAt) return -1;
+    const open = R.stages * R.loop;
+    if (t < S.iceAt) return open + Math.min(R.openA - 1, Math.floor(((t - S.fireAt) * R.openFps) / 1000));
+    const b = Math.floor(((t - S.iceAt) * R.openFps) / 1000);
+    return b < R.openB ? open + R.openA + b : Math.floor(((t - S.fireAt) * R.loopFps) / 1000) % R.loop;
+  }
+  return stage < 0 || stage >= R.stages ? -1 : stage * R.loop + (Math.floor((now * R.loopFps) / 1000) % R.loop);
+}
+
+/**
+ * The rift his storm tears in the board (Eric, Nov 27: "like somebody ripped open the board"): one impact between his swords, a lava
+ * fissure to the lower left, an ice fissure to the upper right, under the pieces. It opens with the swords in the opening scene, stays
+ * through the storm's turns and heals a little each turn (`stage`), gone with the storm. One small canvas, drawn only when its frame
+ * changes.
+ */
+function StormRift({ scene, stage }: { scene: number | null; stage: number }) {
+  const cv = useRef<HTMLCanvasElement>(null);
+  const at = useRef({ scene, stage });
+  at.current = { scene, stage };
+  useLayoutEffect(() => {
+    const g = cv.current?.getContext("2d");
+    if (!g) return;
+    g.imageSmoothingEnabled = false;
+    const R = RIFT_ART;
+    const sheet = sheetOf("rift");
+    let shown = -2;
+    const draw = () => {
+      if (!sheet.src) return;
+      const f = riftFrame(at.current.scene, at.current.stage, Date.now());
+      if (f === shown) return;
+      shown = f;
+      drawn.rift = f;
+      g.clearRect(0, 0, R.px, R.px);
+      if (f >= 0) g.drawImage(sheet.src, (f % R.cols) * R.px, Math.floor(f / R.cols) * R.px, R.px, R.px, 0, 0, R.px, R.px);
+    };
+    draw();
+    const stop = onEachFrame(draw);
+    return () => {
+      stop();
+      drawn.rift = -1;
+    };
+  }, []);
+  return <canvas ref={cv} class="sg-rift" width={RIFT_ART.px} height={RIFT_ART.px} aria-hidden="true" data-stage={stage} />;
 }
 
 /** Where he stands for the storm's scene (% of the board): his feet a little below its middle, his head on it. */
@@ -428,30 +488,9 @@ const swordPoints = (): { fire: Pt; ice: Pt } => {
   return { fire: { x: STORM_STAND.x - dx, y: STORM_STAND.y }, ice: { x: STORM_STAND.x + dx, y: STORM_STAND.y } };
 };
 
-/** The cracks from one sword's point (% of the board), from the seed of its side: a few jagged branches, each a list of points. */
-function cracksFrom(p: Pt, salt: number): Pt[][] {
-  const out: Pt[][] = [];
-  for (let b = 0; b < 6; b++) {
-    let a = (b / 6) * Math.PI * 2 + hash(b, salt) * 0.9;
-    let at = { ...p };
-    const pts = [at];
-    const n = 4 + Math.floor(hash(b, salt + 1) * 3);
-    for (let k = 0; k < n; k++) {
-      a += (hash(b * 10 + k, salt + 2) - 0.5) * 1.1;
-      const len = 2.2 + hash(b * 10 + k, salt + 3) * 2.6;
-      at = { x: r2(at.x + Math.cos(a) * len), y: r2(at.y + Math.sin(a) * len * 0.8) };
-      pts.push(at);
-    }
-    out.push(pts);
-  }
-  return out;
-}
-const CRACKS = { fire: cracksFrom(swordPoints().fire, 11), ice: cracksFrom(swordPoints().ice, 23) };
-
-/** The board's cracks and the swords' ripples (one SVG in % of the board): each crack opening from its sword's slam, healing at the end. */
-function Cracks({ t }: { t: number }) {
+/** The swords' ripples in the board (one SVG in % of the board): rings out from each sword's point from its slam, faster through the charge. */
+function Ripples({ t }: { t: number }) {
   const S = STORM_SCENE;
-  const heal = t < S.healAt ? 1 : 1 - clamp01((t - S.healAt) / S.healMs);
   const pts = swordPoints();
   const charge = t >= S.gripAt && t < S.pullAt;
   const period = charge ? lerp(700, 280, (t - S.gripAt) / (S.fullAt - S.gripAt)) : 700;
@@ -464,24 +503,8 @@ function Cracks({ t }: { t: number }) {
       return [<circle key={`${cls}${k}`} class={cls} cx={at.x} cy={at.y} r={r2(2 + u * 30)} style={{ opacity: String(r2((1 - u) * 0.8)) }} />];
     });
   };
-  const line = (side: "fire" | "ice", from: number) => {
-    const open = clamp01((t - from) / 260);
-    if (open <= 0 || heal <= 0) return null;
-    return CRACKS[side].map((b, i) => {
-      const shown = b.slice(0, Math.max(2, Math.ceil(b.length * open)));
-      const d = shown.map((q) => `${q.x},${q.y}`).join(" ");
-      return (
-        <g key={`${side}${i}`} style={{ opacity: String(r2(heal)) }}>
-          <polyline class={`sg-glow sg-${side}`} points={d} />
-          <polyline class="sg-crack" points={d} />
-        </g>
-      );
-    });
-  };
   return (
     <svg class="sg-cracks" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      {line("fire", S.fireAt)}
-      {line("ice", S.iceAt)}
       {rings(S.fireAt, pts.fire, "sg-ripple sg-fire")}
       {rings(S.iceAt, pts.ice, "sg-ripple sg-ice")}
     </svg>
@@ -516,9 +539,10 @@ const nudgeAt = (t: number): number => {
 
 /**
  * The storm's opening scene (STORM_SCENE): his leap from his place to the board's middle, the pieces there nudged aside; his swords out,
- * the fire sword then the ice sword slammed in, the board cracking round each and rippling its color as the storm gathers round the
- * board (the ring, drawn by the board layer); his grip on both hilts, his red and blue aura, the charge building to the full swirl; then
- * the swords pulled out, his leap back, the cracks healing and the pieces sliding back to their squares.
+ * the fire sword then the ice sword slammed in, the board torn open from each (the rift, drawn by the board layer under the pieces) and
+ * rippling its color as the storm gathers round the board (the ring, the board layer's too); his grip on both hilts, his red and blue
+ * aura, the charge building to the full swirl; then the swords pulled out, his leap back and the pieces sliding back to their squares.
+ * The rift stays for the storm's turns.
  */
 function stormMoment({ boss, moment, t, orientation }: MomentProps) {
   const S = STORM_SCENE;
@@ -537,7 +561,7 @@ function stormMoment({ boss, moment, t, orientation }: MomentProps) {
   return (
     <div class="power-moment pm-storm" data-stage={stage}>
       <div class="hb-pieces pg-layer" aria-hidden="true">
-        <Cracks t={t} />
+        <Ripples t={t} />
         {nudged(boss.board.fen, orientation).map((n) => {
           const c = centreOf(n.square, orientation);
           return <piece key={n.square} class={`pg-piece sg-nudge ${n.code}`} data-square={n.square} style={{ left: `${r2(c.x - 6.25 + n.dx * out)}%`, top: `${r2(c.y - 6.25 + n.dy * out)}%` }} />;
@@ -636,17 +660,23 @@ export const STRANGER_UI = {
     const fx = EFFECTS.iceOverlay;
     const st = p.stranger?.strike ?? null;
     const flee = st && p.turn > st.frozenUntil && p.turn <= st.burnAt ? st.square : null;
-    // (His storm: its ring while its turns run (and through its opening scene), and a fire turn's marked squares ablaze.)
+    // (His storm: its ring and its rift while its turns run (and through its opening scene), a soft dim round the board, and a fire
+    // turn's marked squares ablaze.)
     const scene = sceneOf(moments, now);
     const storm = scene !== null || (!!p.stranger?.storm && stormOn(p.stranger, p.turn));
     const pick = p.stranger?.pick;
+    const lead = scene === null && pick?.turn === p.turn ? pick.kind : null;
+    // (The rift heals a little each turn of the storm: whole on its first.)
+    const stage = p.stranger?.storm ? Math.max(0, p.turn - p.stranger.storm.at) : 0;
     // (Burnt as your move landed: the marks go, and the burn's moment plays on their squares.)
     const burnt = p.stranger?.scorch?.at === pick?.turn;
     const marks = pick?.kind === "fire" && pick.turn === p.turn && !burnt ? pick.squares.filter((sq) => now >= appearAt(sq)) : [];
     return {
+      under: storm ? <StormRift scene={scene} stage={stage} /> : undefined,
       over: (
         <>
-          {storm && <StormRing scene={scene} />}
+          {storm && (scene === null || now >= scene + STORM_SCENE.fireAt) && <span class="sg-dim" />}
+          {storm && <StormRing scene={scene} lead={lead} />}
           {marks.length > 0 && <BoardEffects items={marks.map((square) => ({ square, name: "fireTile" as const, anim: "stage3", since: 0 }))} orientation={orientation} class="pw-fire-board" />}
           {marks.map((sq) => (
             <span key={`storm-${sq}`} class="pw-fire stage-3 pw-storm-fire" style={onSquare(sq, orientation)} data-square={sq} data-stage={3}>

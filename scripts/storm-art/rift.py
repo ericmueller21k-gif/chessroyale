@@ -11,7 +11,11 @@ then the floor far below (lava on the fire side, ice on the other) with the wall
 Drawn once, offline: one short loop (FRAMES frames: the flames lick, the lava and crystals glint, the chunks bob) for each heal stage
 (the rift closes from its ends and narrows each turn of the storm). The game only shows the pictures, under the pieces.
 
-  python3 scripts/storm-art/rift.py <out-dir> [res=202]    # rift-<stage>-<frame>.png, and rift-<stage>.png (the frames side by side)
+The opening (his storm's scene, STORM_SCENE in bosses/stranger.ts) tears it open: at the fire sword's slam a flash, the impact's pit,
+the lava fissure ripping out to the lower left, its chunks bursting up; at the ice sword's the ice fissure ripping out to the upper
+right, its crystals erupting, its chunks. OPEN_A frames from the first slam and OPEN_B from the second, 12 a second, ending on stage 1.
+
+  python3 scripts/storm-art/rift.py <out-dir> [res=202]    # sheet.png: COLS a row: each stage's loop, then the opening's frames
 
 Units: the board is 0..1 both ways, y down. Needs numpy and Pillow.
 """
@@ -30,6 +34,39 @@ FRAMES = 4
 CENTER = (0.5, 0.545)  # the impact: between his two swords
 # What is left at each stage: the fissures' length and width, the crater's size, how many chunks and crystals, the flames' height.
 STAGES = [dict(length=1.0, width=1.0, crater=1.0, bits=1.0, flames=1.0), dict(length=0.72, width=0.74, crater=0.78, bits=0.6, flames=0.7), dict(length=0.44, width=0.5, crater=0.55, bits=0.3, flames=0.42)]
+COLS = 8  # the sheet: frames a row
+OPEN_A, OPEN_B = 9, 10  # the opening's frames: from the fire sword's slam, from the ice sword's
+OPEN_FPS, LOOP_FPS = 12, 6
+SLAMS = (1900, 2700)  # STORM_SCENE.fireAt, iceAt (ms)
+SWORDS = ((CENTER[0] - 0.0356, CENTER[1]), (CENTER[0] + 0.0356, CENTER[1]))  # where each sword goes in (Stranger.tsx swordPoints)
+
+
+def stage_state(i):
+    """A heal stage as the drawing takes it: each number for the lava side and the ice side."""
+    s = STAGES[i]
+    return dict(length=[s["length"]] * 2, width=[s["width"]] * 2, crater=s["crater"], bits=[s["bits"]] * 2, flames=s["flames"], ice_on=True, burst=[1.0, 1.0], flash=None)
+
+
+def opening_state(k):
+    """The opening's frame k: how far each fissure has torn, the pit, the chunks' flight, the slam's flash; and the loop frame its
+    flames show (the same clock the loop runs on after it)."""
+    ease = lambda x: 1 - (1 - min(max(x, 0.0), 1.0)) ** 2
+    if k < OPEN_A:
+        ms = k * 1000 / OPEN_FPS
+        gl, gi, on = 0.14 + 0.86 * ease(k / (OPEN_A - 1)), 0.0, False
+        burst = [(k + 1) / OPEN_A, 0.0]
+        flash = (LAVA, 1 - k / 2.0) if k < 2 else None
+        crater = min(1.0, (k + 1) / 3)
+    else:
+        j = k - OPEN_A
+        ms = SLAMS[1] - SLAMS[0] + j * 1000 / OPEN_FPS
+        gl, gi, on = 1.0, 0.14 + 0.86 * ease(j / (OPEN_B - 1)), True
+        burst = [1.0, (j + 1) / OPEN_B]
+        flash = (ICY, 1 - j / 2.0) if j < 2 else None
+        crater = 1.0
+    st = dict(length=[gl, gi], width=[0.5 + 0.5 * gl, 0.5 + 0.5 * gi], crater=crater, bits=[1.0, 1.0], flames=0.35 + 0.65 * gl, ice_on=on, burst=burst, flash=flash)
+    return st, int(ms * LOOP_FPS / 1000) % FRAMES
+
 LAVA, ICY = 0, 1
 BOARD_LIGHT = (240, 216, 176)
 BOARD_DARK = (184, 152, 120)
@@ -66,8 +103,9 @@ class Fissure:
 
     def width(self, t, side, st):
         """Its half-width at `t` on a side (0 left of its heading, 1 right): widest at the impact, a point at its end."""
-        left = np.clip(1 - t / st["length"], 0, 1)
-        return self.wide * st["width"] * left**0.8 * np.interp(t, *self.jit[side])
+        length = max(st["length"][self.kind], 1e-4)
+        left = np.clip(1 - t / length, 0, 1)
+        return self.wide * st["width"][self.kind] * left**0.8 * np.interp(t, *self.jit[side])
 
     def field(self, u, v, st):
         """For every pixel: how deep into it (1 on its middle line, 0 at its lip, below 0 outside), and how far outside its lip."""
@@ -85,7 +123,8 @@ class Fissure:
             sd = np.where(near, (abx * (v - a[1]) - aby * (u - a[0]) > 0).astype(np.int32), sd)
         w = np.where(sd == 0, self.width(tt, 0, st), self.width(tt, 1, st))
         q = np.where(w > 1e-5, 1 - best / np.maximum(w, 1e-5), -1.0)
-        return q, best - w, w
+        # (Past where it ends there is no lip: nothing of it out there.)
+        return q, np.where(w > 1e-5, best - w, 1e9), w
 
 
 class Rift:
@@ -111,8 +150,7 @@ class Rift:
         self.low = volume((1, 128, 128), 2, 10, seed + 2, slope=1.1)
         self.lick = volume((FRAMES, 128, 128), 2, 16, seed + 3, slope=1.1, taniso=5)
 
-    def draw(self, res, stage, frame):
-        st = STAGES[stage]
+    def draw(self, res, st, frame):
         R = res * SS
         tau = frame / FRAMES
         c = (np.arange(R, dtype=np.float32) + 0.5) / R
@@ -126,7 +164,7 @@ class Rift:
         kind = np.zeros(u.shape, np.int32)
         wide = np.zeros_like(u)
         for f in self.all:
-            if f.fork > st["length"] * 0.8:
+            if st["length"][f.kind] <= 0 or f.fork > st["length"][f.kind] * 0.8:
                 continue
             fq, fn, fw = f.field(u, v, st)
             closer = fn < near
@@ -141,7 +179,7 @@ class Rift:
         cq = 1 - rho / rc
         axis = (-rx + ry) * 0.7071 + 0.02 * (low - 0.5)
         in_crater = cq > q
-        kind = np.where((rho - rc < near) | in_crater, (axis < 0).astype(np.int32), kind)
+        kind = np.where((rho - rc < near) | in_crater, (axis < 0).astype(np.int32) if st["ice_on"] else LAVA, kind)
         wide = np.where(rho - rc < near, rc * 0.7, wide)
         near = np.minimum(near, rho - rc)
         q = np.maximum(q, cq)
@@ -149,23 +187,24 @@ class Rift:
         lava_side = kind == LAVA
         layer = np.zeros((R, R, 4), np.float32)
         out = np.maximum(near, 0)
+        there = smooth(0.0, 0.008, wide)  # its lips' marks on the board thin out to nothing at its ends
 
         # 1. The glow that spills onto the board: lava's, and the cold's. Soft, see-through.
-        spill = np.exp(-out / 0.045) * (near > 0) * (0.7 + 0.3 * low) * np.clip(wide / 0.03, 0.25, 1)
+        spill = np.exp(-out / 0.045) * (near > 0) * (0.7 + 0.3 * low) * np.clip(wide / 0.03, 0.25, 1) * there
         over(layer, np.where(lava_side[..., None], np.array([255, 96, 16], np.float32), np.array([64, 160, 255], np.float32)), 0.34 * spill)
         # 2. The lifted, broken edges: a slab along each lip, tilted up toward the rift (lit at the lip, shaded toward its break), a
         #    dark break line, and its thin shadow on the board past it.
         reach = (0.012 + 0.03 * unit(samp(self.low, u * 3.3 + 0.2, v * 3.3, 0), 1.6)) * np.clip(wide / 0.03, 0.3, 1)
         t = np.clip(out / reach, 0, 1.6)
-        slab = (near > 0).astype(np.float32)
+        slab = (near > 0) * there
         over(layer, np.array([255, 246, 226], np.float32), 0.16 * np.clip(1 - t / 0.45, 0, 1) * slab)
         over(layer, np.array([44, 26, 18], np.float32), 0.42 * smooth(0.4, 1.0, t) * (t <= 1) * slab)
         over(layer, np.array([20, 10, 10], np.float32), 0.34 * np.clip(1 - (t - 1) / 0.35, 0, 1) * (t > 1) * slab)
         over(layer, np.array([24, 12, 10], np.float32), 0.9 * np.exp(-(((out - reach) / 0.0028) ** 2)) * slab)
         # 3. Scorch and molten rock over the fire side's lips; rime over the ice side's.
-        edge = np.exp(-out / 0.014) * (near > 0)
+        edge = np.exp(-out / 0.014) * (near > 0) * there
         over(layer, np.array([30, 12, 8], np.float32), 0.55 * edge * lava_side * (0.35 + 0.65 * grain))
-        melt = np.clip(np.exp(-out / 0.014) * 1.5 - 1.38 * (1 - unit(samp(self.low, u * 6.1, v * 6.1, 0), 1.6)), 0, 1) * lava_side * (near > 0)
+        melt = np.clip(np.exp(-out / 0.014) * 1.5 - 1.38 * (1 - unit(samp(self.low, u * 6.1, v * 6.1, 0), 1.6)), 0, 1) * lava_side * (near > 0) * there
         over(layer, ramp(np.clip(0.3 + 0.75 * melt, 0, 1), FIRE), smooth(0.0, 0.18, melt))
         over(layer, ramp(np.clip(0.55 + 0.45 * grain, 0, 1), ICE), 0.6 * np.clip(edge * 1.3 - 0.7 * (1 - grain), 0, 1) * ~lava_side)
 
@@ -180,9 +219,10 @@ class Rift:
                 turn = rng.choice([-1, 1]) * rng.uniform(0.5, 1.3)
                 length = rng.uniform(0.04, 0.1)
                 turns = [(rng.uniform(-0.7, 0.7), rng.uniform(0.4, 1.0)) for _ in range(4)]
-                if t0 > st["length"] or f.fork > st["length"] * 0.8:
+                reach_t = st["length"][f.kind]
+                if t0 > reach_t or f.fork > reach_t * 0.8:
                     continue
-                x, y, ang = f.at(min(t0, st["length"] * 0.98))
+                x, y, ang = f.at(min(t0, reach_t * 0.98))
                 ang += turn
                 pts = [(x, y)]
                 for da, dn in turns:
@@ -263,14 +303,15 @@ class Rift:
                 side = int(rng.integers(0, 2))
                 spikes = [(rng.uniform(-0.85, 0.85), rng.uniform(0.45, 1.0), rng.uniform(0.16, 0.26), rng.random(), int(rng.integers(0, FRAMES))) for _ in range(int(rng.integers(2, 4)))]
                 size = rng.uniform(0.055, 0.125) * (1 if main else 0.6)
-                keep = rng.random() < st["bits"] + 0.15
-                if t0 > st["length"] * 0.92 or f.fork > st["length"] * 0.8 or not keep:
+                keep = rng.random() < st["bits"][ICY] + 0.15
+                reach_t = st["length"][ICY]
+                if t0 > reach_t * 0.92 or f.fork > reach_t * 0.8 or not keep:
                     continue
                 x, y, ang = f.at(t0)
                 w = float(f.width(np.float32(t0), side, st))
                 out_ang = ang + (math.pi / 2 if side else -math.pi / 2)
                 bx, by = x + math.cos(out_ang) * w * 0.8, y + math.sin(out_ang) * w * 0.8
-                grow = size * (0.45 + 0.55 * (1 - t0 / st["length"])) * (0.6 + 0.4 * st["width"])
+                grow = size * (0.45 + 0.55 * (1 - t0 / reach_t)) * (0.6 + 0.4 * st["width"][ICY])
                 for da, dl, wid, tone, glint in spikes:
                     a = out_ang + da
                     a = math.atan2(math.sin(a) - 0.35, math.cos(a))  # they lean upward: erupting
@@ -310,11 +351,16 @@ class Rift:
             lightc = rng.random() < 0.5
             size = rng.uniform(0.02, 0.042) * (1.2 - 2.0 * far)
             phase = int(rng.integers(0, FRAMES))
-            keep = rng.random() < st["bits"]
-            if not keep:
+            on_lava = (-math.cos(ang) + math.sin(ang) * 0.9) > 0
+            mine = LAVA if on_lava else ICY
+            keep = rng.random() < st["bits"][mine]
+            b = st["burst"][mine]
+            if not keep or b <= 0:
                 continue
-            far *= 0.55 + 0.45 * st["crater"]
-            bob = [0, -1, 0, 1][(frame + phase) % FRAMES] / res
+            # (Bursting out: it flies from the impact to its place, up in an arc on the way.)
+            far *= (0.55 + 0.45 * st["crater"]) * (1 - (1 - b) ** 2)
+            up = 0.075 * math.sin(math.pi * b) if b < 1 else 0.0
+            bob = [0, -1, 0, 1][(frame + phase) % FRAMES] / res - up
             x, y = CENTER[0] + math.cos(ang) * far, CENTER[1] + math.sin(ang) * far * 0.9 + bob
             pts = [(x + math.cos(t) * size * rr, y + math.sin(t) * size * rr * 0.8) for t, rr in zip(angs, rad)]
             lift = 0.012 + 0.11 * far
@@ -322,7 +368,6 @@ class Rift:
             thick = size * 0.34
             draw.polygon([px(qx, qy + thick) for qx, qy in pts], fill=(80, 48, 40, 255))
             draw.polygon([px(*p) for p in pts], fill=(BOARD_LIGHT if lightc else BOARD_DARK) + (255,))
-            on_lava = (-(x - CENTER[0]) + (y - CENTER[1])) > 0
             order = sorted(range(n), key=lambda i: (pts[i][0] - CENTER[0]) ** 2 + (pts[i][1] - CENTER[1]) ** 2)
             draw.line([px(*pts[order[0]]), px(*pts[order[1]])], fill=(255, 170, 60, 255) if on_lava else (170, 224, 255, 255), width=max(1, int(0.006 * R)))
             draw.line([px(*p) for p in pts] + [px(*pts[0])], fill=(40, 20, 24, 255), width=max(1, int(0.004 * R)))
@@ -330,6 +375,14 @@ class Rift:
         over(layer, np.array([10, 6, 14], np.float32), 0.5 * sh)
         chips = np.asarray(img, np.float32)
         over(layer, chips[..., :3], chips[..., 3] / 255)
+        # 9. A slam's flash where its sword goes in: a white-hot burst, gone in two frames.
+        if st["flash"] and st["flash"][1] > 0:
+            which, power = st["flash"]
+            sx, sy = SWORDS[which]
+            fr = np.hypot(u - sx, v - sy)
+            tint = np.array([255, 216, 80], np.float32) if which == LAVA else np.array([136, 208, 255], np.float32)
+            over(layer, tint, 0.8 * power * np.exp(-((fr / 0.16) ** 2)))
+            over(layer, np.array([255, 252, 236], np.float32), power * np.exp(-((fr / 0.075) ** 2)))
         return layer
 
 
@@ -358,14 +411,22 @@ def main():
     res = int(sys.argv[2]) if len(sys.argv) > 2 else 202
     os.makedirs(out, exist_ok=True)
     rift = Rift()
+    frames = []
     for stage in range(len(STAGES)):
-        strip = Image.new("RGBA", (res * FRAMES, res), (0, 0, 0, 0))
         for frame in range(FRAMES):
-            img = finish(rift.draw(res, stage, frame), res)
+            img = finish(rift.draw(res, stage_state(stage), frame), res)
             img.save(os.path.join(out, f"rift-{stage + 1}-{frame}.png"))
-            strip.paste(img, (frame * res, 0))
-        strip.save(os.path.join(out, f"rift-{stage + 1}.png"))
-    print(f"{out}: {len(STAGES)} stages, {FRAMES} frames each, {res} px")
+            frames.append(img)
+    for k in range(OPEN_A + OPEN_B):
+        st, frame = opening_state(k)
+        img = finish(rift.draw(res, st, frame), res)
+        img.save(os.path.join(out, f"open-{k:02d}.png"))
+        frames.append(img)
+    sheet = Image.new("RGBA", (res * COLS, res * ((len(frames) + COLS - 1) // COLS)), (0, 0, 0, 0))
+    for i, img in enumerate(frames):
+        sheet.paste(img, ((i % COLS) * res, (i // COLS) * res))
+    sheet.save(os.path.join(out, "sheet.png"))
+    print(f"{out}: {len(STAGES)} stages of {FRAMES} frames, the opening's {OPEN_A} + {OPEN_B}, {res} px; sheet {sheet.size}")
 
 
 if __name__ == "__main__":
