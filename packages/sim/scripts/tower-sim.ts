@@ -16,6 +16,8 @@
  * - `stockfish`: Stockfish at full strength among the allowed moves (`TOWER_NODES`, default 200k): the ceiling, what only the
  *   powers and the rules can beat.
  * Each floor also records how it ended (`how`: mate, the move cap, stalemate, a power's kill, …) and its last position.
+ * The bosses draw as the floor does (Nov 26, core floorDraw: looser on the first floors, never a gift); `TOWER_DRAW=off` draws as
+ * before (BOSS_BRAIN's, gifts and all), for a baseline.
  *
  *   CLIMBER=<climber> npx tsx packages/sim/scripts/tower-sim.ts run <rating> <runs> <seed>   appends to reports/tower-sim/<climber>-<rating>.jsonl
  *   (the first run's files, `<rating>.jsonl`, are `maia`)
