@@ -2032,10 +2032,16 @@ export const BOSS_POWERS = {
    * was small (only plants), and nothing placed would only be less. Each outcome
    * weighs at most waterLooks squares (seeded among those its guards allow; a killer plant the crowd's pieces first, his
    * own only when none keeps the band), each searched at waterNodes; a watering searches at most waterBudget positions in
-   * all, besides the one before it, so ten seeds never stall a phone.
+   * all, besides the one before it and the pass alone, so ten seeds never stall a phone.
    */
   waterBand: [0.5, 2.5] as readonly [number, number],
   waterTarget: 1.5,
+  /**
+   * The placement's floor (Nov 27): no outcome goes where it leaves him more than this under the band's bottom, or under
+   * where he stands before the seeds (the pass alone, or with the regrowth) if that's lower; with no square above it, the
+   * outcome comes up as nothing. Without it a seed step could pull him far under (−6.99 in one probe: every option bad).
+   */
+  waterFloorMargin: 0.5,
   jackpotMax: 6,
   waterLooks: 4,
   waterNodes: 20_000,
