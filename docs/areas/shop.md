@@ -270,6 +270,10 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   really got shows the purest real one). Deleting ignores them and buying goes by what's really owned. A new item in `ITEM_DEFS` or a new worn shop slot is covered with no change; a new catalog
   needs its line in `admin-copies.ts`. Chat packs are left out
   ([2026-10-31-admin-owns-all.md](../decisions/2026-10-31-admin-owns-all.md)). Nov 7: the locker's preview is one pawn in your default color (W/B picker, bottom right, `Crates.tsx` `LockerPanel`), and the God King tab is gone (its effects stay under All).
+- **Rare frames and the item preview** (Nov 27; [2026-11-27-rare-frames-preview.md](../decisions/2026-11-27-rare-frames-preview.md)):
+  Legendary tiles wear a gold frame, Mythic a diamond one (`ITEM_FRAMES`, `frameClass` in settings.ts), in the locker and a crate's lists.
+  A locker tile's magnifier (`.locker-peek`; the tile's tap still wears it) or a crate's item row opens `ItemPreview` (Crates.tsx): your
+  pawn wearing or riding just that item (`Avatar`), its name, tier and finish, Close or Escape. Guard: `e2e/shop.spec.ts`, "rare frames".
 - **The icon builder** (the profile): a 48 × 48 pixel drawing with a paint bucket and undo (`UNDO_STEPS`), saved as a
   small PNG data URL (at most 16 KB, checked by the server).
 

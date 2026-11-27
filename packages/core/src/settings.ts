@@ -6350,3 +6350,12 @@ export const RESIDENTS = {
   gamePollMs: 30_000,
   host: { sleepAfter: "30m", args: ["--follow-deploys"], versionCheckMinutes: 2, drainMinutes: 20 },
 } as const;
+
+/**
+ * Rare item frames (Eric, Nov 12: "a nice clean like gold border or like diamond border";
+ * docs/decisions/2026-11-27-rare-frames-preview.md): the frame an item's tile wears by its tier, in the locker, a crate's
+ * "Possible items" and the item's preview. A tier not listed has no frame (its colored edge, as before).
+ */
+export const ITEM_FRAMES: Readonly<Record<string, "gold" | "diamond">> = { legendary: "gold", mythic: "diamond" };
+/** The tile class for an item tier's frame (" frame-gold", " frame-diamond", or "" for none). */
+export const frameClass = (tier: string) => (ITEM_FRAMES[tier] ? ` frame-${ITEM_FRAMES[tier]}` : "");
