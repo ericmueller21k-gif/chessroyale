@@ -1,4 +1,4 @@
-import { STRANGER_FX, finisherOf, pieceAt, withoutPiece, type Finisher } from "@chessroyale/chess";
+import { STRANGER_FX, finisherLeadMs, finisherOf, pieceAt, withoutPiece, type Finisher } from "@chessroyale/chess";
 import { EFFECTS, animLength, cueAt } from "../characters/power-art.ts";
 import { STRANGER, STRANGER_HOP } from "../characters/stranger.ts";
 import type { BossView } from "../game.ts";
@@ -207,7 +207,8 @@ const turnSeen = new Map<string, number>();
 
 /**
  * His finisher while he still thinks (strangerBattle.finisher: his move takes a piece of yours that isn't a pawn, known, about to show):
- * this turn's, from when this device first saw it; his move shows after it (the server holds it, solo waits).
+ * this turn's, from when this device first saw it (after his block, where a piece of his was just lost); his move shows after it (the
+ * server holds it, solo waits).
  */
 export function strangerTurnMoments(boss: BossView, now = Date.now()): Moment[] {
   const p = boss.powers;
@@ -221,7 +222,8 @@ export function strangerTurnMoments(boss: BossView, now = Date.now()): Moment[] 
         turnSeen.set(key, (at = now));
         if (turnSeen.size > 20) turnSeen.delete(turnSeen.keys().next().value!);
       }
-      return { kind: "finisher", key, at, ms: STRANGER_FX.finisher, square: e.square!, ...(e.shape ? { shape: e.shape } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}) } satisfies Moment;
+      // (After his block, where a piece of his was just lost: it plays where he stands first, his move held as long: finisherLeadMs.)
+      return { kind: "finisher", key, at: at + finisherLeadMs(boss.board, boss.crowdSide), ms: STRANGER_FX.finisher, square: e.square!, ...(e.shape ? { shape: e.shape } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}) } satisfies Moment;
     });
 }
 
@@ -245,7 +247,7 @@ export const STRANGER_UI = {
     frostfire: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + FREEZE.iceAt : undefined), view: strikeMoment },
     frostfireBurn: { order: 0, kit: "power", dock: (m) => (m.fizzled?.length ? "The fire spared the piece there." : m.shape ? "The square burnt." : "The square burnt empty."), view: burnMoment },
     // (His finisher, while he still thinks: strangerTurnMoments. No banner: his move is an ordinary capture.)
-    finisher: { order: 2, dock: (m) => `He comes for your ${PIECE_WORD[m.shape ?? "n"] ?? "piece"}.`, view: finisherMoment },
+    finisher: { order: 2, dock: (m) => `Your ${PIECE_WORD[m.shape ?? "n"] ?? "piece"} falls.`, view: finisherMoment },
   },
   // The frozen piece's ice (the characters' iceOverlay, as Ginger's freeze), and on the flee turn its tile ablaze, its countdown 1.
   board: ({ boss, p, board, orientation, now, appearAt }) => {

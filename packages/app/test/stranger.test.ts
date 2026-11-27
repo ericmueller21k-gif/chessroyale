@@ -5,7 +5,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ART_KITS, BOSS_KITS, STRANGER_FLOURISH_EVERY, STRANGER_SLASHES, strangerAnim } from "../src/characters/kits.ts";
-import { FINISHERS } from "@chessroyale/chess";
+import { FINISHERS, FINISHER_BLOCK_MS } from "@chessroyale/chess";
+import { animLength } from "../src/characters/power-art.ts";
 import { finishTimeline, finisherStand } from "../src/components/Stranger.tsx";
 import { EFFECTS } from "../src/characters/power-art.ts";
 import { POSES, STRANGER, STRANGER_FOOT, STRANGER_PORTRAIT, STRANGER_SOUNDS, TIPS_AT } from "../src/characters/stranger.ts";
@@ -171,6 +172,8 @@ describe("his swords (Eric, Nov 27: his slashes, his block, his flourish, his fi
     // His shout (the God King's, Eric's) as every strike winds up; his clang as he blocks.
     for (const a of [...STRANGER_SLASHES, ...FINISHERS.map((f) => `fin_${f}`)]) expect(STRANGER.anims[a]!.frames.some((f) => f.cue === "shout"), a).toBe(true);
     expect(STRANGER.anims.block!.frames.some((f) => f.cue === "clang")).toBe(true);
+    // (His finisher waits for his block: the block's whole animation within the wait.)
+    expect(animLength(STRANGER.anims.block!)).toBeLessThanOrEqual(FINISHER_BLOCK_MS);
     expect(STRANGER_SOUNDS.shout).toBe("gkHyuah");
   });
 

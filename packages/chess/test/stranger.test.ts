@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BATTLE_TOWER, BOSS_POWERS, BOSS_ROSTER, adminFirst, adminFirstBosses, bossDef, canPick, chooseBoss, finishFloor, floorBoss, floorUnlocks, isPlayable, menuBosses, mulberry32, newRun, startFloor, towerPool, unlockBosses, unlockFloor, unlockReady, type BossDef } from "@chessroyale/core";
-import { FINISHERS, FINISHER_TEST, MatchRunner, POWER_FX, STRANGER_FX, bossRules, finisherOf, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
+import { FINISHERS, FINISHER_BLOCK_MS, FINISHER_TEST, MatchRunner, POWER_FX, STRANGER_FX, bossRules, finisherOf, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
 import { KIT_OPENING, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 import { powerRoll } from "../src/bosses/base.ts";
 
@@ -285,7 +285,9 @@ describe("his finisher (Eric, Nov 27: a capture of a piece that isn't a pawn sho
     await crowdMove(r);
     const id = r.state.boards[0]!;
     const board = r.boards.get(id)!;
-    r.boards.set(id, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== board.history.length), { ply: board.history.length, fen }] });
+    // (The same position before the crowd's last move too: nothing of his just lost, no block to wait for.)
+    const ply = board.history.length;
+    r.boards.set(id, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply < ply - 1), { ply: ply - 1, fen }, { ply, fen }] });
     r.state = { ...r.state, boss: { ...r.boss!, crowdSide: crowd } };
     return r;
   }
@@ -350,7 +352,8 @@ describe("the finisher's test switch (?power=finisher, finisher-<kind>)", () => 
         let held = 0;
         const move = await r.playBoss(undefined, async (ms) => void (held = ms));
         expect(move.slice(2, 4)).toBe(side === "w" ? "f6" : "f3");
-        expect(held).toBe(STRANGER_FX.finisher);
+        // (After his block: your bishop took his knight.)
+        expect(held).toBe(STRANGER_FX.finisher + FINISHER_BLOCK_MS);
         r.deal();
         expect(pieceAt(fenOf(r), move.slice(2, 4))?.color).toBe(side === "w" ? "b" : "w");
       }

@@ -7,8 +7,8 @@
  */
 import { BIRDIE_SOUND_EVERY, BOSS_ROSTER, type BossDef } from "@chessroyale/core";
 import type { SoundName } from "../sound.ts";
-import { hash, material, type Beat, type BeatLines, type BeatResult, type BeatState, type Loop, type Stage } from "./boss-beats.ts";
-import { fenAtPly } from "@chessroyale/chess";
+import { hash, type Beat, type BeatLines, type BeatResult, type BeatState, type Loop, type Stage } from "./boss-beats.ts";
+import { hisLoss } from "@chessroyale/chess";
 import { BIGBOY_ATTACK, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT, BIGBOY_SPRITE } from "./bigboy.ts";
 import { CLOWN, CLOWN_ATTACK, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_ATTACK, GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT } from "./gingerbread.ts";
@@ -232,16 +232,11 @@ export const STRANGER_FLOURISH_EVERY = 3;
  * - a piece of his taken that isn't a pawn (he lost 3 or more): his block ("he takes them out and blocks ... took a blow"); a pawn: his flinch;
  * - every third of his quiet moves: his swords drawn, twirled and sheathed.
  */
-export function strangerAnim(beat: Pick<BeatResult, "anim" | "key">, s: Pick<BeatState, "fen" | "history" | "bases" | "crowdSide" | "lastMove" | "seen">): string | undefined {
+export function strangerAnim(beat: Pick<BeatResult, "anim" | "key">, s: Pick<BeatState, "fen" | "history" | "bases" | "crowdSide" | "lastMove">): string | undefined {
   const took = s.lastMove?.captured;
   if (beat.anim === "capture" || beat.anim === "check") return took === "p" ? STRANGER_SLASHES[hash(beat.key) % STRANGER_SLASHES.length] : took ? "idle" : undefined;
-  if (beat.anim === "hurt") {
-    if (!s.history.length) return undefined;
-    const see = s.seen ?? ((f: string) => f);
-    const his = s.crowdSide === "w" ? "b" : "w";
-    const lost = material(see(fenAtPly(s.history, s.history.length - 1, s.bases)), his) - material(see(s.fen), his);
-    return lost >= 3 ? "block" : undefined;
-  }
+  // (The same rule as his finisher's wait for it: hisLoss.)
+  if (beat.anim === "hurt") return hisLoss(s, s.crowdSide) >= 3 ? "block" : undefined;
   if (beat.anim === "move") return Math.ceil(s.history.length / 2) % STRANGER_FLOURISH_EVERY === 0 ? "flourishAll" : undefined;
   return undefined;
 }
@@ -1292,7 +1287,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   Stranger: {
     // (His phone bar's fit, measured with packages/app/test/bar-fit.ts's barFit over his rest frames.)
     barScale: 0.79,
-    barShift: 1,
+    // (2, was 1: his swords twirled and swept reach a pixel further left, Nov 27.)
+    barShift: 2,
     ch: STRANGER,
     anims: {
       entrance: "nod",

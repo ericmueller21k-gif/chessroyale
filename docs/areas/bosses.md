@@ -1036,6 +1036,11 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   hilts on his back peek over his shoulders beside it. His aura grows
   from the figure's own part (two levels), so it never paints him twice. His lines are his alone: his voice's sound is keyed by a
   line's words.
+  His swords (Nov 27, docs/decisions/2026-11-27-stranger-swords.md): his move taking your piece that isn't a pawn is held for his
+  **finisher** (`strangerBattle.finisher` via `bossMoveMoment`, as Chandy's lock; `finisher` event, `pick` → flame, ice, cut or frostfire):
+  his hop onto the board, the finisher on the piece, the piece off the board (`strangerBoard`), his hop back, then the move
+  (`components/Stranger.tsx`, `finishTimeline`); after his block first (`finisherLeadMs`). Your pawn: one of three slashes; his piece lost:
+  his block; every third quiet move: his flourish (`kits.ts` `strangerAnim`, the kit's `animOf`). Shout: `gkHyuah`. Test link `&power=finisher[-kind]`.
 
 - **Chandy** (Nov 16; art docs/decisions/2026-11-16-chandy-art.md, rules 2026-11-16-chandy-rules.md): rules `bosses/chandy.ts`
   (and `chandyBattle`: the meter, the queen lock's shot, Dodge's rounds), server `server/src/bosses/chandy.ts` (Dodge's timer and

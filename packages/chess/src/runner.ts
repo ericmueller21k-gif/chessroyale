@@ -140,7 +140,6 @@ import {
   chandyBattle,
   CHANDY_FX,
   strangerBattle,
-  STRANGER_FX,
   dodgeWon,
   mateHeld,
   trainSquare,
@@ -1836,7 +1835,7 @@ export class MatchRunner {
     if (!(this.bossAllowed() ?? legalMoves(fen)).includes(move)) return 0;
     if (chandyBattle.firstLock(this.battle, move)) return CHANDY_FX.lockOn;
     // (The Stranger's finisher on a piece of yours that isn't a pawn: his leap, the strike, then the move.)
-    return strangerBattle.finisher(this.battle, move) ? STRANGER_FX.finisher : 0;
+    return strangerBattle.finisher(this.battle, move);
   }
 
   /** Boingo's funhouse: he plays the crowd's move this turn (the funhouse's first, once), before the crowd picks. */
