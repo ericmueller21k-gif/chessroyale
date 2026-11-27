@@ -12,6 +12,7 @@ import { TOWN_ITEM_FRAMES, type ItemLook } from "@chessroyale/core";
 import { Avatar } from "../components/Items.tsx";
 import type { YouArt } from "./render.ts";
 import { art2d } from "./paint.ts";
+import { upName } from "./frame-report.ts";
 
 /** Room round the pawn's box for items that rise or reach past it (`Avatar` lets them go 12% past it at most). */
 const PAD = 0.15;
@@ -147,7 +148,7 @@ export async function dressedPawn(look: ItemLook | null | undefined, pawn: HTMLC
         break;
       }
     const art: YouArt = { img: c, pad: PAD, top: Math.floor(first / 4 / S) / S };
-    if (spec && frameLayers.length) art.loop = { frames: frameLayers.map(compose), loopMs: spec.loopMs, fromMs: spec.fromMs, toMs: spec.toMs };
+    if (spec && frameLayers.length) art.loop = { frames: frameLayers.map((l) => upName(compose(l), "dressed pawn frame")), loopMs: spec.loopMs, fromMs: spec.fromMs, toMs: spec.toMs };
     return art;
   } catch {
     return null;
