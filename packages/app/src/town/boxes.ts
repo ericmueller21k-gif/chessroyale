@@ -379,11 +379,11 @@ let P: BoxPlan;
 let BI: BoxInst;
 let BX: TownBox;
 let V: View;
-let offX = 0;
-let offY = 0;
-let CUT = 0;
+// (The box being planned's offsets and near cut: 0, 1 and 2. In a typed array, not module `let`s, Nov 27: a module variable holding a
+// fraction is a new boxed number each time it's set, three a box a frame, a few hundred boxes: much of walking's garbage.)
+const OFF = new Float64Array(3);
 /** A world point of the box being planned into the camera's frame (`cq`). */
-const atCam = (x: number, y: number) => toCam(V, x + offX, y + offY, cq);
+const atCam = (x: number, y: number) => toCam(V, x + OFF[0]!, y + OFF[1]!, cq);
 function grow(x: number, y: number): void {
   if (x < P.minX) P.minX = x;
   if (x > P.maxX) P.maxX = x;
@@ -403,7 +403,7 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   atCam(wp.x, wp.y);
   w.dx = (ax + cq.dx) / 2;
   w.dz = (az + cq.dz) / 2;
-  if (Math.max(az, cq.dz) < CUT) return;
+  if (Math.max(az, cq.dz) < OFF[2]!) return;
   // (A wall running past the camera, a row's beside you: only its part in front of the camera, cut where it passes the near plane.)
   let bx = cq.dx;
   let bz = cq.dz;
@@ -469,10 +469,10 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
   BI = b;
   BX = box;
   V = v;
-  CUT = cut;
+  OFF[2] = cut;
   // Every point from the camera, the nearest way round the wrap from the box's front line's middle.
-  offX = wrapFX(b.fx - camX) - b.fx;
-  offY = wrapFY(b.fy - camY) - b.fy;
+  OFF[0] = wrapFX(b.fx - camX) - b.fx;
+  OFF[1] = wrapFY(b.fy - camY) - b.fy;
   p.on = false;
   p.minX = p.minY = Infinity;
   p.maxX = p.maxY = -Infinity;
