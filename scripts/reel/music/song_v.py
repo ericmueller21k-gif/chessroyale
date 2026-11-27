@@ -64,13 +64,15 @@ like before that, we need like this one more verse ... It keeps ... every kind o
 different keys that just sounds like really nice, like pleasant to the ear. And it ... does like a ... one note,
 like ring out for a second and then like stops. And then ... the background beat ... everything kind of is picking
 up. And then it does like another ... a few times maybe. And there could be like a small part in the middle ... an
-extra like 25 to 30 seconds." So, between the second duel and the choir alone, 24 bars at 200 (29 s; RECLUSE_HYMN=1
-in the environment puts them in: without it the score is as it was): the band goes on as in the chant, and over
-it the men sing one full major chord for a bar and let it go; the band alone drives the next bar harder (a kick on
-every 16th, the lead and the fiddle tearing through the scale); then the next chord: G, E flat, B (the score's
-three roots, a major third apart, now all bright) and D. In the middle, eight bars of a hymn in four parts, a chord
-every two beats. Then the three again in another order, the boys over the men, shouts after each, and D held long,
-into the book.
+extra like 25 to 30 seconds." The first go kept the band at full tilt under the men; Eric: "I meant ... the choir
+humming as like the main sound you're hearing ... think like church ... like you're in like an oil well ... the
+reverb ... whatever you put in there, it's like in the background anyway, so I can't even hear it". So, the second
+go, between the second duel and the choir alone, 24 bars at 200 (29 s; RECLUSE_HYMN=1 in the environment puts them
+in: without it the score is as it was): wherever the men sing, the band is out and only the clock ticks. The band
+stops on a kick; the men sing one full major chord alone for six beats and let it go into a church twice the stone
+room's size; the beat picks up (the bass and a kick, the band, the band harder under a roll) and stops on the next
+chord: G, E flat, then the small part in the middle (six chords in G major with a line on top, the bass creeping
+in under the last two), then B, and D, which the men take up again over the band and hold into the book.
 591 beats, about 3:58 (687 and 4:27 with the hymn).
   python3 song_v.py <out.wav>
 
@@ -272,17 +274,16 @@ assert (T_FLAG, T_MEMORY, T_CHANT2, T_LAST, BEATS, len(SWEEP)) == (138, 268, 334
 # ---- the hymn (the third form's; after the second duel). ----
 MAJOR = (0, 2, 4, 5, 7, 9, 11)
 MIXO = (0, 2, 4, 5, 7, 9, 10)  # the major scale from its fifth
-# A chord rung out: the bass, the strings' root, the run's first note and scale, and the men's five notes.
-RING_G = (43, 67, 55, MAJOR, (43, 50, 55, 59, 62))
-RING_EB = (39, 63, 51, MAJOR, (39, 51, 55, 58, 63))
+# A chord rung out: the bass, the strings' root, the run's first note and scale, and the men's notes from the bottom.
+RING_G = (43, 67, 55, MAJOR, (43, 50, 55, 59, 62, 67))
+RING_EB = (39, 63, 51, MAJOR, (39, 51, 55, 58, 63, 67))
 RING_B = (47, 59, 59, MAJOR, (47, 54, 59, 63, 66))
-RING_D = (38, 62, 50, MIXO, (38, 50, 57, 62, 66))
-# The hymn in the middle, eight bars in G major, four parts, a chord every two beats (the last for four): the bass, the
-# strings' root, minor or major, and the men's notes from the bottom.
-CHORALE = [(43, 67, "M", (43, 50, 55, 59)), (42, 62, "M", (42, 50, 57, 62)), (40, 64, "m", (40, 52, 59, 64)), (48, 60, "M", (48, 55, 60, 64)),
-           (47, 67, "M", (47, 55, 59, 62)), (45, 69, "m", (45, 52, 57, 60)), (38, 62, "M", (38, 55, 57, 62)), (38, 62, "M", (38, 54, 57, 62)),
-           (40, 64, "m", (40, 55, 59, 64)), (38, 59, "m", (38, 54, 59, 66)), (48, 60, "M", (48, 55, 64, 67)), (47, 67, "M", (47, 55, 62, 67)),
-           (45, 69, "m", (45, 55, 60, 64)), (38, 62, "M", (38, 54, 60, 62)), (43, 67, "M", (43, 50, 55, 59, 62))]
+RING_D = (38, 62, 50, MIXO, (38, 50, 57, 62, 66, 69))
+# The small part in the middle, in G major: six chords of four beats (G, B minor over F sharp, E minor, C, G over D,
+# D), the lower parts' notes from the bottom; and the top part's line over them, which hangs on G before the last
+# chord's third.
+PSALM = [(43, 50, 55, 59), (42, 54, 59), (40, 52, 59), (48, 55, 60), (38, 50, 55, 59), (38, 50, 57, 62)]
+PSALM_TOP = "D4:4 | D4:2 E4:1 F#4:1 | G4:3 F#4:1 | E4:4 | D4:2 G4:2 | G4:2 F#4:4"
 
 
 def render(window=None, lead: float = 8.0, rage=None, loom: bool = False) -> np.ndarray:
@@ -301,7 +302,7 @@ def render(window=None, lead: float = 8.0, rage=None, loom: bool = False) -> np.
     sr = x.sr
     tau = 2 * np.pi
     levels = {"solo": 1.6, "violins": 1.0, "violas": 1.0, "cellos": 1.0, "pads": 1.0, "slide": 1.6, "lead": 1.25, "bass": 0.7, "sub": 0.6, "brass": 1.0,
-              "kick": 0.9, "snare": 2.0, "hats": 4.0, "drum": 1.5, "clock": 3.0, "book": 1.5, "fx": 1.2, "hum": 0.7, "choir": 6.0, "guitar": 1.15, "keys": 2.1, "park": 3.0, "tune": 2.1, "box": 2.1, "siren": 1.6}
+              "kick": 0.9, "snare": 2.0, "hats": 4.0, "drum": 1.5, "clock": 3.0, "book": 1.5, "fx": 1.2, "hum": 0.7, "choir": 6.0, "hymn": 8.5, "guitar": 1.15, "keys": 2.1, "park": 3.0, "tune": 2.1, "box": 2.1, "siren": 1.6}
     BOWED = x.BOWED
     BRIDGE = [0.5, 0.6, 0.8, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.25, 0.2]  # bowed near the bridge: the high overtones over the note
 
@@ -580,9 +581,9 @@ def render(window=None, lead: float = 8.0, rage=None, loom: bool = False) -> np.
                 bow(b, d, m + 4, "violas", 0.55 * third, 0.15, long=True)
         return line
 
-    def sing(b, d, m, vol=0.1, mouth=0.7, pan=0.0, singers=5, start=0.1):
+    def sing(b, d, m, vol=0.1, mouth=0.7, pan=0.0, singers=5, start=0.1, bus="choir", let_go=None):
         """Men singing one note, no words: several voices a little apart, straight (hardly any vibrato); `mouth` from
-        closed (0, a hum) to "ah" (1)."""
+        closed (0, a hum) to "ah" (1). `let_go`: the seconds the note takes to die away, when not the usual short one."""
         at(b, d)
         k = x.k(d * 1.03)
         t = np.arange(k) / sr
@@ -599,7 +600,7 @@ def render(window=None, lead: float = 8.0, rage=None, loom: bool = False) -> np.
             ph = tau * np.cumsum(f0 * 2 ** (rng.uniform(-14, 14) / 1200) * waver) / sr
             for h, g in enumerate(gains, 1):
                 w += g * np.sin(h * ph + rng.uniform(0, tau))
-        put("choir", b, (w / singers + 0.015 * hiss(k, 4000, 0.5)) * np.minimum(1, t / start) * tail(k, min(0.18, 0.4 * k / sr)) * vol, pan)
+        put(bus, b, (w / singers + 0.015 * hiss(k, 4000, 0.5)) * np.minimum(1, t / start) * tail(k, min(0.18, 0.4 * k / sr) if let_go is None else let_go) * vol, pan)
 
     def chant(line, vol=1.0, mouth=0.75, scale=None):
         """The choir on a line: the men, the basses an octave under them, and (where `scale`, a set of the notes
@@ -1072,61 +1073,78 @@ def render(window=None, lead: float = 8.0, rage=None, loom: bool = False) -> np.
     chanted(T_CHANT2, big=True)
     dueled(T_DUEL2, [DUEL[1], DUEL[2], DUEL[0], DUEL[3]], big=True)
 
-    def hymn(b, d, ms, vol=1.0, boys=False, mouth=0.95):
-        """The men on one chord, open-mouthed, a note to a part; `boys`: its top two notes an octave over, softly."""
+    def monks(b, d, ms, vol=1.0):
+        """The men on one chord, alone in a big church: a note to a part, seven voices each, the mouths half open
+        ("oh"), let go slowly. On a bus of their own, which gets the long echo at the end."""
         for j, m in enumerate(ms):
-            sing(b, d, m, (0.15 if j == 0 else 0.128) * vol, mouth * (0.8 if m < 48 else 1.0), (-0.1, 0.35, -0.35, 0.15, -0.5)[j % 5], 4, start=0.14)
-        if boys:
-            sing(b, d, ms[-1] + 12, 0.045 * vol, 0.6, 0.2, 3, start=0.18), sing(b, d, ms[-2] + 12, 0.04 * vol, 0.6, -0.2, 3, start=0.18)
+            loud = 0.15 if j == 0 else 0.085 if m > 65 else 0.12
+            sing(b, d, m, loud * vol, 0.45 if m < 48 else 0.58, (-0.1, 0.35, -0.35, 0.15, -0.5, 0.5)[j % 6], 7, start=0.16, bus="hymn", let_go=0.3)
 
-    def rung(b, ring, big=False, runs=None, shouts=False):
-        """Two bars of the hymn's ring-outs. The first: the men's chord, held for the bar and let go, a bell, low brass,
-        the band under it as it was. The second: the band alone and harder, a kick on every 16th; the lead and the
-        fiddle through the chord's scale (`runs`: which run), or the snare's roll; `shouts`: two short ones to end it."""
+    def pickup(b, low, vol=1.0):
+        """Two beats of the beat coming back: the bass and a short kick on the 8ths, louder each, and the clock."""
+        for i in range(4):
+            synth(b + i / 2, low, 0.45, (0.14 + 0.03 * i) * vol, 1100)
+            kick(b + i / 2, (0.26 + 0.05 * i) * vol, short=True)
+            tick(b + i / 2, 0.12, i % 2 == 0)
+
+    def rung(b, ring, big=False, runs=None):
+        """A chord rung out, four bars. The band stops on a kick and a crash. The men sing the chord alone for six
+        beats and let it go, the clock ticking under them; for two beats the church rings, the clock in 8ths. Then
+        the beat picks up: the bass and a kick for two beats, the band for two, the band harder for four (a kick on
+        every 16th) under the snare's roll and (`runs`: which) the lead and the fiddle through the chord's scale."""
         low, chord, tonic, scale, voices = ring
-        x.crash(b, 0.14 if big else 0.1, decay=0.5)
-        bell(b, chord - 12, 1.6, 0.09 if big else 0.07)
-        hymn(b, 4, voices, 1.05 if big else 1.0, boys=big)
-        brass(b, 6, low, 0.13 if big else 0.11)
-        band(b, 4, low, chord, "M")
-        band(b + 4, 4, low, chord, "M", hard=True)
+        kick(b, 0.6), x.crash(b, 0.12 if big else 0.09, decay=0.45)
+        monks(b, 6, voices, 1.1 if big else 1.0)
+        for i in range(6):
+            tick(b + i, 0.1, i % 2 == 0)
+        for i in range(4):
+            tick(b + 6 + i / 2, 0.07 + 0.015 * i, i % 2 == 0)
+        pickup(b + 8, low)
+        band(b + 10, 2, low, chord, "M", hard=big)
+        band(b + 12, 4, low, chord, "M", hard=True)
         if runs is not None:
-            run(b + 4, RUNS[runs], tonic, scale)
-        else:
-            for i in range(8):
-                snare(b + 6 + i * 0.25, 0.06 + 0.016 * i)
-        if shouts:
-            stab(b + 7, low, chord, "M", 0.8), stab(b + 7.5, low, chord, "M", 0.8)
-        else:
-            snare(b + 7.5, 0.2), snare(b + 7.75, 0.26)
+            run(b + 12, RUNS[runs], tonic, scale)
+        for i in range(8):
+            snare(b + 14 + i * 0.25, 0.06 + 0.016 * i)
 
     def hymned(start):
-        """The hymn: 24 bars at 200, the band at full tilt all through. Four chords rung out (G, E flat, B, D), a bar
-        each with a bar of the band between; eight bars of the men's hymn in four parts; then three rung out again,
-        bigger (B, E flat, G: boys over the men, shouts), and D held for seven beats over a roll, into the book."""
-        for i, (ring, runs) in enumerate(((RING_G, None), (RING_EB, 1), (RING_B, None), (RING_D, 3))):
-            rung(start + 8 * i, ring, runs=runs)
+        """The hymn: 24 bars at 200. Wherever the men sing the band is out: only the clock under them. Two chords
+        rung out (G, E flat), the beat picking up after each; the small part in the middle, six chords in G major
+        with a line on top, the bass creeping in under the last two; then B rung out, and D, which the men take up
+        again over the band and hold into the book."""
+        rung(start, RING_G)
+        rung(start + 16, RING_EB, runs=1)
         b = start + 32
-        x.crash(b, 0.12, decay=0.5), bell(b, 55, 1.8, 0.08)
-        for i, (low, chord, kind, voices) in enumerate(CHORALE):
-            count = 4 if i == len(CHORALE) - 1 else 2
-            hymn(b, count * 1.02, voices, 1.0, mouth=0.85)
-            band(b, count, low, chord, kind)
-            if i % 4 == 0:
-                brass(b, 8, low, 0.1)
-            b += count
-        run(start + 60, RUNS[1], 55, MAJOR)
-        for i, (ring, runs) in enumerate(((RING_B, 0), (RING_EB, None), (RING_G, 1))):
-            rung(start + 64 + 8 * i, ring, big=True, runs=runs, shouts=True)
-        b = start + 88
+        kick(b, 0.6), x.crash(b, 0.09, decay=0.45)
+        for i, voices in enumerate(PSALM):
+            monks(b + 4 * i, 6 if i == 5 else 4, voices, 1.15)
+        for first, d, m in notes(b, PSALM_TOP):
+            sing(first, d, m, 0.12, 0.6, 0.1, 7, start=0.12, bus="hymn", let_go=0.25)
+        for i in range(26):
+            tick(b + i, 0.1, i % 2 == 0)
+        for i in range(20):
+            synth(b + 16 + i / 2, 38, 0.45, 0.05 + 0.008 * i, 1100)
+            if i >= 8 and i % 2 == 0:
+                kick(b + 16 + i / 2, 0.2 + 0.02 * (i - 8), short=True)
+        band(b + 26, 2, 38, 62, "M"), band(b + 28, 4, 38, 62, "M", hard=True)
+        run(b + 28, RUNS[3], 50, MIXO)
+        for i in range(8):
+            snare(b + 30 + i * 0.25, 0.06 + 0.016 * i)
+        rung(start + 64, RING_B, big=True, runs=1)
+        b = start + 80
         low, chord, tonic, scale, voices = RING_D
-        x.crash(b, 0.16, decay=0.6), bell(b, 50, 2.0, 0.1)
-        hymn(b, 7, voices, 1.1, boys=True)
-        brass(b, 8, low, 0.14)
-        band(b, 4, low, chord, "M", hard=True), band(b + 4, 3, low, chord, "M", hard=True)
-        shimmer(b, 7, chord + 19, 0.035, 0.3)
+        kick(b, 0.6), x.crash(b, 0.14, decay=0.5)
+        monks(b, 6, voices, 1.1)
+        for i in range(6):
+            tick(b + i, 0.1, i % 2 == 0)
+        for i in range(4):
+            tick(b + 6 + i / 2, 0.07 + 0.015 * i, i % 2 == 0)
+        pickup(b + 8, low)
+        monks(b + 10, 6, voices, 1.2)
+        brass(b + 10, 6, low, 0.14)
+        band(b + 10, 2, low, chord, "M", hard=True), band(b + 12, 4, low, chord, "M", hard=True)
         for i in range(16):
-            snare(b + 4 + i * 0.25, 0.05 + 0.011 * i)
+            snare(b + 12 + i * 0.25, 0.05 + 0.011 * i)
 
     if HYMN:
         # (Made with its own run of the random numbers, put back after: every other note of the score is as it was.)
@@ -1216,6 +1234,8 @@ def render(window=None, lead: float = 8.0, rage=None, loom: bool = False) -> np.
     cathedral("choir")
     cathedral("keys", 2.5, 0.4), cathedral("tune", 2.5, 0.4), cathedral("box", 2.5, 0.45)
     cathedral("park", 1.6, 0.7), cathedral("siren", 3.0, 0.35)
+    if HYMN:
+        cathedral("hymn", 6.0, 1.2)  # the hymn's church: twice the stone room, more of it than of the men
     x.beat_s = 60 / 160  # the echoes' beat
     x.echo("lead", 0.75, 0.14, 0.06)
     x.echo("solo", 0.75, 0.12, 0.05)

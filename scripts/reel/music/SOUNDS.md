@@ -803,7 +803,7 @@ also don't want like repeated exact verse or sound that's already been used ... 
 - The other two-minute themes, to do one by one if this passes: Boingo, Jefferson, Big Boy, Sawyer, Moo & Moon,
   Folio, Timber, Don Dough (2:00 each); Ginger, Alfil and Chub & Chirp are 2:10.
 
-## A hymn for the Hidden Boss's third form (Nov 26), sent, no verdict yet
+## A hymn for the Hidden Boss's third form (Nov 26): first go not liked; second go sent as a sample
 
 Eric, of the game's "he transforms" piece (song_v.py from the second chant on): "right now, like it dies out kind of
 during the middle, and then it does its final build up. But I feel like before that, we need like this one more verse
@@ -828,6 +828,30 @@ there could be like a small part in the middle ... an extra like 25 to 30 second
   last third 1 dB over; -16.0 LUFS, peak -1.2 dBFS.
 - If he passes it: `RECLUSE_HYMN=1 python3 phases_v.py --stereo --kbps 192 <folder>` rebuilds his four pieces (only
   `recluse-phase3-loop` and its length change in substance), then the director gets the new loop's seconds.
+
+**Second go (Nov 26), a 44-second sample.** Eric on the first: "it wasn't even when I meant like the choir humming as
+like the main sound you're hearing. Like if you have to think like church, like style. Like there's like the halo,
+like the iconic halo. Like it sounds like you're in like an oil well ... we don't want like a real echo ... Maybe
+reverb is really the way I'm trying to describe it. But yeah, whatever you put in there, it's like in the background
+anyway, so I can't even hear it ... just for that small sample bit of the hidden boss ... maybe give it one more
+shot, but otherwise we'll just leave it be."
+- The game he names is a style reference only: a men's choir alone in a very long reverb. No tune, chord order or
+  rhythm of its music is used; the chords are the score's own three roots and D, and the middle part's line is new.
+- What changed: wherever the men sing, the band is out (only the clock ticks). The band stops on a kick; the men
+  sing the chord alone for six beats (1.8 s) and let go; the church rings for two beats; the beat picks up over
+  eight (bass and kick, the band, the band harder under a roll) and stops on the next chord. G, E flat; the middle
+  part (six chords in G major, four beats each, a line on top; 8 s without the band); B; D, which the men take up
+  again over the band and hold into the book's slam.
+- The voice: the score's own men (`sing`), seven to a part, five or six parts, mouths half open, on a bus of their
+  own (`hymn`) with a 6-second church (`cathedral("hymn", 6.0, 1.2)`: more echo than voice; the chant's room is 3.5 s
+  and half as wet).
+- Measured on the master: the men alone -18.6 dB RMS, the band's stretches -17.4 to -19.9, the middle part -18.8
+  (the first go's choir was 4 dB under everything it sang over); the ring two beats after they stop is only 5 dB
+  under them; the last chord over the band is the piece's loudest moment (-15). Without the switch the score is
+  bit for bit the one from before the hymn.
+- **Lessons:** "the main sound you're hearing" means the other voices stop, not that the new voice matches their
+  level. When he names a famous sound, ask what about it he means (here: the room, not the notes) and say so.
+- If it misses, the hymn's code comes out of song_v.py and the score stays as the game has it.
 
 **Hollow's longer song, second go (Nov 26).** Eric on the first: "I'm not a fan of the hollow changes ... that first
 part of the transition, it just doesn't sound great ... whatever ... comes in at like 156 onward is good, but before
