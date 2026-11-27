@@ -2577,6 +2577,8 @@ export const RECLUSE_CHILD = {
  * starts his fight as the child (`recluseChildFirst`, the settings' `recluseChild`).
  */
 export type RecluseForm = "child" | "adult" | "four";
+// (The profile's match history stores a count, results.forms_beaten, read as a position in this list: reordering or dropping a
+// form re-reads every stored row (drop the child, and an old 1 grays the man).)
 export const RECLUSE_FORMS: readonly RecluseForm[] = ["child", "adult", "four"];
 /** His fight starts as the child: his forms (RECLUSE_FORMS) begin with it. The settings' `recluseChild` where he's fought. */
 export const recluseChildFirst = (forms: readonly RecluseForm[] = RECLUSE_FORMS): boolean => forms[0] === "child";
@@ -2587,14 +2589,24 @@ export function recluseNextForm(form: RecluseForm, forms: readonly RecluseForm[]
 }
 /**
  * How many of his forms (RECLUSE_FORMS, met in order) a fight beat, for the profile's match history (Eric, Nov 13: "gray out the ones
- * you beat"; results.forms_beaten): all of them when it was won, else the forms before the one it ended in. Anything else (a number
- * from a device) is held to what a result can be: a fight not won beat at most all but his last.
+ * you beat"; results.forms_beaten): all of them when it was won, else the forms that fell: those before the one it ended in, and that
+ * one too when it had already fallen (`fell`: its fall, before his next form). Anything else (a number from a device) is held to what
+ * a result can be: a fight not won beat at most all but his last.
  */
-export function recluseFormsBeaten(won: boolean, form: RecluseForm | number): number {
+export function recluseFormsBeaten(won: boolean, form: RecluseForm | number, fell = false): number {
   const all = RECLUSE_FORMS.length;
   if (won) return all;
-  const n = typeof form === "number" ? form : RECLUSE_FORMS.indexOf(form);
+  const n = typeof form === "number" ? form : RECLUSE_FORMS.indexOf(form) + (fell ? 1 : 0);
   return Number.isFinite(n) ? Math.max(0, Math.min(all - 1, Math.round(n))) : 0;
+}
+/**
+ * A result's count against him (recluseFormsBeaten) from where his fight ended, one rule for online (lobby.ts) and solo (App.tsx
+ * soloResult): a raid against him only (else null); his four boards once his phase 2 began; else the form the boss is in, fallen once
+ * its result is the crowd's (the child's fall before his adult form; the man's before the results where no phase 2 follows).
+ */
+export function recluseFormsAt(raid: boolean, boss: { id?: string; form?: RecluseForm; result?: string } | null | undefined, won: boolean, fourBoards: boolean): number | null {
+  if (!raid || !boss || boss.id !== HIDDEN_ROOM.boss) return null;
+  return fourBoards ? recluseFormsBeaten(won, "four") : recluseFormsBeaten(won, boss.form ?? "adult", boss.result === "crowd");
 }
 
 /**

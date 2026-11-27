@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, towerPartySettings, hiddenRoomSettings, HIDDEN_ROOM, recluseFormsBeaten, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, ownMoves, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, towerPartySettings, hiddenRoomSettings, HIDDEN_ROOM, recluseFormsAt, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, ownMoves, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { BoardFoot } from "./board-foot.ts";
@@ -130,11 +130,10 @@ function soloResult(solo: SoloMatch, phase: Results) {
     : phase.gameWinner === undefined || !me?.team
       ? null
       : phase.gameWinner === me.team;
-  // (A fight against the Hidden Boss (Boss alone): how many of his forms it beat, for the profile's match history. His four boards are
-  // phase 2's (`simul` on the result); else the form on the runner now: the child, or his adult form. The server holds it to what it
-  // can check: won, all three.)
-  const recluse = mode === "boss" && runner.boss?.id === HIDDEN_ROOM.boss;
-  const formsBeaten = recluse ? recluseFormsBeaten(teamWon === true, phase.simul ? "four" : (runner.boss?.form ?? "adult")) : null;
+  // (A fight against the Hidden Boss (Boss alone): how many of his forms it beat, for the profile's match history (core's recluseFormsAt,
+  // as online). His four boards are phase 2's (`simul` on the result); else the form on the runner now, counted once it fell. The
+  // server holds it to what it can check: won, all three.)
+  const formsBeaten = recluseFormsAt(mode === "boss", runner.boss, teamWon === true, !!phase.simul);
   // XP (Nov 9): the server's clock times the game (its id from the start); your moves, the win, a resign and a test switch are this
   // device's word, which can only lower it. The answer's XP goes to the result screen's box (xp.ts).
   return {

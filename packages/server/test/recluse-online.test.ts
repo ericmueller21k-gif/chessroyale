@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, childRating, hiddenRoomSettings, levelForMaia, maiaTopRating, modeSettings, mulberry32, recluseChildFirst, recluseFormsBeaten, recluseNextForm, type FairMove, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, childRating, hiddenRoomSettings, levelForMaia, maiaTopRating, modeSettings, mulberry32, recluseChildFirst, recluseFormsAt, recluseFormsBeaten, recluseNextForm, type FairMove, type Settings } from "@chessroyale/core";
 import { START_FEN, applyMove, bankLeft, legalMoves, phase2Standings, slowJudgeMs, type BoardScore, type MatchRunner, type MoveScore, type Phase2Board, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type PartyLobby } from "../src/lobby.ts";
 import { mateFirst, phase2NoResult, phase2NoResultFor, phase2Unvouched, pick, quickMove, withMates, type Phase2SearchRequest } from "../src/bosses/recluse.ts";
@@ -167,6 +167,16 @@ describe("his forms: a list in settings, the child form to go first without touc
     expect(["child", "adult", "four"].map((f) => recluseFormsBeaten(false, f as "child"))).toEqual([0, 1, 2]);
     expect(recluseFormsBeaten(true, "child")).toBe(3);
     expect([-1, 0.4, 2, 3, 99, Number.NaN].map((n) => recluseFormsBeaten(false, n))).toEqual([0, 0, 2, 2, 2, 0]);
+    // (A form that fell counts: the child's fall, one; the man's, two; past his last, held to two. The review of #990.)
+    expect(["child", "adult", "four"].map((f) => recluseFormsBeaten(false, f as "child", true))).toEqual([1, 2, 2]);
+    // (Where a fight ended, as the lobby reads it: his room's raid, the child fallen, one; the man fallen where no phase 2 follows (a
+    // raid against him outside his room), two; the four boards begun, two; won, three; not a raid, or another boss, nothing.)
+    const him = HIDDEN_ROOM.boss;
+    expect(recluseFormsAt(true, { id: him, form: "child", result: "crowd" }, false, false)).toBe(1);
+    expect(recluseFormsAt(true, { id: him, result: "crowd" }, false, false)).toBe(2);
+    expect(recluseFormsAt(true, { id: him, result: "crowd" }, false, true)).toBe(2);
+    expect(recluseFormsAt(true, { id: him, result: "crowd" }, true, true)).toBe(3);
+    expect([recluseFormsAt(false, { id: him }, false, false), recluseFormsAt(true, { id: "gingerbread" }, false, false), recluseFormsAt(true, null, true, false)]).toEqual([null, null, null]);
     // (Where he's fought, the settings follow the list: his room's fight and the Crowd's final start as the child.)
     expect(recluseChildFirst()).toBe(true);
     expect(recluseChildFirst(["adult", "four"])).toBe(false);
@@ -261,16 +271,20 @@ describe("his child form online (Nov 13: RECLUSE_CHILD, the first of his forms)"
     expect(F.core.record.phase).toBe("phase2");
   });
 
-  it("each result keeps the forms its fight beat (results.forms_beaten, the profile's match history, Nov 26): a resign as the child, none; in his adult form, one", () => {
-    const F = roomFight(3, 1, { child: true });
+  it("each result keeps the forms its fight beat (results.forms_beaten, the profile's match history, Nov 26): a resign as the child, none; in his fall, one; in his adult form, one", () => {
+    const F = roomFight(4, 0, { child: true });
     F.core.message("p1", { t: "maiaReady" });
     F.advance(1000);
     F.advance(60_000);
-    playOn(F, 4, 3);
-    F.core.message("p3", { t: "resign" });
-    expect(F.core.record.left!.find((l) => l.id === "p3")!.result).toMatchObject({ teamWon: false, formsBeaten: 0 });
+    playOn(F, 4, 4);
+    F.core.message("p4", { t: "resign" });
+    expect(F.core.record.left!.find((l) => l.id === "p4")!.result).toMatchObject({ teamWon: false, formsBeaten: 0 });
     expect(F.core.winFormTrigger("p1", true)).toBe(true);
-    playOn(F, 99, 2);
+    playOn(F, 99, 3);
+    // (His fall: still the child, his result the crowd's, until his adult form comes. The child fell: one, not none. The review of #990.)
+    expect(F.runner().boss).toMatchObject({ form: "child", result: "crowd" });
+    F.core.message("p3", { t: "resign" });
+    expect(F.core.record.left!.find((l) => l.id === "p3")!.result).toMatchObject({ teamWon: false, formsBeaten: 1 });
     F.advance(RECLUSE_CHILD.fallMs);
     playOn(F, 2, 2);
     expect(F.runner().boss!.form).toBeUndefined();
