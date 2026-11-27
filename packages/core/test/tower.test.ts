@@ -7,6 +7,7 @@ import {
   adminFirstBosses,
   finishFloor,
   floorBossCount,
+  drawLooser,
   floorDraw,
   floorsWonBest,
   floorStrength,
@@ -127,6 +128,14 @@ describe("the tower: how Maia's move is drawn by floor (floorDraw; Eric, Nov 26:
     expect(floorDraw(8, rows, own)).toEqual({ temperature: 1.1, topP: 0.75, noGift: true });
     expect(floorDraw(10, rows, own)).toEqual({ temperature: 0.7, topP: 0.8, noGift: true });
     expect(floorDraw(40, [], own)).toEqual({ temperature: 0.7, topP: 0.8, noGift: true });
+  });
+
+  it("looser than BOSS_BRAIN (drawLooser: no throw strike online) only before the last row's floor; never a gift alone, or no draw, isn't", () => {
+    const last = BATTLE_TOWER.carelessDraw[BATTLE_TOWER.carelessDraw.length - 1]![0];
+    for (let f = 1; f <= 50; f++) expect([f, drawLooser(floorDraw(f))]).toEqual([f, f < last]);
+    expect(drawLooser(undefined)).toBe(false);
+    expect(drawLooser({ temperature: BOSS_BRAIN.temperature, topP: BOSS_BRAIN.topP, noGift: true })).toBe(false);
+    expect(drawLooser({ temperature: BOSS_BRAIN.temperature, topP: 1 })).toBe(true);
   });
 });
 

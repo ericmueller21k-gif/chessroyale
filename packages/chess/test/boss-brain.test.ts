@@ -495,8 +495,11 @@ describe("never a gift on a Battle Tower floor (giftedMaterial, humanBrainMove's
       ["4k3/8/8/4p3/3Q4/8/8/4K3 w - - 0 1", "e1e2", 0],
       ["4k3/8/8/4p3/8/8/8/1N2K3 w - - 0 1", "b1c2", 0],
       ["4k3/8/8/4p3/8/8/8/2N1K3 w - - 0 1", "c1d3", 0],
-      // (A mate is never a gift.)
+      // (A mate is never a gift, nor a sacrifice that mates (the review of #991, nit 3): Qg8+ Rxg8 Nf7#.)
       ["r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4", "h5f7", 0],
+      ["r6k/6pp/7N/8/2Q5/8/8/6K1 w - - 0 1", "c4g8", 0],
+      // (The same queen onto g8 with no knight to mate: simply lost, a gift.)
+      ["r6k/6pp/8/8/2Q5/8/8/6K1 w - - 0 1", "c4g8", 9],
     ];
     for (const [fen, move, lost] of cases) expect([fen, move, giftedMaterial(fen, move)]).toEqual([fen, move, lost]);
     expect(isGift("4k3/8/8/4p3/8/8/8/3QK3 w - - 0 1", "d1d4")).toBe(true);

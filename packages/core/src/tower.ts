@@ -81,6 +81,14 @@ export function floorDraw(floor: number, rows: TowerDrawRows = BATTLE_TOWER.care
   return { temperature: own.temperature, topP: own.topP, noGift: true };
 }
 
+/**
+ * A draw looser than BOSS_BRAIN's own (a tower floor's first floors: floorDraw), a hotter temperature or a wider topP: the lobby gives no
+ * throw strike on such a battle (BOSS_CHECK.throwLoss was set at BOSS_BRAIN's draw, and an older app draws that way). Never a gift alone
+ * isn't looser: it only takes gifts away.
+ */
+export const drawLooser = (draw: MaiaDraw | undefined, own: Pick<BossBrainSettings, "temperature" | "topP"> = BOSS_BRAIN): boolean =>
+  !!draw && (draw.temperature > own.temperature || draw.topP > own.topP);
+
 /** BATTLE_TOWER.carelessDraw's shape: [floor, temperature, topP] rows in floor order. */
 export type TowerDrawRows = readonly (readonly [number, number, number])[];
 

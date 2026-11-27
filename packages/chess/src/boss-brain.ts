@@ -18,19 +18,35 @@ const WORTH: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
 function exchangeOn(c: Chess, sq: Square): number {
   const target = c.get(sq);
   if (!target) return 0;
-  const takes = c.moves({ verbose: true }).filter((m: Move) => m.to === sq && (!m.promotion || m.promotion === "q"));
-  if (!takes.length) return 0;
-  const cheapest = takes.reduce((a, b) => (WORTH[b.piece]! < WORTH[a.piece]! ? b : a));
+  const cheapest = cheapestTake(c, sq);
+  if (!cheapest) return 0;
   c.move(cheapest);
   const gain = WORTH[target.type]! - exchangeOn(c, sq);
   c.undo();
   return Math.max(0, gain);
 }
 
+/** The side to move's cheapest legal capture on `sq` (a pawn promoting as a queen), or null. */
+function cheapestTake(c: Chess, sq: Square): Move | null {
+  const takes = c.moves({ verbose: true }).filter((m: Move) => m.to === sq && (!m.promotion || m.promotion === "q"));
+  return takes.length ? takes.reduce((a, b) => (WORTH[b.piece]! < WORTH[a.piece]! ? b : a)) : null;
+}
+
+/** After the other side's cheapest capture on `sq`, the mover has a mate in one (a sacrifice that mates: chess.js's "#"). */
+function matesAfterTake(c: Chess, sq: Square): boolean {
+  const take = cheapestTake(c, sq);
+  if (!take) return false;
+  c.move(take);
+  const mate = c.moves().some((san) => san.endsWith("#"));
+  c.undo();
+  return mate;
+}
+
 /**
  * How much a move gives away with the piece it moves (BATTLE_TOWER's gift check, no engine): when it moves one of `pieces` (a queen or
  * rook), what the other side wins taking it on its new square (exchangeOn), less what the move itself took; 0 for any other piece, a
- * mate, or a position chess.js can't read. A piece left hanging elsewhere isn't counted (a missed threat is allowed).
+ * mate, a sacrifice that mates (a mate in one after the cheapest capture on its square: matesAfterTake), or a position chess.js can't
+ * read. A piece left hanging elsewhere isn't counted (a missed threat is allowed).
  */
 export function giftedMaterial(fen: string, move: string, pieces: readonly string[] = BATTLE_TOWER.giftPieces): number {
   try {
@@ -41,7 +57,8 @@ export function giftedMaterial(fen: string, move: string, pieces: readonly strin
     if (!piece || !pieces.includes(piece.type)) return 0;
     const made = c.move({ from, to, ...(move[4] ? { promotion: move[4] } : {}) });
     if (c.isCheckmate()) return 0;
-    return Math.max(0, exchangeOn(c, to) - (made.captured ? WORTH[made.captured]! : 0));
+    const lost = exchangeOn(c, to) - (made.captured ? WORTH[made.captured]! : 0);
+    return lost > 0 && !matesAfterTake(c, to) ? lost : 0;
   } catch {
     return 0;
   }
