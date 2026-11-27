@@ -110,7 +110,17 @@ if (location.pathname === "/chandy") {
   // (The account loads in <App>, which this page never renders: ask for it here.)
   void loadAccount();
   open();
-} else render(<Root />, document.getElementById("app")!);
+} else render(<Top />, document.getElementById("app")!);
+
+/**
+ * What `render` is given: a component that never renders again. (Nov 27: Preact keeps the vnode given to `render` for good, and the
+ * children it had at its first render. Given Root, which renders again as the account loads, it kept the first screen's components
+ * (the town, opened at /town or after a reload) and through them the whole town and some 240 MB of its pictures, for the life of the
+ * page. Top's one vnode is always current, so a screen once gone is let go.)
+ */
+function Top() {
+  return <Root />;
+}
 
 // Your own worn ride's drawing (its own chunk, rides/load.ts), asked for after the first paint and again whenever your look
 // changes (once a ride: it's kept), so your pawn on home, in your ring and in the town rarely waits for it (Nov 1, rides lazy).
