@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { SHOP, bossCrateOf, discountLabel, shopPrice } from "@chessroyale/core";
+import { MYTHIC_CRATE, SHOP, bossCrateOf, discountLabel, shopPrice } from "@chessroyale/core";
 import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, tapInTown, test, townTapPoint, wearItem, townReady } from "./helpers.ts";
 
 /**
@@ -1412,6 +1412,54 @@ test("the coin boost in the Crates tab (Nov 26): the boost lines always there, g
   await expect(dialog.getByRole("button", { name: "▶ Open" })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
+});
+
+test("the Mythic Crate (Nov 27): listed while unowned (greyed, never behind Show unowned), its page shows its odds, the Banana Suit 2%; an admin grants one, it opens with a key, every opening a Transcendent spin, to one of its items", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await asServerAdmin(page);
+  await page.goto("/shop?crates");
+  const row = page.locator('.series-crate-row[data-crate="mythic"]');
+  // None held: listed, greyed with a padlock as the series crates, whether "Show unowned" is ticked or not (nothing hidden: the review
+  // of #998); its page says none can be earned yet (nothing sells the bundle).
+  await expect(page.locator(".crates")).toContainText("Ready to open");
+  await expect(row).toContainText("You have none");
+  await expect(row).toHaveClass(/none/);
+  await expect(row.locator(".crate-lock")).toBeVisible();
+  await page.getByRole("checkbox", { name: "Show unowned" }).check();
+  await expect(row).toHaveCount(1);
+  await page.getByRole("checkbox", { name: "Show unowned" }).uncheck();
+  await expect(row).toHaveCount(1);
+  await row.click();
+  await expect(page.locator(".crate-held")).toContainText("None can be earned yet");
+  await page.goto("/shop?crates");
+  // An admin's test grants: Mythic Crates and a key; its row under Ready to open.
+  const grants = page.getByRole("region", { name: "Admin test grants" });
+  await grants.getByRole("combobox", { name: "Crate" }).selectOption("mythic");
+  await grants.getByRole("button", { name: "+5 crates" }).click();
+  await grants.getByRole("button", { name: "+1 crate key" }).click();
+  await expect(page.getByRole("region", { name: "Ready to open" }).locator('.series-crate-row[data-crate="mythic"]')).toContainText("You have 5");
+  // Its page: one Transcendent spin, 100%; the Banana Suit among its items at 2.0% (MYTHIC_CRATE_ODDS.bananaSuit).
+  await row.click();
+  await expect(page.locator(".crate-held")).toContainText("You have 5");
+  const odds = page.locator(".odds-row");
+  await expect(odds.filter({ hasText: "Transcendent" }).first().locator(".odds-pct")).toHaveText("100%");
+  await expect(odds.filter({ hasText: "Banana Suit" }).locator(".odds-pct")).toHaveText("2.0%");
+  await expect(page.getByText("Every one opens to a Transcendent spin: a Legendary or Mythic item.")).toBeVisible();
+  // Open it: the strip spins, then the reveal; the item is one of the Mythic Crate's.
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/mythic-crate-page-${test.info().project.name}.png`, fullPage: true });
+  await page.getByRole("button", { name: "▶ Open · uses 1 key" }).click();
+  await expect(page.locator(".crate-opening .cox-reel")).toBeVisible({ timeout: 15_000 });
+  const reveal = page.locator(".reveal-card");
+  await expect(reveal).toBeVisible({ timeout: 30_000 });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/mythic-crate-reveal-${test.info().project.name}.png` });
+  const locker = (await (await page.request.get("/api/locker")).json()) as { items: { id: string; def: string }[]; seriesCrates: Record<string, number>; keys: number };
+  const mine = locker.items.filter((i) => !i.id.startsWith("admin:"));
+  expect(mine).toHaveLength(1);
+  expect(MYTHIC_CRATE.items).toContain(mine[0]!.def);
+  expect([locker.seriesCrates.mythic, locker.keys]).toEqual([4, 0]);
+  expect(errors).toEqual([]);
 });
 
 test("boss tokens: a counted boss battle (Boss alone, 5 minutes by the server's clock) drops one: the result screen's square box, OK, and it's in the inventory", { tag: "@phone-only" }, async ({ page }) => {

@@ -86,6 +86,8 @@ import {
   lastStandBar,
   liveStrip,
   tierItems,
+  fischerOdds,
+  MYTHIC_CRATE,
   itemDef,
   maiaRatingFor,
   scoreGroup,
@@ -131,6 +133,8 @@ export interface FaqSources {
   ratingMinMoves: number;
   rankedShare: number;
   crates: readonly CrateDef[];
+  /** The Mythic Crate (Nov 27): every opening a Transcendent spin, and its secret prize. */
+  mythicCrate: CrateDef;
   /** Boss crates (sold in the bosses' shops for their tokens), boss tokens' rules and a boss crate's price. */
   bossCrates: readonly BossCrateDef[];
   bossTokens: typeof BOSS_TOKENS;
@@ -190,6 +194,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   ratingMinMoves: RATING_MIN_MOVES,
   rankedShare: RANKING.rankedMinHumanShare,
   crates: CRATES,
+  mythicCrate: MYTHIC_CRATE,
   // (Not the crate of a boss in the game for admins first, Timber's: his block shows once he's live for everyone.)
   bossCrates: BOSS_CRATES.filter((c) => !adminFirst({ id: c.boss })),
   bossTokens: BOSS_TOKENS,
@@ -1175,6 +1180,15 @@ function crates(src: FaqSources): FaqSection {
     .map((c) => `**${c.name}** holds ${itemDef(c.ride)?.name ?? c.ride} (${pct(fischerShare(c), 0)} of the time: the only item behind its Transcendent) and ${c.items.length - 1} Common to Epic items`)
     .join("; ");
   const n = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
+  // The Mythic Crate (Nov 27): each item's share of its one Transcendent spin, by tier, and its secret prize's.
+  const my = src.mythicCrate;
+  const myOdds = fischerOdds(my);
+  const myPrize = my.prize ? (myOdds.find((x) => x.item === my.prize!.item)?.weight ?? 0) / 100 : 0;
+  const myTier = (t: string) => {
+    const list = myOdds.filter((x) => x.item !== my.prize?.item && itemDef(x.item)?.tier === t);
+    return list.length ? `${n(list.length, `${name(t)} item`)}, ${pct(list[0]!.weight / 100, 1)} each` : "";
+  };
+  const mythicWords = [myTier("legendary"), myTier("mythic")].filter(Boolean).join("; ");
   return {
     id: "crates",
     title: "Crates and items",
@@ -1206,6 +1220,8 @@ Some items take a second color (a present's ribbon, a suit's tie), rolled the sa
 ${purity}
 
 **Boss tokens and boss crates.** A boss battle, won or lost, counts once it reaches ${bt.moves} of your moves or ${bt.minutes} minutes. In any ${bt.windowHours} hours, your first counted battle always gives you a boss's token (one of the bosses you can meet, each as likely), and each one after that gives one ${pct(bt.chance, 0)} of the time, up to ${bt.cap}. Our server decides, never your device, and it times a solo battle itself (${bt.minutes} minutes from its start to its end). A boss's shop in the town sells its crate for ${n(bp.tokens, "token")} of that boss, or ${n(bp.withKey.tokens, "token")} and ${n(bp.withKey.keys, "crate key")}: ${bossCrates}, in the same boxes at the same odds as above. A crate you buy goes into your inventory (the Crates tab), where you open it like any crate, once.
+
+**The Mythic Crate.** The rarest crate opens with a crate key like the others, and every one is a Transcendent spin: ${mythicWords}${myPrize ? `; and its own prize, a Mythic item in no other crate, ${pct(myPrize, 1)}` : ""}. It's never a bonus crate, a daily reward or a level-up crate.
 
 **Bonus crates.** ${bonusOddsLine(src.crateBonus.chance)} The crates it can be: every series crate, retired ones too, and the crate of every boss out for everyone, each as likely. It goes into your inventory unopened, with a crate key when it opens with one (a boss crate doesn't). Our server rolls it with the item. A bonus crate opens like any crate, after your other crates of that kind, so you never lose a chance at one.
 

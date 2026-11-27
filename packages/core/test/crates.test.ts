@@ -34,6 +34,8 @@ import {
   BOSS_CRATES,
   BOSS_CRATE_POOL,
   MYTHIC_CRATE_ITEMS,
+  MYTHIC_CRATE,
+  MYTHIC_CRATE_ODDS,
   OUTFIT,
   BOSS_ADMIN_FIRST,
   HUNCHESS_RIDES,
@@ -480,7 +482,7 @@ describe("outfits (Eric, Nov 10)", () => {
   const it_ = (def: string) => ({ def, color: "red", blemish: 10, seed: 3 });
   const look: ItemLook = { head: it_("top-hat"), face: it_("ski-goggles"), skin: it_("snowman"), weapon: it_("katana"), ride: it_("moon-ride"), outfit: it_("banana-suit") };
 
-  it("a secret slot of its own; the Banana Suit is Mythic, the Mythic Crate's secret item, in no crate that rolls yet", () => {
+  it("a secret slot of its own; the Banana Suit is Mythic, the Mythic Crate's secret item, in no other crate", () => {
     expect(SLOT_NAMES.outfit).toBe("Outfit");
     expect(ITEM_DEFS.filter((d) => d.slot === "outfit").map((d) => [d.id, d.name, d.tier])).toEqual([["banana-suit", "Banana Suit", "mythic"]]);
     expect(MYTHIC_CRATE_ITEMS).toEqual(["banana-suit"]);
@@ -507,5 +509,70 @@ describe("outfits (Eric, Nov 10)", () => {
     expect(mountOf(rest)?.def).toBe("moon-ride");
     expect(hiddenByOutfit(rest, "top-hat")).toBe(false);
     expect(shownLook(undefined)).toBeUndefined();
+  });
+});
+
+describe("the Mythic Crate and its secret prize, the Banana Suit (Eric, Nov 10; Nov 27)", () => {
+  const pullOf = (c: CrateDef) => c.items.filter((id) => ["legendary", "mythic"].includes(itemDef(id)!.tier));
+
+  it("every opening is a Transcendent spin over the series crates' Legendary and Mythic items, and the suit", () => {
+    expect(crateDef("mythic")).toBe(MYTHIC_CRATE);
+    expect(CRATES.map((c) => c.id)).not.toContain("mythic");
+    expect(liveStrip(MYTHIC_CRATE)).toEqual([{ tier: FISCHER, weight: 100 }]);
+    expect(presentChance(MYTHIC_CRATE, FISCHER)).toBe(1);
+    expect([...MYTHIC_CRATE.items].sort()).toEqual([...new Set([...CRATES.flatMap(pullOf), "banana-suit"])].sort());
+    expect(MYTHIC_CRATE.prize).toEqual({ item: "banana-suit", weight: MYTHIC_CRATE_ODDS.bananaSuit });
+  });
+
+  it("the suit's odds are the setting's; Legendary keeps its 80; the other Mythic items share the rest of the 20", () => {
+    expect(MYTHIC_CRATE_ODDS.bananaSuit).toBe(2);
+    const odds = new Map(fischerOdds(MYTHIC_CRATE).map((x) => [x.item, x.weight]));
+    expect(odds.get("banana-suit")).toBeCloseTo(2, 9);
+    const legendary = pullOf(MYTHIC_CRATE).filter((id) => itemDef(id)!.tier === "legendary");
+    const mythic = pullOf(MYTHIC_CRATE).filter((id) => itemDef(id)!.tier === "mythic" && id !== "banana-suit");
+    for (const id of legendary) expect(odds.get(id), id).toBeCloseTo(80 / legendary.length, 9);
+    for (const id of mythic) expect(odds.get(id), id).toBeCloseTo(18 / mythic.length, 9);
+    expect([...odds.values()].reduce((a, b) => a + b, 0)).toBeCloseTo(100, 9);
+    // The crate page's odds (itemChance) say the same, and add up to every opening.
+    expect(itemChance(MYTHIC_CRATE, "banana-suit")).toBeCloseTo(0.02, 9);
+    expect(MYTHIC_CRATE.items.reduce((a, id) => a + itemChance(MYTHIC_CRATE, id), 0)).toBeCloseTo(1, 9);
+  });
+
+  it("no other crate's odds change: each Transcendent tier still shared evenly, no prize anywhere else", () => {
+    for (const c of [...CRATES, ...BOSS_CRATES]) {
+      expect(c.prize, c.id).toBeUndefined();
+      const live = c.fischer.filter((f) => pullOf(c).some((id) => itemDef(id)!.tier === f.tier));
+      const total = live.reduce((a, f) => a + f.weight, 0);
+      const was = live.flatMap((f) => {
+        const list = pullOf(c).filter((id) => itemDef(id)!.tier === f.tier);
+        return list.map((item) => ({ item, weight: (100 * f.weight) / total / list.length }));
+      });
+      expect(fischerOdds(c), c.id).toEqual(was);
+    }
+  });
+
+  it("rolls by its odds over many seeds (the suit about 2%, Legendary about 80%), each a whole item with a color and purity", () => {
+    const n = 40000;
+    const counts = new Map<string, number>();
+    for (let seed = 0; seed < n; seed++) {
+      const roll = rollCrate(mulberry32(seed * 7919 + 1), MYTHIC_CRATE);
+      expect(roll.fischer).toBe(true);
+      counts.set(roll.def, (counts.get(roll.def) ?? 0) + 1);
+      if (roll.def === "banana-suit") expect(ITEM_COLORS.map((c) => c.id)).toContain(roll.color);
+    }
+    expect([...counts.keys()].sort()).toEqual([...MYTHIC_CRATE.items].sort());
+    expect(Math.abs(counts.get("banana-suit")! / n - 0.02)).toBeLessThan(0.004);
+    const legendary = MYTHIC_CRATE.items.filter((id) => itemDef(id)!.tier === "legendary").reduce((a, id) => a + (counts.get(id) ?? 0), 0);
+    expect(Math.abs(legendary / n - 0.8)).toBeLessThan(0.01);
+  });
+
+  it("the suit never rolls from any other crate (Transcendent forced, many seeds)", () => {
+    for (const c of [...CRATES, ...BOSS_CRATES, WELCOME_CRATE]) {
+      expect(c.items, c.id).not.toContain("banana-suit");
+      for (let seed = 0; seed < 2000; seed++) {
+        expect(rollCrate(mulberry32(seed), c).def, c.id).not.toBe("banana-suit");
+        expect(rollCrate(mulberry32(seed), c, { fischer: true }).def, c.id).not.toBe("banana-suit");
+      }
+    }
   });
 });
