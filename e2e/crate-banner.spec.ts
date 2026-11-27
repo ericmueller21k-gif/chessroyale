@@ -14,7 +14,7 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
   await giveCrates(page, "beta-001", 1, 2);
   await giveCrates(page, "winter-1", 1, 0);
   await page.goto("/shop?crates");
-  await expect(page.locator(".series-crate-row")).toHaveCount(2);
+  await expect(page.locator(".series-crate-row")).toHaveCount(3); // (beta and winter, and the Mythic Crate: listed while none is held, Nov 27)
   for (const [id, box] of [
     ["beta-001", ".supply-art"],
     ["winter-1", ".present-art:not(.supply-art)"],
@@ -52,7 +52,7 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
     await expect(page.getByTestId("crate-opening")).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem("hunchess-crate-unseen")), "seen once Done is tapped").toBeNull();
     await page.goto("/shop?crates");
-    await expect(page.locator(".series-crate-row")).toHaveCount(2);
+    await expect(page.locator(".series-crate-row")).toHaveCount(3);
     await expect(page.getByTestId("crate-opening"), "no reveal resumed over the list").toHaveCount(0);
   }
 });
@@ -65,7 +65,7 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
 test("crates: the gambling warning's red ring is always at the top of the crate pages and moves nothing; a tap opens its message box, Close puts it away", async ({ page }) => {
   await named(page, "Warned");
   await page.goto("/shop?crates");
-  await expect(page.locator(".series-crate-row")).toHaveCount(2);
+  await expect(page.locator(".series-crate-row")).toHaveCount(3);
   // (The page's fonts in: what's measured here is the message box's effect, not a font arriving. Nov 13: the pixel font's swap moved the
   // rows under the crates' title 5 px between the two looks; that title now keeps one line height, and the fonts are preloaded.)
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
@@ -126,7 +126,7 @@ test("crates: the gambling warning's red ring is always at the top of the crate 
     await expect(page.locator(".crate-hero")).toBeVisible();
     await near(`${id}'s page`, ".crate-hero");
     await page.getByRole("button", { name: "‹ Crates" }).click();
-    await expect(page.locator(".series-crate-row")).toHaveCount(2);
+    await expect(page.locator(".series-crate-row")).toHaveCount(3);
   }
 });
 

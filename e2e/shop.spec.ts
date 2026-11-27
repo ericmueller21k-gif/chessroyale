@@ -1426,6 +1426,7 @@ test("the Mythic Crate (Nov 27): listed while unowned (greyed, never behind Show
   await expect(page.locator(".crates")).toContainText("Ready to open");
   await expect(row).toContainText("You have none");
   await expect(row).toHaveClass(/none/);
+  await expect(row.locator(".crate-lock")).toBeVisible();
   await page.getByRole("checkbox", { name: "Show unowned" }).check();
   await expect(row).toHaveCount(1);
   await page.getByRole("checkbox", { name: "Show unowned" }).uncheck();

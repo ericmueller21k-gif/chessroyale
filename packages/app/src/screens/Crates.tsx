@@ -269,13 +269,14 @@ export function CratesPanel() {
             every boss crate you don't hold. */}
         {welcomeShown.filter((r) => r.state !== "ready").map(welcomeRow)}
         {CRATES.filter((c) => heldOf(locker, c) === 0).map(seriesRow)}
+        {/* (The Mythic Crate, Nov 27: always listed while you hold none, greyed with a padlock as the series crates, never behind "Show
+            unowned": nothing hidden (Eric's rule; the boss crates are his one exception, Nov 24). Its page shows its odds. Right after the series crates, so ticking "Show
+            unowned" moves only what is below the boss rows.) */}
+        {heldOf(locker, MYTHIC_CRATE) === 0 && seriesRow(MYTHIC_CRATE)}
         {boostCrates === 0 && boostRow}
         {picks === 0 && pickRow}
         {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
         {moreBoss.map(bossRow)}
-        {/* (The Mythic Crate, Nov 27: always listed while you hold none, greyed with a padlock as the series crates, never behind "Show
-            unowned": nothing hidden (Eric's rule; the boss crates are his one exception, Nov 24). Its page shows its odds.) */}
-        {heldOf(locker, MYTHIC_CRATE) === 0 && seriesRow(MYTHIC_CRATE)}
         {!showUnowned && <p class="small muted no-boss-crates">{heldBoss.length ? MORE_BOSS_CRATES_LINE : NO_BOSS_CRATES_LINE}</p>}
         <p class="small muted crates-how">
           Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward, and an opening sometimes gives a bonus crate (with its key if it needs one). A daily quest
@@ -642,7 +643,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           <span class="small crate-held" data-held={held} data-keys={keys}>
             {!held
               ? crate.id === MYTHIC_CRATE.id
-                ? "You have none. None can be earned yet: it comes with the shop's bundles."
+                ? "You have none. None can be earned yet: it will come with the shop's bundles."
                 : "You have none. Leveling up and the daily reward give you crates."
               : !keys
                 ? `You have ${heldWords}. You need a crate key to open one: ${everyLevel(XP.levelRewardEvery)} gives you one.`
