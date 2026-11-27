@@ -1,36 +1,13 @@
 # Review: PR #993, mode ranks PR 1 (design + core math), Nov 27
 
-Read: CLAUDE.md, docs/areas/ranked.md, asks-audit item 1, the design, mode-ranks.ts, MODE_RANKS, the tests. Numbers below come from the
-PR's own functions (a scratch probe run with node; vitest wasn't run here, no node_modules).
+Read: CLAUDE.md, docs/areas/ranked.md, asks-audit item 1, the design, mode-ranks.ts, MODE_RANKS, the tests. Numbers below come from the PR's own functions (a scratch probe run with node; vitest wasn't run here, no node_modules).
 
-1. **Blocker: Squads' strength lets fixed-rated bots set a person's rating, multiplied by seats ÷ people.** `packages/core/src/mode-ranks.ts:251`, `:274`.
-   A member's E comes from the squad's mean (bots at fixed ratings), but the whole step lands on their own rating, so their rating
-   settles where the *mean* fits the results: one real player at 1500 plus 3 bots at 1200, splitting 50/50 with a 1500 squad, goes to 1746
-   after 50 matches and 2338 after 400 (heading to 2400, ladder 2654, Radiant): (H + 3×1200)/4 = 1500. Strong bots deflate the same way.
-   Pre-launch almost every squad has bots, so a Squads rank tracks the bots' draw, which breaks "bots never count". Fix in PR 1: base the
-   strength on the people only and have ranked Squads' fill bots play at their squad's people's mean (the leaverBotSkill rule), or
-   take E from the member's own rating against the other squad's strength. Same root: a carry with low-seeded alts lowers their own E (plain mean).
-2. **Should-fix (blocks PR 3's plan): the join snapshot plus a CAS on `games` loses matches.** `docs/ideas/mode-ranks.md:66`, `:115`. Leave
-   50 v 50 A at move 5 (the leave gets written when A ends) and join B. If B ends first (N → N+1), A's CAS on N fails and the leave
-   never costs anything: a dodge. In the other order, B's whole match is lost. Fix: read the player's own row fresh at write time
-   (CAS, recompute on a miss), take only the opponents from the snapshot (or write a leaver's row when they leave), and pass the match's
-   end time as `now`, not the retry's.
-3. **Should-fix: "you should not lose a lot" holds only when the ladder equals the hidden rating.** `mode-ranks.ts:125`. The catch-up is
-   full size even when (S − E) is close to 0. Hidden 1200 with ladder 1400 (worth 1600), last among 99 players at 1900: **−11 RP**. The design's table
-   (`mode-ranks.md:85`, −1) and the test (`mode-ranks.test.ts:158`) both start with the catch-up at 0. Scale the catch-up for a loss
-   (e.g. by 2·|S − E|) or cap it, and test with the ladder above the hidden rating.
-4. **Should-fix (measure in PR 2): the score part compares perMove over different moves.** `mode-ranks.ts:205`. Someone cut at
-   move 6 is judged on other positions than the winner's 40 moves, yet decides 30% of each pair; `scoreMinMoves` 6 is low. Side effect for Eric
-   to confirm: 1200, last among 1900s with an equal perMove: **+6 RP** (the best perMove: +12). Last place gains. Options: compare
-   over the moves both played, or raise the minimum.
-5. **Nit:** 1st never loses RP, but the hidden rating can still drop (1900, 1st among 1200s with the worst perMove: −17 hidden, 0 RP), and
-   later catch-ups take it back. Say "RP" in the rule's wording (`mode-ranks.ts:110`, the design's d).
-6. **Nit (a test checks less than it claims):** `mode-ranks.test.ts:270` "the squad's strength unchanged" can't fail: every seat is 1500, so it passes
-   with the leaver dropped or a replacement bot added. Use unequal ratings. Also document on `SquadEntrant.bots` (`:243`) that a
-   leaver's replacement bot isn't listed (else 5 seats).
-7. **Nit:** thin placements before launch: 3 wins against one 1500 each place a player at RD 183 (hidden 1692, ladder 1560). Acceptable with
-   PR 2's spread check.
+1. **Blocker: Squads' strength lets fixed-rated bots set a person's rating, multiplied by seats ÷ people.** `packages/core/src/mode-ranks.ts:251`, `:274`. A member's E comes from the squad's mean (bots at fixed ratings), but the whole step lands on their own rating, so their rating settles where the *mean* fits the results: one real player at 1500 plus 3 bots at 1200, splitting 50/50 with a 1500 squad, goes to 1746 after 50 matches and 2338 after 400 (heading to 2400, ladder 2654, Radiant): (H + 3×1200)/4 = 1500. Strong bots deflate the same way. Pre-launch almost every squad has bots, so a Squads rank tracks the bots' draw, which breaks "bots never count". Fix in PR 1: base the strength on the people only and have ranked Squads' fill bots play at their squad's people's mean (the leaverBotSkill rule), or take E from the member's own rating against the other squad's strength. Same root: a carry with low-seeded alts lowers their own E (plain mean).
+2. **Should-fix (blocks PR 3's plan): the join snapshot plus a CAS on `games` loses matches.** `docs/ideas/mode-ranks.md:66`, `:115`. Leave 50 v 50 A at move 5 (the leave gets written when A ends) and join B. If B ends first (N → N+1), A's CAS on N fails and the leave never costs anything: a dodge. In the other order, B's whole match is lost. Fix: read the player's own row fresh at write time (CAS, recompute on a miss), take only the opponents from the snapshot (or write a leaver's row when they leave), and pass the match's end time as `now`, not the retry's.
+3. **Should-fix: "you should not lose a lot" holds only when the ladder equals the hidden rating.** `mode-ranks.ts:125`. The catch-up is full size even when (S − E) is close to 0. Hidden 1200 with ladder 1400 (worth 1600), last among 99 players at 1900: **−11 RP**. The design's table (`mode-ranks.md:85`, −1) and the test (`mode-ranks.test.ts:158`) both start with the catch-up at 0. Scale the catch-up for a loss (e.g. by 2·|S − E|) or cap it, and test with the ladder above the hidden rating.
+4. **Should-fix (measure in PR 2): the score part compares perMove over different moves.** `mode-ranks.ts:205`. Someone cut at move 6 is judged on other positions than the winner's 40 moves, yet decides 30% of each pair; `scoreMinMoves` 6 is low. Side effect for Eric to confirm: 1200, last among 1900s with an equal perMove: **+6 RP** (the best perMove: +12). Last place gains. Options: compare over the moves both played, or raise the minimum.
+5. **Nit:** 1st never loses RP, but the hidden rating can still drop (1900, 1st among 1200s with the worst perMove: −17 hidden, 0 RP), and later catch-ups take it back. Say "RP" in the rule's wording (`mode-ranks.ts:110`, the design's d).
+6. **Nit (a test checks less than it claims):** `mode-ranks.test.ts:270` "the squad's strength unchanged" can't fail: every seat is 1500, so it passes with the leaver dropped or a replacement bot added. Use unequal ratings. Also document on `SquadEntrant.bots` (`:243`) that a leaver's replacement bot isn't listed (else 5 seats).
+7. **Nit:** thin placements before launch: 3 wins against one 1500 each place a player at RD 183 (hidden 1692, ladder 1560). Acceptable with PR 2's spread check.
 
-Checked and fine: the field weights add up to min(n, fullField); one opponent is exactly a 1 v 1 update; the RP sign rules hold; 100 equals
-with 50 sharing 1st give ±8; party members aren't in each other's field; bots are never 50 v 50 opponents; Squads' worst-place leave
-plus leaveRp covers a final-two leave; seeding order; one rank per mode. The stored data is otherwise minimal (`wins`, `peak`, `results.rp` are all used).
+Checked and fine: the field weights add up to min(n, fullField); one opponent is exactly a 1 v 1 update; the RP sign rules hold; 100 equals with 50 sharing 1st give ±8; party members aren't in each other's field; bots are never 50 v 50 opponents; Squads' worst-place leave plus leaveRp covers a final-two leave; seeding order; one rank per mode. The stored data is otherwise minimal (`wins`, `peak`, `results.rp` are all used).
