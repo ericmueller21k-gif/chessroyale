@@ -2286,3 +2286,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 27 01:25: #990 delta review clean (5/5 fixed); accounts page nit fixed by director 838eeb0d; final CI bbsgrtlhx then merge. Rare items restarted (Opus high). Tower fix round finishing.
 - Nov 27 01:34: #991 fix round done (528321af): online draw, no strike on loose floors 1-9, mate-sac skip. Touches fair play -> full-e2e label + fair-play delta review session_01JuCWRrMN1d86huAzTvYs9r. Opus: rare items (high) + #991 review (xhigh).
 - Nov 27 01:42: Stranger: art helper session_01JuCWRsRTMMj5zwo13vwLyW, rules helper (xhigh). Rare items paused again (interrupted 01:35, its WIP lost). Opus now 3: art, rules, #991 fair-play review.
+- Nov 27 01:55: #990 MERGED b6206491 (full lane complete). Main watcher running; check the live D1 migration ran (profile read ok).
