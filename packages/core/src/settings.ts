@@ -3841,6 +3841,24 @@ export const RANKED_1V1 = {
 export const LADDER = { season: 1, size: 200, cacheSeconds: 60 };
 
 /**
+ * The mode ranks (Eric, Nov 9-25: "one rank per mode"; "When you play a 50v50 or squads it also counts toward your rank for that
+ * mode"; the design: docs/ideas/mode-ranks.md; the math: core's mode-ranks.ts). 50 v 50 ("crowd") and Squads each keep a rank on
+ * 1 v 1's tiers, ladder and hidden-rating scale (RANKED_1V1), measured against the real players in the match outside your party.
+ * - `placeWeight`: your result against each opponent is this share placement (ahead 1, equal ½, behind 0) and the rest engine score
+ *   (your points a move against theirs). Squads: 1, "entirely on your placement" (Eric, Nov 16).
+ * - `scoreBand`: points a move within this of each other are an equal score (½).
+ * - `scoreMinMoves`: either of a pair with fewer counted moves than this: the score part is the place part.
+ * - `fullField`: a whole match is worth this many 1 v 1 games, however many play: each opponent's weight is min(1, fullField / n),
+ *   and the RP is scaled by min(1, n / fullField) (one other real player in a 50 v 50: a third).
+ * - `perMatch`: RP = 2 × perMatch × (your result − the expected) for a full field, as 1 v 1's perGame; the catch-up as 1 v 1's.
+ * - `placements`: counted matches before a rank shows (1 v 1 has 5); then placed from the hidden rating, at most Radiant 5 0.
+ */
+export const MODE_RANKS = {
+  crowd: { placeWeight: 0.7, scoreBand: 0.1, scoreMinMoves: 6, fullField: 3, perMatch: 20, placements: 3 },
+  squads: { placeWeight: 1, scoreBand: 0.1, scoreMinMoves: 6, fullField: 2, perMatch: 20, placements: 3 },
+};
+
+/**
  * Leaving ranked games early (phase L1, 1 v 1; Eric, Nov 9: "Quitting during time control. Yeah, that's fine. Quitting
  * mid-game. Yeah, full loss."; docs/ideas/ranked-ladder.md section 4, docs/areas/ranked.md "Leaving"). The server
  * decides all of it from the game's own record (core's ranked-leaves.ts does the math); PAUSE_LEAVE_PENALTIES turns it off.

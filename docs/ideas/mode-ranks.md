@@ -39,7 +39,7 @@ Every mode's settings are `RANKED_1V1` with its own placements and points (core 
 
 **50 v 50: placement and engine score.** For each real opponent *j*:
 
-`s = placeWeight × place part + scoreWeight × score part` (0.7 and 0.3, in settings)
+`s = placeWeight × place part + (1 − placeWeight) × score part` (`placeWeight` 0.7, in `MODE_RANKS`)
 
 - **Place part:** 1 if you finished ahead of *j*, ½ on an equal place, 0 behind. The places are the rework's (those still in at the
   end, the winning side's first, then each cut back by their score at it), so winning the game counts as it does today.
@@ -75,15 +75,20 @@ player's `E` is small, so finishing low costs little and finishing high pays a l
   for a typical match with a full field, as a 1 v 1 game; one other real player, a third of that. Finishing above `E` never takes
   RP, below never gives it, and a 1st place never loses any.
 
-| Case (settled players, 50 v 50, a full field) | E | Place | RP |
-| --- | --- | --- | --- |
-| You 1500 among 1500s | 0.50 | middle (S 0.50) | 0 |
-| You 1500 among 1500s | 0.50 | last (S 0.00) | −20 |
-| You 1200 among 1900s (Eric's "super strong" lobby) | 0.14 | last (S 0.00) | −6 |
-| You 1200 among 1900s | 0.14 | top 10% (S 0.90) | +30 |
-| You 1900 among 1200s | 0.86 | top 10% (S 0.90) | +2 |
+| A 50 v 50 of 100 real players, all settled (worked out by PR 1's code, place alone) | E | Finish | RP | Hidden rating |
+| --- | --- | --- | --- | --- |
+| You 1500 among 1500s | 0.50 | 50th | 0 | 0 |
+| You 1500 among 1500s | 0.50 | last | −21 | −28 |
+| You 1500 among 1500s | 0.50 | 1st | +21 | +28 |
+| You 1400 among 1700s (a strong lobby) | 0.16 | last | −7 | −9 |
+| You 1400 among 1700s | 0.16 | 10th | +32 | +44 |
+| You 1200 among 1900s (Eric's "super strong" lobby) | 0.02 | last | −1 | −1 |
+| You 1900 among 1200s | 0.98 | 10th | −3 | −4 |
+| You 1900 among 1200s | 0.98 | 1st | +1 | +1 |
+| You 1500 and one other real player (1500), you 2nd | 0.50 | last | −7 | −10 |
 
-(Before the catch-up, which moves a rank toward its hidden rating by at most 10.)
+(The RP include the catch-up, which moves a rank toward its hidden rating by at most 10; the engine score adds to or takes from the
+place part by up to 30% of each pair.)
 
 ### e. Placements, seeding, leavers, holds
 
