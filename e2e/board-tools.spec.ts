@@ -29,7 +29,8 @@ async function game(browser: Browser, names: [string, string]): Promise<{ white:
   const b = await player(browser, names[1]);
   const pool = poolName();
   await a.goto(`/1v1?nolanding&debug&pool=${pool}`);
-  await expect(a.locator(".dv-search")).toContainText("Finding opponent…");
+  // (15 s: the 1 v 1 screen's first load on a cold CI runner took about 5 s, the default wait, once on main a92ba06, Nov 27.)
+  await expect(a.locator(".dv-search")).toContainText("Finding opponent…", { timeout: 15_000 });
   await b.goto(`/1v1?nolanding&debug&pool=${pool}`);
   for (const p of [a, b]) await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 40_000 });
   const white = (await a.locator(".dv-strip.dv-you").getAttribute("data-side")) === "w";
