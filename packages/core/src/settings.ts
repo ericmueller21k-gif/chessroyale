@@ -4792,7 +4792,15 @@ export const OUTFIT = {
  * or never started). The server counts and grants them (server/welcome.ts); the prize is welcome.ts in core.
  */
 export const WELCOME_GIFT = {
+  /**
+   * Each Welcome Crate's stored key (`welcome_crates.milestone`) and the finished games it needs: the second at 25. The first (5)
+   * is given on the account's first visit since Nov 27 (`firstOnVisit`; Eric: "a golden ride beta crate is given when you open the
+   * game for the first time"): 5 stays its key, so crates earned before are unchanged.
+   */
   milestones: [5, 25],
+  firstOnVisit: true,
+  /** The level from which a Welcome Crate opens (Eric, Nov 27: "it's only openable after level 5 is reached"); the server refuses below. */
+  openLevel: 5,
   /**
    * A solo game counts toward them only with XP.minMoves of your own moves (as its XP) and at least this many seconds of the server's
    * time (POST /api/xp/solo/start, then its result): its result is the device's word, and empty posts earned crates (the outside
