@@ -2303,3 +2303,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 27 02:42: #997 review: blocker (profile ride count 36->41) fixed add6239c; nits 4 fixed; HELD for Eric: where the riders go (Beta is ~never earned) + Tommy Gun/Parrot rarer.
 - Nov 27 02:45: #995 rare frames MERGED 7c813c68.
 - Nov 27 02:46: #1000 chess(2) failed: king-save-altered audit missing stranger; director added it (7dd399ac), 39/39 pass. CI re-running.
+- Nov 27 02:50: #996 Dash nits MERGED a90f3cc3. #1000 Stranger rules review: should-fix 1 Boss alone menu empty for an unlocked Stranger (menuBosses has no unlock bosses; Home.tsx:180,:97; e2e should tap it) MUST fix before the art PR lands; should-fix 2 unlock = tower_best >= 10 counts floor-10 wins that never met him (ask Eric: accept, or key to a win vs him = stored data, full lane); nits 3-5 (test-server towerPool parity; stranger.test.ts early returns, names). Fix round next session (one Opus).
