@@ -134,6 +134,7 @@ describe("the FAQ's contents", () => {
     expect(words).toContain(`nothing (${o.nothing}%), a plain plant (${o.plant}%), a killer plant (${o.killer}%), a pawn for him (${o.pawn}%), a knight, bishop or rook for him (${o.piece}%), or a queen for him (${o.queen}%)`);
     expect(words).toContain(`blocks it for ${BOSS_POWERS.plantTurns} turns of yours`);
     expect(words).toContain(`about ${BOSS_POWERS.waterTarget} pawns (at most ${BOSS_POWERS.waterBand[1]})`);
+    expect(words).toContain(`more than ${BOSS_POWERS.waterFloorMargin} of a pawn under ${BOSS_POWERS.waterBand[0]} (or under where he already stood`);
     expect(words).toContain("A queen is his jackpot, and it has no cap");
     expect(words).toContain(`no further than ${BOSS_POWERS.jackpotMax} pawns, or than the queen alone did`);
     expect(words).toContain("he can't grow a piece he still has a full set of");

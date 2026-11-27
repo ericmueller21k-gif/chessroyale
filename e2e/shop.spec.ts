@@ -1952,3 +1952,58 @@ test("the shop page's width (Eric, Nov 8): on a computer all three tabs sit 120 
     if (computer && shots) await page.screenshot({ path: `${shots}/${c.shot}-computer-padded.png` });
   }
 });
+
+/**
+ * Rare frames and the item preview (Eric, Nov 12; docs/decisions/2026-11-27-rare-frames-preview.md). In the locker a Common tile
+ * has no frame, a Legendary one gold and a Mythic one diamond, each tile the same size. A tile's own tap still wears it; its small
+ * magnifier opens the preview instead: the pawn riding the ride (or wearing the hat) in a framed box, the item's name and
+ * "Mythic · Ride", Close (Escape too); nothing worn by it. A crate's "Possible items" row opens the same preview with a tap.
+ */
+test("rare frames: gold Legendary, diamond Mythic, commons plain; the magnifier previews a pawn riding a ride or wearing a hat, the tile's tap still wears it", async ({ page }) => {
+  await asSignedIn(page, "frames");
+  await page.goto("/shop");
+  await giveItems(page, [
+    { def: "beanie", color: "red" },
+    { def: "candy-cane", color: "red" },
+    { def: "riding-chirp", color: "red" },
+  ]);
+  await page.reload();
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  const tile = (name: string) => page.locator(".locker-cell").filter({ has: page.getByRole("button", { name: new RegExp(`^${name}, `) }) });
+  await expect(tile("Beanie").locator(".locker-item")).not.toHaveClass(/frame-/);
+  await expect(tile("Candy Cane").locator(".locker-item")).toHaveClass(/frame-gold/);
+  await expect(tile("Riding Chirp").locator(".locker-item")).toHaveClass(/frame-diamond/);
+  const sizes = await page.locator(".locker-item").evaluateAll((els) => els.map((e) => `${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`));
+  expect(new Set(sizes).size, `every tile the same size: ${sizes.join(" ")}`).toBe(1);
+  // The magnifier: the preview, nothing worn.
+  await page.getByRole("button", { name: "Preview Riding Chirp" }).click();
+  const box = page.getByRole("dialog");
+  await expect(box.locator(".item-preview-stage.frame-diamond .avatar.riding[data-ride=riding-chirp]")).toHaveAttribute("data-drawn", "1");
+  await expect(box.locator("#item-preview-title")).toHaveText("Riding Chirp");
+  await expect(box.locator(".item-preview-tier")).toHaveText("Mythic · Ride");
+  await expect(page.locator(".locker-worn")).toHaveCount(0);
+  const stage = (await box.locator(".item-preview-stage").boundingBox())!;
+  const vp = page.viewportSize()!;
+  expect(stage.x).toBeGreaterThanOrEqual(0);
+  expect(stage.x + stage.width).toBeLessThanOrEqual(vp.width);
+  await box.getByRole("button", { name: /Close/ }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // The tile's own tap still wears it.
+  await page.getByRole("button", { name: /^Riding Chirp, / }).click();
+  await expect(tile("Riding Chirp").locator(".locker-worn")).toHaveText("Worn");
+  // A hat's preview: the pawn wearing it; Escape closes it.
+  await page.getByRole("button", { name: "Preview Beanie" }).click();
+  await expect(page.getByRole("dialog").locator(".item-preview-stage:not([class*=frame-]) .avatar")).toHaveCount(1);
+  await expect(page.getByRole("dialog").locator(".item-preview-tier")).toHaveText("Common · Head");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // A crate's Possible items: the row's tap previews it (the Fire & Ice Crown, Mythic: diamond).
+  await page.getByRole("tab", { name: "Crates", exact: true }).click();
+  await page.locator('.crate-row[data-crate="winter-1"]').click();
+  await expect(page.locator(".odds-item .odds-art.frame-gold")).toHaveCount(2);
+  await expect(page.locator(".odds-item .odds-art.frame-diamond")).toHaveCount(1);
+  await page.getByRole("button", { name: "Preview Fire & Ice Crown" }).click();
+  await expect(page.getByRole("dialog").locator(".item-preview-stage.frame-diamond .avatar")).toHaveCount(1);
+  await expect(page.getByRole("dialog").locator(".item-preview-tier")).toHaveText("Mythic · Head");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+});

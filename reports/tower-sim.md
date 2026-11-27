@@ -76,3 +76,29 @@ moves: a smoke run at 3000 won 12 of 12 floors). Each floor now records how it e
   floors). Neither bot is a stand-in for a person who learns the powers; Eric's own climbs are the real measure.
 - **Hardest bosses** (floors lost/met, all four tries): Jefferson (grex) 44%, Tiger 38%, the Hollow 33%, Big Boy 32%, Folio 32%.
   **Easiest:** Smudgy 14%, Hopper 20%.
+
+## Nov 26: bad players on the first floors (the careless draw, never a gift)
+
+Eric: "1,000 ELO chess player should be breezing through the first 5 or 6 ... I want these guys to play like bad players for the
+first 8 to 10 levels. And then, it should be like progressively getting harder". Maia was at its floor (600) already, so the change
+is how its move is drawn: `BATTLE_TOWER.carelessDraw` (temperature 1.6 and top-p 1 on floor 1, easing to BOSS_BRAIN's 0.8 and 0.9
+by floor 10), and on every Maia floor a queen or rook move that's simply lost is drawn again (`giftPieces`, `giftLoss` 3). The
+climb's ratings are unchanged. Climber `maia`, 2 lives, the same deals (seeds 7 to 9), to floor 40. "Today" (`maia-today-lives2-*`)
+ran the code before the change (`TOWER_DRAW=off` draws the same way); "careless" is `maia-careless1-lives2-*`.
+
+| Climber | Floors 1-6 won | Floors 7-10 won | Floors 11-20 won | Out on (the third loss) | Floors won: median |
+| --- | --- | --- | --- | --- | --- |
+| 1000, today | 16/24 (67%) | 3/6 | 1/2 | 6, 7, 7, 12 | 4 |
+| 1000, careless | 22/24 (92%) | 13/16 (81%) | 4/11 (36%) | 12, 12, 13, 14 | 9.5 |
+| 1500, today | 18/23 (78%) | 6/10 | 2/5 | 5, 8, 10, 15 | 6 |
+| 1500, careless | 24/24 (100%) | 14/16 (88%) | 13/23 (57%) | 13, 16, 17, 17 | 13.5 |
+
+**What it says**
+- **The first floors are a breeze now:** the 1000 bot wins 92% of floors 1 to 6 (67% before) and every run reaches floor 12; the
+  1500 bot loses none of floors 1 to 6. Floors 7 to 10 are won 81 to 88% of the time (50 to 60% before).
+- **The climb is felt from floor 11:** with the draw back to the usual and +40 a floor, the 1000 bot wins about a third of floors 11
+  to 20 and is out by 12 to 14; the 1500 bot wins about 57% and is out by 13 to 17. No run passed floor 17, so floors 10 to 30 are
+  not too easy and the climb from 10 stays as it was (point 3 of the brief: steeper only if the sim said so).
+- **Short of the 20s for the 1500 bot:** read as the floor (the worst case), as above: the bot doesn't know the powers (most lost
+  floors were mates: 10 of 12 at 1000 and 8 of 12 at 1500, the rest stalemates and other draws). If Eric's own climbs find floors
+  11 to 15 a wall, the knob is the last `carelessDraw` row (say, the usual draw from floor 14 instead of 10).

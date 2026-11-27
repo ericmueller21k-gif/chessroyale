@@ -80,7 +80,11 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 - **The deal:** a seeded deck of the pool, in order, a new deck when it runs out: every boss once before any twice, never the same boss
   on two floors in a row, never an `apart` pair (a deck that would leave a pair waiting at its end is shuffled again).
 - **In the runner** (`settings.towerFloor`, set by `startFloor`): every boss at the floor's strength (`elo` the floor's rating, no
-  offset or difficulty; the brain Maia at that rating for one player or a party alike, Stockfish from floor 51; "best" from 80). A side
+  offset or difficulty; the brain Maia at that rating for one player or a party alike, Stockfish from floor 51; "best" from 80).
+  **Bad players first** (Eric, Nov 26; docs/decisions/2026-11-26-tower-easy-floors.md): Maia's draw is the floor's (`floorDraw`,
+  `carelessDraw`: temperature 1.6 and top-p 1 on floor 1, BOSS_BRAIN's 0.8 and 0.9 from floor 10), and on every Maia floor a drawn
+  queen or rook move that's simply lost (`giftPieces`, `giftLoss`: boss-brain.ts `isGift`, a chess.js static exchange) is drawn again
+  from Maia's other listed moves; a piece already hanging may stay so. The plan carries it (`BossBrainPlan.draw`, `NetBossBrain.draw`). A side
   core's `sideRefusal` refuses still throws in `startSide` (test switch, tests); a room never gets there (finding 7).
 - Calls made: [2026-11-19-tower-climb-rules.md](../decisions/2026-11-19-tower-climb-rules.md).
 
@@ -343,7 +347,7 @@ take from `startSide`) fixed in PR 8 (above).
 
 `packages/chess/test/board-layer.test.ts` (every mark, overlaps, the lift, castling, promotion, en passant); each family's twin
 (today's rule, frozen, against the layer over seeded battles: `held-layer-twin.test.ts` for the held pieces, `square-layer-twin.test.ts` for the square marks, `shield-layer-twin.test.ts` for the shields); the boss kit (`packages/chess/test/boss-kit.test.ts`) and `e2e/boss-smoke.spec.ts` guard every boss
-moved onto the layer; `boss-kit-side.test.ts` runs the kit over every pair and a sample of threes (and audit 1's seeds), `several-bosses.test.ts` the side's
+moved onto the layer; `boss-kit-side.test.ts` runs the kit over every pair (on main; a PR plays 1 in 4, rotated by its number: `KIT_PAIR_SHARE`) and a sample of threes (and audit 1's seeds), `several-bosses.test.ts` the side's
 rules (Chandy in every order: a mate in one brings no Dodge, your mate is a mate on a floor of several; Folio's crease line at the floor's rates), and `boss-kit-parity.test.ts` solo against online
 for every boss in a pair and two threes (more by hand: `KIT_PARITY_SIDES`); core `tower.test.ts` (the design's table, the deal over 300 seeds and two pools, the run's steps and lives, finding 7's start) and the runner's
 side of finding 7 in `several-bosses.test.ts`; server `tower.test.ts` (the index, every route's happy path and refusals, a result once and

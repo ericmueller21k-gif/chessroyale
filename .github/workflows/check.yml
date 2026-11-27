@@ -79,6 +79,10 @@ jobs:
       matrix:
         shard: [1, 2]
     env:
+      # (Nov 27, docs/decisions/2026-11-27-kit-side-sample.md: a pull request plays 1 in 4 of boss-kit-side's pairs, rotated by its
+      # number so any four PRs in a row play them all; every push to main plays every pair.)
+      KIT_PAIR_SHARE: ${{ github.event_name == 'pull_request' && '4' || '' }}
+      KIT_PAIR_ROTATE: ${{ github.event.pull_request.number || 0 }}
       HALF1: >-
         packages/chess/test/boss-kit-side.test.ts packages/chess/test/several-bosses.test.ts
         packages/chess/test/boss-kit.test.ts packages/chess/test/square-layer-twin.test.ts

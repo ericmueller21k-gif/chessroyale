@@ -682,6 +682,9 @@ export class NetMatch implements GameView {
     // (Birdie's moments' start, on the lobby's clock: onto this device's, BirdieView.turnAt.)
     const bd = next.powers?.birdie;
     if (bd?.turnAt) next = { ...next, powers: { ...next.powers!, birdie: { ...bd, turnAt: { turn: bd.turnAt.turn, at: this.local(bd.turnAt.at), ...(bd.turnAt.dropAt !== undefined ? { dropAt: this.local(bd.turnAt.dropAt) } : {}) } } } };
+    // (Dash's pop-off's hold's start, the same: DashView popOff.since.)
+    const pop = next.powers?.dash?.popOff;
+    if (pop?.since !== undefined) next = { ...next, powers: { ...next.powers!, dash: { ...next.powers!.dash!, popOff: { ...pop, since: this.local(pop.since) } } } };
     return (this.boss = { ...next, board: this.toView(next.board) });
   }
 
@@ -1113,7 +1116,7 @@ export class NetMatch implements GameView {
       const rng = draw ? mulberry32(draw) : Math.random;
       // (Which brain played it, from its last note: sent with it, so two devices' different moves are settled fairly.)
       let by: "maia" | "stockfish" = "stockfish";
-      const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), ...(draw ? { seed: draw } : {}), engine: this.maia, onNote: (n: BrainNote) => ((this.brainNote = n), (by = n.by)) } : undefined;
+      const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), ...(brain.draw ? { draw: brain.draw } : {}), ...(draw ? { seed: draw } : {}), engine: this.maia, onNote: (n: BrainNote) => ((this.brainNote = n), (by = n.by)) } : undefined;
       // (The admins' debug line: the battle is on Maia, but this move is the engine's.)
       if ((kind === "best" || share) && this.bossPlan) this.brainNote = { brain: this.bossPlan.brain, rating: this.bossPlan.rating, ...(this.bossPlan.stockfishShare ? { share: this.bossPlan.stockfishShare } : {}), by: "stockfish", why: share ? "share" : "power" };
       const ahead = land?.length && !funhouse ? slamAhead(land) : null;

@@ -242,11 +242,15 @@ export function DashHangOn({ at }: { at: number }) {
   );
 }
 
-/** When this device first saw each pop-off (a screen drawn again carries on; it doesn't start over). */
+/**
+ * When each pop-off began on this device: online, when the server's hold for it began (`since`: a reload or a rejoin in the middle
+ * carries on from there, never from its start, Nov 27); solo (whose reload starts the hold over too), when this device first saw it.
+ * A screen drawn again carries on; it doesn't start over.
+ */
 const popOffSeen = new Map<string, number>();
 
 /**
- * His pop-off, as his thinking screen's moments (Boss.tsx), from when this device first saw it: the pop-off's two beats, one after
+ * His pop-off, as his thinking screen's moments (Boss.tsx), from when it began (popOffSeen): the pop-off's two beats, one after
  * the other; or in the second's place his "Hang on" (Nov 26), its four (hangOnTimeline). It plays while he thinks after your move for
  * the turn it comes (popOffPending); popOffMs holds his move for them.
  */
@@ -257,7 +261,7 @@ export function popOffMoments(boss: BossView, now = Date.now()): Moment[] {
   const seenKey = `${boss.startMove}:${key}`;
   let at = popOffSeen.get(seenKey);
   if (at === undefined) {
-    popOffSeen.set(seenKey, (at = now));
+    popOffSeen.set(seenKey, (at = Math.min(now, d.popOff.since ?? now)));
     if (popOffSeen.size > 20) popOffSeen.delete(popOffSeen.keys().next().value!);
   }
   if (d.popOff.hangOn) {

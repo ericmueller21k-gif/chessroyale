@@ -15,6 +15,13 @@ const MAX_MOVES = 16;
 const THREES = Number(process.env.KIT_THREES ?? 12);
 /** More seeds of each pair, for a deeper run by hand: `KIT_PAIR_SEEDS=3 npx vitest run packages/chess/test/boss-kit-side.test.ts`. */
 const PAIR_SEEDS = Number(process.env.KIT_PAIR_SEEDS ?? 1);
+/**
+ * Pull requests play a share of the pairs (Nov 27; docs/decisions/2026-11-27-kit-side-sample.md): with KIT_PAIR_SHARE=n (check.yml
+ * sets 4 on pull_request events) a PR plays the pairs whose place in kitPairs() is KIT_PAIR_ROTATE (the PR number) mod n, so any n
+ * PRs in a row cover every pair; the rest show as skipped. Unset (every push to main, and by hand): every pair.
+ */
+const PAIR_SHARE = Math.max(1, Math.floor(Number(process.env.KIT_PAIR_SHARE || 1)));
+const PAIR_ROTATE = Math.floor(Number(process.env.KIT_PAIR_ROTATE || 0));
 
 /**
  * Pairs the kit finds breaking, the seeds they break on (1: CI's; more by hand: KIT_PAIR_SEEDS) and the rule proposed for each (the
@@ -41,6 +48,10 @@ export function kitPairs(): string[][] {
     }
   return out;
 }
+
+/** Whether a pair at place i of kitPairs() plays in this run: every one unless KIT_PAIR_SHARE samples them. */
+export const pairInSample = (i: number, share = PAIR_SHARE, rotate = PAIR_ROTATE): boolean =>
+  share <= 1 || (((i - rotate) % share) + share) % share === 0;
 
 /** A seeded sample of threes (none BATTLE_TOWER.apart keeps apart), each boss in as many as the sample allows. */
 export function kitThrees(count: number): string[][] {
@@ -88,6 +99,19 @@ describe("the boss kit over several bosses: its own ground", () => {
     expect(pairs.some((p) => p.includes("hollow") && p.includes("smudgy"))).toBe(false);
     expect(kitThrees(THREES).length).toBe(THREES);
   });
+  it("a PR's share of the pairs: about 1 in n, and any n PRs in a row play every pair", () => {
+    const n = kitPairs().length;
+    for (const share of [1, 4]) {
+      const covered = new Set<number>();
+      for (let rotate = 990; rotate < 990 + share; rotate++) {
+        const picked = [...Array(n).keys()].filter((i) => pairInSample(i, share, rotate));
+        expect(picked.length).toBeGreaterThanOrEqual(Math.floor(n / share));
+        expect(picked.length).toBeLessThanOrEqual(Math.ceil(n / share));
+        for (const i of picked) covered.add(i);
+      }
+      expect(covered.size).toBe(n);
+    }
+  });
 });
 
 /** One battle of several bosses; its failures (the first few), and the kinds of step it played. */
@@ -105,11 +129,13 @@ describe("the boss kit over several bosses: every pair", () => {
       expect(rule).toMatch(/ \| .+ \| /);
     }
   });
-  for (const pair of kitPairs()) {
+  for (const [i, pair] of kitPairs().entries()) {
     const name = pair.join(" + ");
     for (let k = 0; k < PAIR_SEEDS; k++) {
       const known = !!PAIR_BREAKS[name]?.seeds.includes(k + 1);
-      (known ? it.fails : it)(`${name}${k ? ` (seed ${k + 1})` : ""}: the invariants after every step${known ? " (a known break: PAIR_BREAKS)" : ""}`, async () => {
+      // (A known break always plays: it's the check that its rule or BATTLE_TOWER.apart has landed.)
+      const play = known || pairInSample(i);
+      (play ? (known ? it.fails : it) : it.skip)(`${name}${k ? ` (seed ${k + 1})` : ""}: the invariants after every step${known ? " (a known break: PAIR_BREAKS)" : ""}`, async () => {
         const r = await side(pair, k);
         expect(r.failures.join("\n\n")).toBe("");
         // (Enough of a battle: a move from each of two bosses at least; Lights out lost at once can end one there.)

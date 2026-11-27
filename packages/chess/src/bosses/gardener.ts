@@ -28,13 +28,14 @@
  *   each on the square (among waterLooks seeded ones its guards allow) that keeps his total gain nearest waterTarget, at
  *   most the band's top (waterBand; a queen lifts the top and the target to jackpotMax). A killer plant tries the crowd's
  *   pieces first and his own only when none keeps the band. An outcome with no square under the top is dropped: it comes
- *   up as nothing. Nothing at all placed: a shrug (his whole turn all the same).
+ *   up as nothing, and so is one with no square above the floor (waterFloorMargin under the band's bottom, or under where
+ *   he stands before the seeds if lower: Nov 27). Nothing at all placed: a shrug (his whole turn all the same).
  * - **Hard guards on every step:** never a king; never either side left in check; never a mate in one for either side;
  *   never the crowd without a move (the plants counted); never a position the engine refuses (stockfishRefuses).
  * - **The regrowth** (Eric, Nov 26: "if he's going to lose like a big piece, then he should just basically regrow that
  *   same piece"): when a piece of his hangs once he passes (regrowKind: the server's, by the exchange check, so the host
- *   can't name another) and passing would lose it (the host's engine: its line after the pass takes a piece of that kind,
- *   or the pass guard's own measure, passLoses; docs/decisions/2026-11-26-puddles-regrow.md), the watering grows
+ *   can't name another) and passing would lose it (the host's engine: its line after the pass wins a piece of that kind
+ *   by the same exchange check, or the pass guard's own measure, passLoses; docs/decisions/2026-11-26-puddles-regrow.md), the watering grows
  *   that same kind of piece back for him first, one more outcome than the seeds, on the square (of waterLooks its guards
  *   allow) that leaves his gain nearest none: it makes up the loss, and the seeds are placed on top of it as ever, so his
  *   total stays near waterTarget, not double. Under the hard guards like any grown piece (a full set: it can't grow).
@@ -76,15 +77,21 @@ export const WATER_BEATS = {
   stagger: 250,
 } as const;
 
+/**
+ * The board art one outcome plays on its square, the screens' and the timing's one answer: a seed's queen (the jackpot)
+ * its grander bud, with its chime; a regrown queen a plain bud, as every regrowth (Nov 27: a regrowth, not the jackpot).
+ */
+export const growthArt = (g: Pick<WaterGrowth, "kind" | "regrow">): "kill" | "budQueen" | "grow" | "wilt" | "bud" =>
+  g.kind === "killer" ? "kill" : g.kind === "q" && !g.regrow ? "budQueen" : g.kind === "plant" ? "grow" : g.kind === "nothing" ? "wilt" : "bud";
+
 /** How long one outcome plays on its square, from its start (its board art). */
-export const growthMs = (g: Pick<WaterGrowth, "kind">): number =>
-  g.kind === "killer" ? GARDEN_ART.kill : g.kind === "q" ? GARDEN_ART.budQueen : g.kind === "plant" ? GARDEN_ART.grow : g.kind === "nothing" ? GARDEN_ART.wilt : GARDEN_ART.bud;
+export const growthMs = (g: Pick<WaterGrowth, "kind" | "regrow">): number => GARDEN_ART[growthArt(g)];
 
 /** When outcome `i` of a watering starts (ms into its moment). */
 export const growthAt = (i: number): number => WATER_BEATS.growAt + i * WATER_BEATS.stagger;
 
 /** How long a watering's moment holds the screen: its cast, then every outcome in turn (WATER_BEATS). */
-export function waterMs(growth: readonly Pick<WaterGrowth, "kind">[] | null | undefined): number {
+export function waterMs(growth: readonly Pick<WaterGrowth, "kind" | "regrow">[] | null | undefined): number {
   return (growth ?? []).reduce<number>((t, g, i) => Math.max(t, growthAt(i) + growthMs(g)), GARDENER_ANIM.water);
 }
 
@@ -96,7 +103,7 @@ export function waterMs(growth: readonly Pick<WaterGrowth, "kind">[] | null | un
 export const GARDENER_FX = { plantMany: 0, plant: 0, water: GARDENER_ANIM.water, cheer: GARDENER_ANIM.cheer, bigCheer: GARDENER_ANIM.bigCheer, shrug: GARDENER_ANIM.shrug } as const;
 
 type SeedSettings = Pick<BossPowerSettings, "seedsAtStart" | "seedEverySec" | "seedMax">;
-type WaterSettings = Pick<BossPowerSettings, "waterBand" | "waterTarget" | "jackpotMax" | "waterLooks" | "waterNodes" | "waterBudget" | "waterTimeMs" | "bouncePawnLogit" | "passGuardPawns">;
+type WaterSettings = Pick<BossPowerSettings, "waterBand" | "waterTarget" | "waterFloorMargin" | "jackpotMax" | "waterLooks" | "waterNodes" | "waterBudget" | "waterTimeMs" | "bouncePawnLogit" | "passGuardPawns">;
 
 // ---------------- Seeds ----------------
 
@@ -346,15 +353,18 @@ export interface WaterPick {
  * square nearest jackpotMax with no top (a queen up saturates the engine's win chances, so a cap would only ever leave it
  * hanging), and lifts the top for the rest to jackpotMax (or what it gained, if more) and their target to jackpotMax. A killer plant weighs the crowd's pieces first (pawns first), his own only when none of them stays under the
  * top, and then only one that lands within the band. An
- * outcome with no option under the top is dropped (it comes up as nothing). The gain is his evaluation after (the crowd
+ * outcome with no option under the top is dropped (it comes up as nothing), as is one with no option above the floor
+ * (waterFloorMargin under the band's bottom, or under where he stands before the seeds if that's lower: the pass alone,
+ * or with the regrowth). The gain is his evaluation after (the crowd
  * to move) against his before (him to move), in pawns of log-odds (bouncePawnLogit), each over the moves no plant stops.
- * **The regrowth first** (`ask.regrow`, Eric, Nov 26): the pass alone is searched, and when it loses him that piece (the
- * engine's line takes one of that kind, or by the pass guard's measure, passLoses), that kind of piece grows back for him before any seed, on the option that leaves his gain nearest none
+ * The pass alone is searched first (outside the budget, as the position before is). **The regrowth first** (`ask.regrow`,
+ * Eric, Nov 26): when the pass loses him that piece (the engine's line wins one of that kind by the exchange check that
+ * named it, not an even trade; or by the pass guard's measure, passLoses), that kind of piece grows back for him before any seed, on the option that leaves his gain nearest none
  * (under the band's top): it makes up the loss; the seeds then go on top of it as ever, their targets reckoned on the
  * whole board, so the total stays near waterTarget (the regrowth counted once). Without `ask.regrow`, or when the pass
  * loses nothing real, the seeds alone, exactly as before.
  * Every step's position is a whole watering that passes the guards, so the last one placed is the answer. The search
- * stops at waterBudget positions or after waterTimeMs (its own clock, `now`; the outcomes left are dropped, `late`),
+ * stops at waterBudget positions (besides the position before and the pass alone) or after waterTimeMs (its own clock, `now`; the outcomes left are dropped, `late`),
  * breathing between squares (Pace), so ten seeds never stall a phone nor run a host past the server's timeout. Null: no
  * engine, no answer, or he can't pass (in check).
  */
@@ -391,8 +401,8 @@ export async function waterFrom(engines: readonly EngineLike[], fen: string, ask
         const crowd = scores[j];
         if (crowd === null || crowd === undefined) return;
         const g = gainOf(crowd);
-        // (His own piece only when that keeps the band: within it, not just under its top.)
-        if (g > top || (tier === "his" && g < s.waterBand[0])) return;
+        // (Never under the floor. His own piece only when that keeps the band: within it, not just under its top.)
+        if (g > top || g < floor || (tier === "his" && g < s.waterBand[0])) return;
         if (!chosen || Math.abs(g - target) < Math.abs(chosen.gain - target)) chosen = { ...o, gain: g };
       });
       if (chosen) {
@@ -409,20 +419,25 @@ export async function waterFrom(engines: readonly EngineLike[], fen: string, ask
     placed.push({ kind, square: c.square, ...(regrow ? { regrow: true as const } : {}) });
     gain = c.gain;
   };
-  // (The pass alone, searched only when a piece of his hangs once he passes: the regrowth's question, and the answer when
-  // nothing is placed. Passing loses it when the engine's line takes a piece of that kind, or by the pass guard's measure.)
-  let passCrowd: number | null | undefined;
-  if (ask.regrow) {
-    const line = await sideLine(engines[0]!, passed, ask.plants, s.waterNodes);
-    passCrowd = line?.expected ?? null;
-    budget--;
-    looks++;
-    const takes = !!line && pieceAt(passed, line.move.slice(2, 4))?.type === ask.regrow;
-    if (line && (takes || passLoses(gainOf(line.expected), s))) {
+  // (The pass alone, searched first and outside the budget, as the position before is: the floor's start, the regrowth's
+  // question, and the answer when nothing is placed.)
+  const line = await sideLine(engines[0]!, passed, ask.plants, s.waterNodes);
+  looks++;
+  const passGain = line ? gainOf(line.expected) : null;
+  // (The floor: no step leaves him more than waterFloorMargin under the band's bottom, or under where he stands before
+  // the seeds, if that's lower; an option under it is no option. The seeds' floor is set after the regrowth, from it.)
+  const floorFrom = (at: number | null) => Math.min(s.waterBand[0], at ?? s.waterBand[0]) - s.waterFloorMargin;
+  let floor = floorFrom(passGain);
+  // (Passing loses the piece when the engine's line wins one of that kind by the exchange check that named it, an even
+  // trade being no loss, or by the pass guard's measure.)
+  if (ask.regrow && line && passGain !== null) {
+    const wins = pieceAt(passed, line.move.slice(2, 4))?.type === ask.regrow && (exchangeNet(passed, line.move) ?? 0) >= s.passGuardPawns;
+    if (wins || passLoses(passGain, s)) {
       const c = await pick(ask.regrow, "regrow", s.waterBand[1], 0);
       if (c) take(ask.regrow, c, true);
     }
   }
+  floor = floorFrom(gain ?? passGain);
   for (let i = 0; i < kinds.length && budget > 0 && !p.over(); i++) {
     const kind = kinds[i]!;
     await p.breathe();
@@ -439,11 +454,8 @@ export async function waterFrom(engines: readonly EngineLike[], fen: string, ask
   }
   if (gain === null) {
     // (Nothing placed: the pass alone, if it's a position the watering may leave.)
-    if (!waterGuard(passed, ask.plants)) return null;
-    const crowd = passCrowd !== undefined ? passCrowd : await sideBest(engines[0]!, passed, ask.plants, s.waterNodes);
-    if (crowd === null) return null;
-    gain = gainOf(crowd);
-    if (passCrowd === undefined) looks++;
+    if (!waterGuard(passed, ask.plants) || passGain === null) return null;
+    gain = passGain;
   }
   return { placed, fen: pos, gain: Math.round(gain * 100) / 100, looks, ownKills, ...(p.over() ? { late: true as const } : {}) };
 }

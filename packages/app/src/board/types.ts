@@ -101,6 +101,11 @@ export interface PremoveSeat {
    * else (a crowd's reveal, which a tap skips).
    */
   watch?: boolean;
+  /**
+   * The premoves waiting keep their pieces on their squares (only their squares colored): a screen showing a position of its own for a
+   * moment, one the moves ahead don't follow from (Dash's "Hang on" taking your move back, Nov 27).
+   */
+  hold?: boolean;
 }
 
 // The board's own elements: a piece (also drawn over the board, and in the promotion picker) and a square's highlight.
