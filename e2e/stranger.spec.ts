@@ -76,6 +76,25 @@ test("his Frostfire on a phone: your piece frozen a turn (no move of it, its ice
   expect(errors).toEqual([]);
 });
 
+/** The brightest pixel (0-255, its three colors' mean) in a box of the page as it's drawn now: the pixels are the point (the storm's shade). */
+async function brightest(page: Page, box: { x: number; y: number; width: number; height: number }): Promise<number> {
+  const shot = await page.screenshot({ clip: box });
+  return page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const cv = document.createElement("canvas");
+    cv.width = img.width;
+    cv.height = img.height;
+    const g = cv.getContext("2d")!;
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, cv.width, cv.height).data;
+    let most = 0;
+    for (let i = 0; i < d.length; i += 4) most = Math.max(most, (d[i]! + d[i + 1]! + d[i + 2]!) / 3);
+    return most;
+  }, shot.toString("base64"));
+}
+
 test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his figure whole on screen), the ring, an Ice turn and a Fire turn, the burn", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
@@ -83,10 +102,28 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   // (Every frame from the start, recorded in the page: the scene's own element and his figure's box, the ring, the dock's words.)
   await page.addInitScript(() => {
     const w = window as any;
-    w.__storm = { scene: [] as number[], outside: [] as string[], ring: 0, drawn: 0, rift: [] as number[], burn: 0, docks: [] as string[], wide: [] as number[] };
+    w.__storm = { scene: [] as number[], outside: [] as string[], ring: 0, drawn: 0, rift: [] as number[], burn: 0, docks: [] as string[], wide: [] as number[], swords: false, early: [] as string[], build: [] as number[], riftSee: [] as string[], home: [] as number[] };
     const look = () => {
       const fig = document.querySelector(".pm-storm .sg-fig");
       if (document.querySelector(".pm-storm")) w.__storm.scene.push(Date.now());
+      // (Eric, Nov 27: "it showed the tornado before he even initiated anything": from the battle's first frame to his first sword,
+      // nothing of the storm is drawn: no ring, no rift, no shade. Then the ring gathers: its strength through his swords.)
+      const stage = document.querySelector(".pm-storm")?.getAttribute("data-stage") ?? "";
+      const art = w.__stormArt as { ring: number; rift: number; strength: number } | undefined;
+      if (stage && stage !== "leap" && stage !== "draw") w.__storm.swords = true;
+      if (!w.__storm.swords) {
+        const shade = document.querySelector(".sg-shade");
+        const seen = [(art?.strength ?? 0) > 0 || (art?.ring ?? -1) >= 0 ? "ring" : "", (art?.rift ?? -1) >= 0 ? "rift" : "", shade && Number(getComputedStyle(shade).opacity) > 0 ? "shade" : "", !stage && document.querySelector(".sg-storm, .sg-rift") ? "canvas" : ""].filter(Boolean).join("+");
+        if (seen && !w.__storm.early.includes(seen)) w.__storm.early.push(seen);
+      }
+      if (stage === "swords") w.__storm.build.push(art?.strength ?? 0);
+      const riftEl = document.querySelector(".sg-rift");
+      const see = riftEl ? getComputedStyle(riftEl).opacity : "";
+      if (see && !w.__storm.riftSee.includes(see)) w.__storm.riftSee.push(see);
+      // (His size, Eric, Nov 27: "it almost looked like his size shrunk a bit": while its banner is up he stands in his place, his
+      // figure's box there his own figure's, to a pixel: its width against his bar figure's.)
+      const own = document.querySelector(".boss-char.ch-stranger .boss-char-sprite");
+      if (stage === "leap" && fig && own && document.querySelector(".fight-banner.storm")) w.__storm.home.push(Math.abs(fig.getBoundingClientRect().width - own.getBoundingClientRect().width), Math.abs(fig.getBoundingClientRect().left - own.getBoundingClientRect().left), Math.abs(fig.getBoundingClientRect().top - own.getBoundingClientRect().top));
       if (fig) {
         // (His drawing's box, its frame's transparent margins aside: whole on screen at every frame.)
         const r = fig.getBoundingClientRect();
@@ -128,9 +165,37 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   // The warning as turn 2 begins, the storm as turn 3 does (the test switch): your moves until its turns have both kinds.
   const kinds = new Set<string>();
   let burnt = false;
+  // (The storm's shade, Eric, Nov 27: "everything should get a little dulled, so it's more of a focus on the board": the move list's
+  // brightest pixel before the storm and in it.)
+  const rowBox = async () => (await page.locator(".boss-dock .mv-row").last().boundingBox())!;
+  let litBefore = 0;
+  let shaded = false;
   for (let i = 0; i < 8 && kinds.size < 2; i++) {
     const t = await yourTurn(page, 90_000);
     const pick = await pickNow();
+    if (!pick && !litBefore && (await page.locator(".boss-dock .mv-row").count())) litBefore = await brightest(page, await rowBox());
+    if (pick && !shaded) {
+      shaded = true;
+      // Everything but the board about half as bright, the board's row over the shade, and a tap goes through it.
+      await expect.poll(() => page.evaluate(() => Number(getComputedStyle(document.querySelector(".sg-shade")!).opacity)), { timeout: 5000 }).toBe(1);
+      const box = await rowBox();
+      const ring = (await page.locator(".sg-storm").boundingBox())!;
+      expect(box.y, "the move list's last row is clear of the ring's flames").toBeGreaterThan(ring.y + ring.height);
+      const lit = await brightest(page, box);
+      expect(litBefore, "the move list read before the storm").toBeGreaterThan(150);
+      expect(lit / litBefore, "the move list about half as bright (45 to 55% darker)").toBeGreaterThan(0.42);
+      expect(lit / litBefore).toBeLessThan(0.6);
+      const layer = await page.evaluate(
+        ([x, y]) => {
+          const shade = getComputedStyle(document.querySelector(".sg-shade")!);
+          return { taps: shade.pointerEvents, shade: Number(shade.zIndex), board: Number(getComputedStyle(document.querySelector(".board-row")!).zIndex), under: !!document.elementFromPoint(x!, y!)?.closest(".boss-dock") };
+        },
+        [box.x + box.width / 2, box.y + box.height / 2],
+      );
+      expect(layer.taps).toBe("none");
+      expect(layer.under, "a tap on the move list reaches it").toBe(true);
+      expect(layer.board, "the board's row over the shade").toBeGreaterThan(layer.shade);
+    }
     if (pick?.kind === "ice") {
       kinds.add("ice");
       // Only your king's moves and the free pieces': every other piece of yours frozen, its ice on the board.
@@ -161,13 +226,26 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   }
   expect([...kinds].sort()).toEqual(["fire", "ice"]);
   expect(burnt, "a marked piece of yours burnt").toBe(true);
-  const rec = await page.evaluate(() => (window as any).__storm as { scene: number[]; outside: string[]; ring: number; drawn: number; rift: number[]; burn: number; docks: string[]; wide: number[] });
+  const rec = await page.evaluate(() => (window as any).__storm as { scene: number[]; outside: string[]; ring: number; drawn: number; rift: number[]; burn: number; docks: string[]; wide: number[]; early: string[]; build: number[]; riftSee: string[]; home: number[] });
+  expect(shaded, "the shade checked on a storm turn").toBe(true);
+  // Nothing of the storm before his first sword; then the ring gathers from nothing to whole, never at once.
+  expect(rec.early, "nothing of the storm drawn before his first sword").toEqual([]);
+  expect(rec.build.length).toBeGreaterThan(30);
+  expect(rec.build[0]!, "the ring from nothing").toBeLessThan(0.1);
+  expect(rec.build.at(-1)!, "the ring whole by his grip").toBeGreaterThan(0.9);
+  expect(rec.build.every((v, i) => i === 0 || v >= rec.build[i - 1]!), "the ring only ever gathers").toBe(true);
+  expect(new Set(rec.build).size, "it builds in many steps").toBeGreaterThan(20);
+  // The rift at half opacity, its opening and its stages alike.
+  expect(rec.riftSee).toEqual(["0.5"]);
+  // His figure's box in his place, his own figure's (never a jump in size or place as the scene takes him over).
+  expect(rec.home.length).toBeGreaterThan(30);
+  expect(Math.max(...rec.home), "his figure's box in his place, within a pixel of his own").toBeLessThan(1);
   expect(rec.wide, "no sideways scroll while the storm's ring shows").toEqual([]);
   expect(rec.burn, "the burn drawn as his thinking began").toBeGreaterThan(5);
   // (Both kinds' words seen, after his name as each turn began and through your turn.)
   expect(rec.docks.length).toBeGreaterThanOrEqual(4);
   expect(rec.docks.filter((d) => d.includes("[cut]"))).toEqual([]);
-  // The scene: 10 to 12 s from his leap (its banner's second before it), every frame of him whole on screen.
+  // The scene: 10 to 12 s from his leap (its banner's 2.25 s before it), every frame of him whole on screen.
   const ms = rec.scene.at(-1)! - rec.scene[0]!;
   expect(ms).toBeGreaterThan(10_500);
   expect(ms).toBeLessThan(13_500);
