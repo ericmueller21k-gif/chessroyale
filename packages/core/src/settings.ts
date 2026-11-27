@@ -2585,6 +2585,17 @@ export function recluseNextForm(form: RecluseForm, forms: readonly RecluseForm[]
   const i = forms.indexOf(form);
   return i >= 0 ? (forms[i + 1] ?? null) : null;
 }
+/**
+ * How many of his forms (RECLUSE_FORMS, met in order) a fight beat, for the profile's match history (Eric, Nov 13: "gray out the ones
+ * you beat"; results.forms_beaten): all of them when it was won, else the forms before the one it ended in. Anything else (a number
+ * from a device) is held to what a result can be: a fight not won beat at most all but his last.
+ */
+export function recluseFormsBeaten(won: boolean, form: RecluseForm | number): number {
+  const all = RECLUSE_FORMS.length;
+  if (won) return all;
+  const n = typeof form === "number" ? form : RECLUSE_FORMS.indexOf(form);
+  return Number.isFinite(n) ? Math.max(0, Math.min(all - 1, Math.round(n))) : 0;
+}
 
 /**
  * The Hidden Boss's cutscene between his adult form and the cyborg (Nov 12; `components/RecluseCutscene.tsx`): after his fall,

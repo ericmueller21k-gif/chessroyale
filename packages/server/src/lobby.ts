@@ -6,7 +6,7 @@ import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { CROWD_PARTY, FAIRPLAY, PLAY_COINS, packParties, type FairMove } from "@chessroyale/core";
-import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, HIDDEN_ROOM, RECLUSE_ONLINE, RECLUSE_PHASE2, finishBoss, recluseNextForm, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, HIDDEN_ROOM, RECLUSE_ONLINE, RECLUSE_PHASE2, finishBoss, recluseFormsBeaten, recluseNextForm, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   BOT_NAMES,
@@ -253,6 +253,8 @@ export type HumanResult = {
   ranked: boolean;
   /** They had the eval bar on, as their app said (null: an app from before the setting). */
   evalBar: boolean | null;
+  /** A fight against the Hidden Boss: how many of his forms it beat (formsBeaten below; results.forms_beaten). */
+  formsBeaten?: number;
 } & MatchFeats;
 
 /**
@@ -1427,6 +1429,7 @@ export class LobbyCore {
       ...(this.r.party ? { bossElo: null } : {}),
       // (In a boss battle they didn't see it through.)
       ...(feats.strikes !== null ? { survived: false } : {}),
+      ...this.formsBeaten(false),
     };
   }
 
@@ -4685,9 +4688,21 @@ export class LobbyCore {
           // (A Boss Battle party's boss plays at the party's difficulty, Very easy to Very hard, not a tier: recorded, but
           // never as an online tier beaten, the profile's "bosses beaten online".)
           ...(this.r.party ? { bossElo: null } : {}),
+          ...this.formsBeaten(teamWon === true),
         },
       ];
     });
+  }
+
+  /**
+   * A fight against the Hidden Boss (a raid against him: his room's): how many of his forms it beat, for the profile's match history
+   * (core's recluseFormsBeaten): won, all three; else the forms before the one it's in now (the child, his adult form, or the four
+   * boards once his phase 2 began here: `recluse2`). Nothing for any other match.
+   */
+  private formsBeaten(won: boolean): { formsBeaten?: number } {
+    const boss = this.runner?.boss;
+    if (!boss || boss.id !== HIDDEN_ROOM.boss || !this.settings.raid) return {};
+    return { formsBeaten: recluseFormsBeaten(won, this.r.recluse2 ? "four" : (boss.form ?? "adult")) };
   }
 
   /**

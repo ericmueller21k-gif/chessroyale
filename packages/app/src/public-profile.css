@@ -609,6 +609,11 @@
 .pp-rpchange.none {
   color: var(--fd-muted);
 }
+/* The Hidden Boss's row: his three forms in the RP change's place, ending where it ends. */
+.pp-forms {
+  --rf-w: 21px;
+  margin-left: 6px;
+}
 .pp-empty {
   display: grid;
   flex: 1;
@@ -902,6 +907,10 @@
 .pp-wide .pp-rpchange {
   min-width: 40px;
   font-size: 19.5px;
+}
+.pp-wide .pp-forms {
+  --rf-w: 27px;
+  gap: 4px;
 }
 .pp-wide .pp-rows {
   min-height: calc(5 * 50.6px);

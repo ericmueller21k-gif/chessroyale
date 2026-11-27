@@ -5,7 +5,7 @@ import { BackButton, DressedPawn } from "../components/FrontDoor.tsx";
 import { BossArt } from "../components/BossPortrait.tsx";
 import { InviteButton, useProfileActions } from "../components/Friends.tsx";
 import { ItemArt } from "../components/Items.tsx";
-import { Recent, ReportSheet, WearingRows } from "../components/ProfileParts.tsx";
+import { Recent, RecluseForms, ReportSheet, WearingRows } from "../components/ProfileParts.tsx";
 import { RankEmblem } from "../components/RankEmblem.tsx";
 import { SELECT_TINT } from "../characters/boss-select.ts";
 import { account, fetchProfile, onAccountChange, type PublicProfile } from "../account.ts";
@@ -382,7 +382,8 @@ function RecentCard({ rows, loading, onAll, none }: { rows: RecentRow[]; loading
               <strong>{r.title}</strong>
               <span>{r.sub}</span>
             </span>
-            <span class={`pp-rpchange ${r.rp.tone}`}>{r.rp.text}</span>
+            {/* (The Hidden Boss's row: his three forms in the RP change's place, a 1 v 1's alone.) */}
+            {r.forms !== undefined ? <RecluseForms beaten={r.forms} class="pp-forms" /> : <span class={`pp-rpchange ${r.rp.tone}`}>{r.rp.text}</span>}
           </li>
         ))}
         {!loading && none && <li class="pp-empty">No matches yet.</li>}

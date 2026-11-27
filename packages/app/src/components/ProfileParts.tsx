@@ -1,11 +1,13 @@
 import { Fragment } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
-import { FAIRPLAY, bossInfo, itemDef, itemName, shownLook, tierInfo, type ItemLook } from "@chessroyale/core";
+import { FAIRPLAY, HIDDEN_ROOM, RECLUSE_FORMS, bossDef, bossInfo, itemDef, itemName, shownLook, tierInfo, type ItemLook, type RecluseForm } from "@chessroyale/core";
 import { wornDetails } from "../item-details.ts";
 import { FdButton, WORN_ORDER } from "./FrontDoor.tsx";
 import { ItemArt } from "./Items.tsx";
+import { BossPortrait } from "./BossPortrait.tsx";
+import { FINAL_FORM } from "../characters/portraits.ts";
 import { reportPlayer, type PublicProfile } from "../account.ts";
-import { nth } from "../public-profile.ts";
+import { nth, recluseFormsShown } from "../public-profile.ts";
 
 /**
  * Pieces of a profile that today's profile (screens/PlayerProfile.tsx, yours) and the public one (screens/PublicProfile.tsx,
@@ -79,6 +81,30 @@ export function Wearing({ look, own }: { look: ItemLook; own: boolean }) {
   );
 }
 
+/** Each of the Hidden Boss's forms' faces (characters/portraits.ts, on the first load): the child, the man, his final form (the four boards). */
+const FORM_FACE: Record<RecluseForm, { name: string; form?: "child" }> = {
+  child: { name: bossDef(HIDDEN_ROOM.boss)!.name, form: "child" },
+  adult: { name: bossDef(HIDDEN_ROOM.boss)!.name },
+  four: { name: FINAL_FORM },
+};
+
+/**
+ * The Hidden Boss's three forms in a match-history row (Eric, Nov 13: "show like all three of his forms... gray out the ones you
+ * beat"): his faces in the order his fight meets them (RECLUSE_FORMS), the first `beaten` grayed and dimmed. Always all three, so the
+ * strip takes the same room whatever the count.
+ */
+export function RecluseForms({ beaten, class: cls = "" }: { beaten: number; class?: string }) {
+  return (
+    <span class={`rf-forms ${cls}`} role="img" aria-label={`${beaten} of ${RECLUSE_FORMS.length} forms beaten`}>
+      {RECLUSE_FORMS.map((f, i) => (
+        <span key={f} class={`rf-face${i < beaten ? " beaten" : ""}`} data-form={f}>
+          <BossPortrait boss={{ ...FORM_FACE[f], icon: "" }} label="" />
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** `mark`: one match to point out (when it was played), scrolled to: "See your result" for a lobby that has closed. */
 export function Recent({ p, mark, bare }: { p: PublicProfile; mark?: number; /** In a sheet that has its own title: no heading of its own. */ bare?: boolean }) {
   const marked = useRef<HTMLDivElement>(null);
@@ -98,6 +124,7 @@ export function Recent({ p, mark, bare }: { p: PublicProfile; mark?: number; /**
             : boss
               ? `Boss Battle · ${r.bossElo ? `${bossInfo(r.bossElo, r.bossId).name} ${r.bossElo}` : "a boss"}`
               : `Classic · ${r.players} players`;
+        const forms = recluseFormsShown(r);
         return (
           <div
             key={`${r.playedAt}-${i}`}
@@ -113,6 +140,7 @@ export function Recent({ p, mark, bare }: { p: PublicProfile; mark?: number; /**
               </strong>
               <span>{[r.bestMove ? `Best move ${r.bestMove}` : null, when(r.playedAt)].filter(Boolean).join(" · ")}</span>
             </span>
+            {forms !== null && <RecluseForms beaten={forms} />}
           </div>
         );
       })}
