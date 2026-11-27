@@ -551,6 +551,8 @@ export interface BossRules {
  */
 export interface BossAsks {
   pull?: string[];
+  /** Chub & Chirp's Long legs (Turf): his pawns' long steps to weigh against his move (legsFrom), written from to. */
+  legs?: string[];
   drag?: true;
   showdown?: "try" | "test";
   seed: number;

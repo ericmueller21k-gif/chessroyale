@@ -1124,7 +1124,8 @@ export const HOPPER: Character = {
  * Each at most 42 characters. How often a moment speaks: HOPPER_CHANCE; a power's moment always has its line. `power`
  * is Leapfrog's hop, `ultimateWarn` the Carrot Patch coming, `ultimate` its cast; the race's own keys: `carrotHis` (he
  * pulls one), `carrotYours` (you do), `spinBig` (his spin on 3 or 4 carrots), `spinSmall` (1 or 2), `spinEmpty` (none)
- * and `carrotsAll` (his fifth: the battle is his); `pawnBounce`, the Pawn Bounce (Nov 22: one line, the hop's animation).
+ * and `carrotsAll` (his fifth: the battle is his); `pawnBounce`, the Pawn Bounce (Nov 22: one line, the hop's animation); `turfHop`
+ * and `doubleHop`, Turf's hop-around and Double hop (Nov 27: one line each).
  */
 export const HOPPER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
   entrance: ["Chub and Chirp, reporting for hops!", "Ready, Chirp? (Chirp!)", "Two friends. One saddle. Big plans."],
@@ -1148,6 +1149,8 @@ export const HOPPER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readon
   spinEmpty: ["Nothing? Not even a pawn?", "Empty reel. Empty tummy.", "Well, it was fun to spin."],
   carrotsAll: ["Five carrots! That's the game!", "All five! Good game, everyone!"],
   pawnBounce: ["Boing! Back you go!"],
+  turfHop: ["Hop, hop, hop… mine!"],
+  doubleHop: ["Again, Chirp! Again!"],
   kingAttack: ["Eat your veggies, your majesty!", "Carrots away! And away! And away!", "Open wide, King!"],
 };
 /** How often each moment speaks (the lines' draft: about 5 moves, 5 captures and 5 lost pieces a game have a line). */

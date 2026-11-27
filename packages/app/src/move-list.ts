@@ -110,9 +110,21 @@ export function plyRows(cache: PlyCache, key: string, history: readonly string[]
     const before = baseFen.get(ply) ?? (ply === 0 ? START_FEN : rows[ply - 1]!.fenAfter);
     const row = plyRow(ply, history[ply]!, before);
     if (!row) break;
-    rows.push(row);
+    rows.push(sentOn(row, baseFen.get(ply + 1)));
   }
   return rows;
+}
+
+/**
+ * A pawn sent on past where its move stopped (Chub & Chirp's Long legs, Wrangler's long pull: the board plays the first step, and the
+ * next base has the pawn one square further along its file, that step's square empty): the row names the square it reached.
+ */
+function sentOn(row: PlyRow, next: string | undefined): PlyRow {
+  if (!next || row.piece !== "p" || row.captured || row.move[0] !== row.to[0]) return row;
+  const dir = Math.sign(Number(row.to[1]) - Number(row.move[1]));
+  const on = `${row.to[0]}${Number(row.to[1]) + dir}`;
+  const pawn = pieceOn(next, on);
+  return !pieceOn(next, row.to) && pawn?.type === "p" && pawn.color === row.color ? { ...row, to: on } : row;
 }
 
 /** Who made a move, for its picture: the boss, the crowd (you, alone), the God King for the crowd, or the opening before the battle. */

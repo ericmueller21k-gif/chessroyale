@@ -4,7 +4,8 @@
 // at the start of his first turn) through the race to his spin. Records every painted frame (Chrome's screencast) and
 // saves a GIF of each moment (the hop; the cast with its ladder; your pull and his; the spin, named by his tier), stills
 // through them, and his tile on the Boss raid screen.
-//   npm run frames:hopper -- <out-dir> [hop|bounce|carrots|tile|all] [phone|desktop] [light|dark] [chase|ignore] [carrots=N]
+//   npm run frames:hopper -- <out-dir> [hop|bounce|carrots|turf|tile|all] [phone|desktop] [light|dark] [chase|ignore] [carrots=N]
+// `turf` (?power=turf): Turf's hop-around on his first turn, frame by frame, and the board and bar before and after it.
 // `chase`: your moves go for the carrots (a pull when one is a move away, else the judge's best, which weighs the race),
 // so his tier is low; `ignore`: moves that never pull one, so his tier is high. `carrots=N` (the test switch, 0 to 5):
 // N carrots a step from his pieces and out of your reach, the rest a step from yours (with `chase`, his spin on N).
@@ -141,6 +142,20 @@ async function run(power) {
       }
       await waitUntil((x) => x.kind === "play", 60_000);
     }
+  } else if (power === "turf") {
+    // Turf (?power=turf: the hop-around on his first turn, his 32 squares lighting Long legs): your move, then his hop-around.
+    await p.screenshot({ path: join(outDir, `${name}-start.png`) });
+    // (A knight's move: a double push would bring the Pawn Bounce first, the hop-around a turn later.)
+    const played = await play((await st()).boss.crowdSide === "w" ? "g1f3" : "g8f6");
+    const s = await waitUntil((x) => (x.kind === "boss" && !x.thinking && !x.intro && (x.boss?.powers?.events ?? []).at(-1)?.kind === "turfHop") || x.kind === "play", 150_000);
+    if (s.kind !== "boss") throw new Error(`${name}: no hop-around`);
+    log(`hop-around ${JSON.stringify(s.boss.powers.turf.hop)}`);
+    // (Its banner holds its whole length first (bannerLeadMs, about 1.5 s), then Chirp drops 0.72 s in, a leg each 0.6 s.)
+    stills.push(...[0, 2300, 2500, 2700, 3000, 3300, 3600, 3900, 4200, 4500, 4800, 5100, 5400].map((ms) => ({ label: `turf-${String(ms).padStart(4, "0")}`, t: s.now + ms })));
+    const e = await waitUntil((x) => x.kind === "play", 60_000);
+    clip("turf-hop", played.at - 200, e.now + 800);
+    await p.waitForTimeout(1200);
+    await p.screenshot({ path: join(outDir, `${name}-after.png`) });
   } else if (power === "pawnbounce") {
     // Your first move a double push: his Pawn Bounce at the start of his turn (from your move landing, so a flicker shows).
     await waitUntil((s) => s.kind === "play");
@@ -244,5 +259,6 @@ if (which === "tile" || which === "all") await tile();
 if (which === "hop" || which === "all") await run("leapfrog");
 if (which === "bounce" || which === "all") await run("pawnbounce");
 if (which === "carrots" || which === "all") await run("carrotpatch");
+if (which === "turf" || which === "all") await run("turf");
 await browser.close();
 await server.close();

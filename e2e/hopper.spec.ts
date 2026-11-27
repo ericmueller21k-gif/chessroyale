@@ -419,3 +419,58 @@ test("their tile and stage, their figure by the board and the dock's count: whol
   await page.screenshot({ path: info.outputPath(`hopper-race-${info.project.name}.png`) });
   expect(errors).toEqual([]);
 });
+
+test("Chub & Chirp's Turf (?power=turf): his prints and your crowned pawns under the pieces, the count, the hop-around's square, a lit hold and its text", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=60&boss=hopper&power=turf&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  const crowd: "w" | "b" = (await bossNow(page)).crowdSide;
+  // The board: his 32 squares' prints (the test switch's) and your 16 crowned pawns, one layer under everything else on it.
+  const layer = page.locator(".board-wrap > svg.hp-turf");
+  await expect(layer).toHaveAttribute("data-his", "32");
+  await expect(layer).toHaveAttribute("data-yours", "16");
+  await expect(layer.locator(".hp-turf-his > g")).toHaveCount(32);
+  await expect(layer.locator(".hp-turf-yours > g")).toHaveCount(16);
+  const z = await page.evaluate(() => ({ turf: getComputedStyle(document.querySelector(".board-wrap > .hp-turf")!).zIndex, piece: getComputedStyle(document.querySelector(".hb-board piece")!).zIndex }));
+  expect(Number(z.turf)).toBeLessThan(Number(z.piece));
+  // The count, and his holds greyed with their thresholds (none yet: his turn hasn't begun).
+  const count = page.locator(".boss-bar .hp-count");
+  await expect(count).toHaveAttribute("data-his", "32");
+  await expect(count).toHaveAttribute("data-yours", "16");
+  await expect(count).toHaveAttribute("data-open", "16");
+  await expect(page.locator(".boss-bar .hp-hold")).toHaveCount(3);
+  await expect(page.locator(".boss-bar .hp-hold.on")).toHaveCount(0);
+  // A knight's move (a double push would bring the Pawn Bounce first); his hop-around claims a square; Long legs is on for your turn.
+  await play(page, crowd === "w" ? "g1f3" : "g8f6");
+  await yourMove(page);
+  const turf = (await bossNow(page)).powers.turf as { owner: string; hop: { at: number; to: string } };
+  expect(turf.hop.at).toBe(1);
+  const ix = (sq: string) => sq.charCodeAt(0) - 97 + 8 * (Number(sq[1]) - 1);
+  expect(turf.owner[ix(turf.hop.to)]).toBe("b");
+  await expect(layer.locator(`.hp-turf-his > g[data-square="${turf.hop.to}"]`)).toHaveCount(1);
+  await expect(count).toHaveAttribute("data-his", String([...turf.owner].filter((c) => c === "b").length));
+  const legs = page.locator('.boss-bar .hp-hold[data-hold="legs"]');
+  await expect(legs).toHaveClass(/\bon\b/);
+  // Its tap text: under the bar, over the board, inside the screen, pushing nothing.
+  const bar = await page.locator(".boss-bar").boundingBox();
+  await legs.click();
+  const tip = page.locator(".hp-hold-tip");
+  await expect(tip).toContainText("Long legs is on.");
+  const t = (await tip.boundingBox())!;
+  const vp = page.viewportSize()!;
+  expect(t.x).toBeGreaterThanOrEqual(0);
+  expect(t.x + t.width).toBeLessThanOrEqual(vp.width);
+  expect(t.y).toBeGreaterThanOrEqual(bar!.y + bar!.height - 1);
+  expect(await page.locator(".boss-bar").boundingBox()).toEqual(bar);
+  // The count and the pills inside the bar.
+  for (const el of [count, page.locator(".boss-bar .hp-holds")]) {
+    const b = (await el.boundingBox())!;
+    expect(b.x).toBeGreaterThanOrEqual(bar!.x);
+    expect(b.x + b.width).toBeLessThanOrEqual(bar!.x + bar!.width + 0.5);
+    expect(b.y + b.height).toBeLessThanOrEqual(bar!.y + bar!.height + 0.5);
+  }
+  expect(errors).toEqual([]);
+});

@@ -27,6 +27,26 @@ const sideBoss = (r: MatchRunner, id: string): BossState => r.sideBosses().find(
 
 const battle = (bosses: string[], test = "", triggerFrom = 99, maxMoves = 24): KitBattle => ({ boss: bosses[0]!, bosses, seed: 11, side: "w", test, triggerFrom, strikes: [], maxMoves, opening: KIT_OPENING });
 
+describe("several bosses: Chub & Chirp's Pawn Bounce (review of #883)", () => {
+  it("your double push knocked back on his turn reaches the other bosses as a move (Chandy's lock follows the pawn); the Turf is off", async () => {
+    const r = runner(["hopper", "chandy"]);
+    r.deal();
+    await r.score(new Map([["h0", { move: "e2e4", thinkMs: 1000 }]]));
+    expect(r.boss!.id).toBe("hopper");
+    // (A lock of Chandy's on your pushed pawn, as his capture would teach it.)
+    r.state = { ...r.state, bosses: r.state.bosses!.map((o) => (o.id === "chandy" ? { ...o, powers: { ...o.powers!, chandy: { ...o.powers!.chandy!, locks: [{ square: "e4", piece: "p", at: 0 }] } } } : o)) };
+    expect(r.hopDue()).toBe(true);
+    expect(r.applyHop(null)).toEqual({ at: 1, from: "e4", to: "e3" });
+    const board = r.boards.get(0)!;
+    expect(pieceAt(board.fen, "e3")).toEqual({ color: "w", type: "p" });
+    expect(sideBoss(r, "chandy").powers!.chandy!.locks.map((l) => l.square)).toEqual(["e3"]);
+    expect(sideBoss(r, "hopper").powers!.turf ?? null).toBeNull();
+    // (His move from the bounced position, then the next boss's.)
+    await r.playBoss();
+    expect(legalMoves(r.boards.get(0)!.fen).length).toBeGreaterThan(0);
+  });
+});
+
 describe("several bosses: the deal", () => {
   it("deals every boss in the order given, from the starting position, the first to reply; their own seeds, strengths and powers", () => {
     const r = runner(["gingerbread", "clown", "moo"]);

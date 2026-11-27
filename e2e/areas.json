@@ -397,6 +397,7 @@
     "Chub & Chirp (hopper)": {
       "paths": [
         "packages/chess/src/bosses/hopper.ts",
+        "packages/chess/src/bosses/turf.ts",
         "packages/chess/src/bosses/carrots.ts",
         "packages/app/src/characters/hopper*.ts",
         "packages/app/src/characters/effects/hopper.ts",
