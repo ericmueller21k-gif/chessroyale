@@ -909,7 +909,8 @@ test("the Gift-Wrap Tube twists like a barber's pole wherever it's drawn: its st
   // don't play the other items' animations, such as the duel's strips.)
   await openDemo(page);
   const twists = page.locator(".ia-twist");
-  expect(await twists.count(), "the pawn's tube and its tile's").toBeGreaterThanOrEqual(2);
+  // (Waited for: the demo draws its items after it opens, so a count read at once can find none; main a92ba06, Nov 27.)
+  await expect(twists.nth(1), "the pawn's tube and its tile's").toBeAttached();
   const state = await page.evaluate(() => {
     const bare = document.createElement("div");
     bare.append(document.querySelector(".ia-twist")!.closest("svg")!.cloneNode(true));
