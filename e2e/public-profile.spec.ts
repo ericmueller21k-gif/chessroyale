@@ -904,7 +904,7 @@ test("each rarity's pill is the shop's: dark ink on the tier's color, Common gra
   }
 });
 
-test("the Gift-Wrap Tube twists like a barber's pole wherever it's drawn: its stripes scroll, one turn a loop, even outside a focus spot (Eric, Nov 27)", { tag: "@phone-only" }, async ({ page }) => {
+test("the Gift-Wrap Tube twists like a barber's pole wherever it's drawn: its stripes scroll, two turns a loop, even outside a focus spot (Eric, Nov 27)", { tag: "@phone-only" }, async ({ page }) => {
   // (The demo wears one: the pawn and its tile. A copy of the pawn's drawing put outside any `.ia-live` spot stands for the places that
   // don't play the other items' animations, such as the duel's strips.)
   await openDemo(page);
@@ -921,5 +921,5 @@ test("the Gift-Wrap Tube twists like a barber's pole wherever it's drawn: its st
     });
   });
   expect(state.some((s) => !s.live), "one outside a focus spot").toBe(true);
-  for (const s of state) expect(s).toMatchObject({ name: "ia-twist", state: "running", end: "translateY(-13.8px)", ms: 1500 });
+  for (const s of state) expect(s).toMatchObject({ name: "ia-twist", state: "running", end: "translateY(-27.6px)", ms: 3000 });
 });

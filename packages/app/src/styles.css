@@ -9173,16 +9173,17 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
     animation: ia-puff 7s ease-out infinite;
   }
 }
-/* The Gift-Wrap Tube's twist (Eric, Nov 27: "like a barber shop pole"): its stripes scroll up it, one turn (TUBE_TWIST, 13.8 units) every
-   1.5 s, on a loop with no seam. Wherever it's drawn, not only under `.ia-live` (like the shine); one transform, never with reduced motion. */
+/* The Gift-Wrap Tube's twist (Eric, Nov 27: "like a barber shop pole"): its stripes scroll up it, one cell (TUBE_TWIST: two turns, 27.6
+   units) every 3 s, on a loop with no seam. Wherever it's drawn, not only under `.ia-live` (like the shine); one transform, never with
+   reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
   .ia-twist {
-    animation: ia-twist 1.5s linear infinite;
+    animation: ia-twist 3s linear infinite;
   }
 }
 @keyframes ia-twist {
   to {
-    transform: translateY(-13.8px);
+    transform: translateY(-27.6px);
   }
 }
 @keyframes ia-flicker {

@@ -98,7 +98,8 @@ describe("a solo game left after SOLO_ABANDON.minMoves", () => {
     // (The new game is open, not real: left now, nothing more.)
     expect(await w.sql.first("SELECT id, real_at FROM solo_games WHERE user_id = ?", ann.id)).toEqual({ id: next, real_at: null });
     expect((await w.call("/api/me", ann.cookie)).body).toMatchObject({ xp: 0, stats: { boss: { matches: 1, teamWins: 0 } } });
-    expect(await w.sql.first("SELECT COUNT(*) AS n FROM ledger")).toEqual({ n: 0 });
+    // (Nothing in the ledger but the first visit's Welcome Crate, Nov 27: no game's.)
+    expect(await w.sql.first("SELECT COUNT(*) AS n FROM ledger WHERE reason <> 'welcome'")).toEqual({ n: 0 });
     expect(await w.sql.first("SELECT COUNT(*) AS n FROM quest_progress")).toEqual({ n: 0 });
     expect(await w.sql.first("SELECT COUNT(*) AS n FROM boss_token_drops")).toEqual({ n: 0 });
     expect(await finishedGames(w.sql, ann.id)).toBe(0);

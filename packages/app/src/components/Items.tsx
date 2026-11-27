@@ -78,12 +78,16 @@ function Snowman({ p, side }: { p: Paint; side: "w" | "b" }) {
  * and its second color, which the item's seed gives (`secondColor`). Drawn upright here, tilted in its group.
  */
 export const TUBE = { x0: 78, x1: 86, top: 16, bottom: 100 };
-/** The stripes' heights: each band `BAND` tall climbs `RISE` across the tube; the three repeat every `TUBE_TWIST` (white, first, second). */
+/**
+ * The stripes' heights: each band `BAND` tall climbs `RISE` across the tube; the three (white, first, second) repeat every 3 bands. The
+ * tube is drawn as a cell of two of those turns, `TUBE_TWIST` tall (two, not one: its blemish is measured on the cell, one sample a unit,
+ * and one turn was too few to match its purity within 4%: gift-tube.test.ts).
+ */
 const BAND = 4.6;
 const RISE = 6;
-export const TUBE_TWIST = 3 * BAND;
+export const TUBE_TWIST = +(2 * 3 * BAND).toFixed(2);
 /**
- * One turn of the tube's stripes, [white, first color, second color], from 0 to `TUBE_TWIST` down (the bands cut at its top and
+ * Two turns of the tube's stripes, [white, first color, second color], from 0 to `TUBE_TWIST` down (the bands cut at its top and
  * bottom, Sutherland-Hodgman): the tube is this cell drawn again every `TUBE_TWIST` from just above its top (`TUBE_TILES`), so its
  * stripes can scroll up it like a barber's pole (Eric, Nov 27) and loop without a seam.
  */
@@ -140,7 +144,7 @@ const sparkle = (x: number, y: number, r: number) =>
  * The Gift-Wrap Tube (Nov 25, the mockup's v2; Eric: "I see the confetti coming out. Yeah, I like that more"): every 5.5 s a small
  * puff of confetti bursts from its tip, five bits in its two colors, white and gold, which tumble up and left and fade.
  * The twist (Eric, Nov 27: "This item is supposed to twist animation like a barber shop pole"): its stripes scroll up it on a loop,
- * one turn (`TUBE_TWIST`) every 1.5 s, wherever it's drawn (not only where it's the focus, like a shiny item's shine; never with
+ * one cell (`TUBE_TWIST`, two turns) every 3 s, wherever it's drawn (not only where it's the focus, like a shiny item's shine; never with
  * reduced motion): one group of the stripes moves (`ia-twist`, a CSS transform), clipped to the tube; the outline and the confetti
  * stay. Each cell is drawn with its own blemish and shine (the same in every cell, so the loop has no seam).
  */
