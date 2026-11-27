@@ -107,7 +107,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   pawn wears your equipped items on the vote board, the cut screen and your profile; other players' looks come with
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
 - **Item animations and the Smiley's expressions** (Nov 25; [2026-11-25-item-polish.md](../decisions/2026-11-25-item-polish.md)): the Fire & Ice
-  Crown's flames, the Candy Cane's strand, the Gift-Wrap Tube's confetti, the Parrot's flap and the Tommy Gun's key and puff play (CSS `ia-`
+  Crown's flames, the Candy Cane's strand, the Gift-Wrap Tube's confetti (and its barber-pole twist, Nov 27: its stripes scroll up it,
+  one turn every 1.5 s, wherever it's drawn, `ia-twist`, `TUBE_CELL`; [2026-11-27-crate-polish.md](../decisions/2026-11-27-crate-polish.md)), the Parrot's flap and the Tommy Gun's key and puff play (CSS `ia-`
   classes in styles.css, SVG transforms and opacity, no frame loop) only under `.ia-live`: `live` on `ItemArt` / `Avatar`, set where the
   item is the focus (your pawn on screen, the locker's preview, a crate's reveal, a profile's Wearing rows and tiles), and only inside
   `prefers-reduced-motion: no-preference`. Grids, lists and the power banner stay still. A Smiley Face's expression (`SMILEY_EXPRESSIONS`:
@@ -233,19 +234,22 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   reveal seen; its page and its ride stay.
 - **The HunChess Welcome Crate** (Eric, Nov 6; [2026-11-06-welcome-crate.md](../decisions/2026-11-06-welcome-crate.md); core's
   `welcome.ts`, the server's `welcome.ts`, `WELCOME_GIFT` in settings):
-  - **Two, earned** each once per account, ever, at 5 and then 25 finished games (Eric: "the first one you get after 5 games, the next
-    one you get after 25"; `WELCOME_GIFT.milestones`) in any mode or against any boss (an online `results` row not marked `abandoned`,
+  - **Two**, each once per account, ever (`WELCOME_GIFT.milestones`, their stored keys 5 and 25): **the first given on a signed-in
+    account's first visit** (Nov 27, `firstOnVisit`, `welcomeGamesNeeded`; [2026-11-27-welcome-crate-first-visit.md](../decisions/2026-11-27-welcome-crate-first-visit.md)),
+    the second at 25 finished games; **both open only from level 5** (`openLevel`; the server refuses below, `WELCOME_TEXT.tooLow`; held,
+    the row sits under Ready to open greyed with a padlock, "Reach level 5 to open", its meter your level, its page showing every ride). The 25 counts in any mode or against any boss (an online `results` row not marked `abandoned`,
     a solo one only with `XP.minMoves` (10) moves and `WELCOME_GIFT.soloMinSeconds` (60) of the server's own time (`play_ms`; Nov 10:
     empty posts had earned crates; idle open timers still count, accepted while items aren't traded), or a ranked 1 v 1 game), by the server only: one statement inserts a `welcome_crates` row per milestone reached (keyed by account and
     milestone) only while it's signed in, and does nothing for one that's there. The second's ride is never the first's. The app's
     `welcomeProgress()` answers `{ next: 5 | 25 | null, done }`. Checked on every `/api/me` (the backfill) and after every
     saved result, ranked game and Squads placement. Guests and bots never get one. A match room marks a player gone too long, idle or
     removed mid-match as `abandoned` (not counted); a resignation counts.
-  - **The notice** (`components/WelcomeNotice.tsx`): **"You earned a Welcome Crate!"**, "Thank you for being an early tester!", "It's in
+  - **The notice** (`components/WelcomeNotice.tsx`): the first's **"A Welcome Crate is waiting in your inventory"** with **Go to inventory**
+    beside OK (Nov 27; e2e's `asSignedIn` closes it unless asked), the second's **"You earned a Welcome Crate!"**, "Thank you for being an early tester!", "It's in
     your inventory's Crates. Not tradeable." and OK, once (`POST /api/locker/welcome/seen`), on home and the result screen.
   - **In the Crates tab**, first: its art (`HunchessCrateArt`: black and the logo's gold, an idle glint), **"HunChess Welcome Crate"**,
-    "Thank you for being an early tester!", a **"Not tradeable"** tag and where yours is: "Finish 5 games to earn your Welcome Crate:
-    3/5" (greyed until earned; a guest's adds "Sign in to earn it."), "You have 1. Open it!", "Opened. Its ride is in your locker.".
+    "Thank you for being an early tester!", a **"Not tradeable"** tag and its line ("Given on your first visit", "Reach level 5 to open",
+    "Finish 25 games to unlock", a guest's "Sign in to get it" / "Sign in to earn", "Ready", "Opened").
     Its page lists every ride it can give (each as likely), no purity; "▶ Open" (greyed unless yours is waiting) opens it with the
     usual strip, Fischer Random ("A HunChess ride") and the reveal ("Not tradeable", no purity, no "Open another").
   - **The prize:** one ride, any of the game's rides but an admins-first boss's (Nov 23, `welcomeRide`: Timber's, Dash's and Birdie's for
@@ -288,7 +292,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   layer over the screen it came from (`OpenLayer`): the whole phone screen, or a computer's middle column, top to bottom, on a blue-black
   background; the screen under it stays as it was. On a computer the stage (its phone layout, 430 × 540) is scaled up whole to the
   column's width and height, at most 1.5× (Nov 25, Eric: "on the desktop, the present is too small"); the phone's is as it was (scaled
-  down only on a short window). The bonus card's OK takes a tap only once it has faded in (`data-ready`). The strip (46 tiles, landing on the 39th) spins `CRATE_OPEN.spinMs` (4 s) with a
+  down only on a short window). The bonus card's OK takes a tap only once it has faded in (`data-ready`). The strip (46 tiles, landing on the 39th), still and sharp while the answer comes, first pulls back
+  `CRATE_OPEN.pullPx` (16 px) over `pullMs` (280 ms; Nov 27, a rubber band; the first strip only, silent), then spins `CRATE_OPEN.spinMs` (4 s) with a
   cubic slowdown, a blurred copy fading as it slows, and stops just past the winning tile's near edge, runs a few pixels over and settles.
   Then the winning tier's box drops in, shakes (light leaking from its lid), and its lid bursts off with a beam in the item's tier color;
   the item rises out of the beam into the reveal card, which forms round it (Legendary and Mythic: more rays, light over the whole stage,
