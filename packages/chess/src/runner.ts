@@ -1499,11 +1499,13 @@ export class MatchRunner {
     const raceLook = this.bossRace(kind);
     this.raceCheck = null;
     const race = raceLook && { ...raceLook, onCheck: (c: RaceCheck) => (this.raceCheck = c) };
+    // (Test switch ?paint=1 or 2 on a shared floor: the other bosses leave Smudgy's hidden rook where it is, so it stays his to move.)
+    const allowed = this.paintHeld(fen);
     const ordinary = async () =>
       mate ??
       paint ??
       grab ??
-      (await bossMoveFrom(engine, fen, elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race, false, this.bossLocks()));
+      (await bossMoveFrom(engine, fen, elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race, false, this.bossLocks()));
     const asks = this.bossAsks();
     if (asks) {
       // (His long pull, drag or showdown on every engine of this device; his ordinary move on `engine`, as ever.)
@@ -1817,6 +1819,19 @@ export class MatchRunner {
   /** The queen lock's aim (the host's pass guard: PASS_WAIT waits a turn, anything else aims); her square, or null. */
   applyQueenLock(answer: string | null = null): string | null {
     return chandyBattle.applyQueenLock(this.battle, answer);
+  }
+
+  /**
+   * The moves the boss to move may make (bossAllowed), but with the test switch ?paint=1 or 2 on a shared floor, for every boss
+   * but Smudgy, none of his hidden rook's: the e2e's hidden square then stays his to the end (Nov 27: Grex's engine slid it on
+   * main's run of #1006, revealing it, as any boss's rook move does). Off the switch: bossAllowed, as ever.
+   */
+  private paintHeld(fen: string): string[] | null {
+    const allowed = this.bossAllowed();
+    if (!this.settings.bossPaintTest || !this.several() || this.state.boss?.id === "smudgy") return allowed;
+    const sq = this.sideBosses().find((b) => b.id === "smudgy")?.powers?.camo?.square;
+    const held = sq ? (allowed ?? legalMoves(fen)).filter((m) => !m.startsWith(sq)) : [];
+    return held.length ? held : allowed;
   }
 
   /** Chandy's locked squares for his move now (the boss request's `lock`: his engine steered toward them), or null. */
