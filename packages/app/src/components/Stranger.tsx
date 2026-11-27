@@ -626,7 +626,9 @@ export const STRANGER_UI = {
     const scene = sceneOf(moments, now);
     const storm = scene !== null || (!!p.stranger?.storm && stormOn(p.stranger, p.turn));
     const pick = p.stranger?.pick;
-    const marks = pick?.kind === "fire" && pick.turn === p.turn ? pick.squares.filter((sq) => now >= appearAt(sq)) : [];
+    // (Burnt as your move landed: the marks go, and the burn's moment plays on their squares.)
+    const burnt = p.stranger?.scorch?.at === pick?.turn;
+    const marks = pick?.kind === "fire" && pick.turn === p.turn && !burnt ? pick.squares.filter((sq) => now >= appearAt(sq)) : [];
     return {
       over: (
         <>
