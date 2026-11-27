@@ -490,6 +490,8 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   is drawn: the town (Canvas 2D and WebGL), the locker, the profiles, home's pawn and ring (`RideLayers`'s `k`; the boxes keep their
   size; the item's own tile keeps 1). **`?rideScale=K`** (0.5 to 1.25), a test switch (admins on the live site): every ride on that
   page at K, to try sizes; read once as the page opens (`test-switches.ts`).
+  **`__townPace(ms | null)`** (Nov 27, a test hook): your steps take `ms` (null: your look's pace again). The rides test walks its views
+  at 450 ms a step, so even CI's slowest frames (300 ms apart) draw each walk ([2026-11-27-rides-test-pace.md](../decisions/2026-11-27-rides-test-pace.md)).
   **Its moving sound** (Nov 14, Eric: "one continuous sound"; [2026-11-14-ride-sounds.md](../decisions/2026-11-14-ride-sounds.md)): a
   ride listed in `RIDE_SOUND.rides` (its file `/sounds/rides/<id>.wav`) sounds as your own pawn moves on it, in the town and a shop's
   room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer, Puddles's Mower, the Candy Cane Sled's bells (Nov 15; `bright`: round the 6 kHz softening, `gameBus(true)`) and Birdie's Train (Nov 23; `synth`: no file, his own medium train run made in code, looped over its last four puffs, `BIRDIE_RIDE_LOOP`; made as the town shows, before the audio too, never on a moving frame) (`kind: "loop"`)
