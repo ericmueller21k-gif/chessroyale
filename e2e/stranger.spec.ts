@@ -83,7 +83,7 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   // (Every frame from the start, recorded in the page: the scene's own element and his figure's box, the ring, the dock's words.)
   await page.addInitScript(() => {
     const w = window as any;
-    w.__storm = { scene: [] as number[], outside: [] as string[], ring: 0, burn: 0, docks: [] as string[], wide: [] as number[] };
+    w.__storm = { scene: [] as number[], outside: [] as string[], ring: 0, drawn: 0, rift: [] as number[], burn: 0, docks: [] as string[], wide: [] as number[] };
     const look = () => {
       const fig = document.querySelector(".pm-storm .sg-fig");
       if (document.querySelector(".pm-storm")) w.__storm.scene.push(Date.now());
@@ -94,6 +94,9 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
       }
       if (document.querySelector(".sg-storm")) {
         w.__storm.ring++;
+        // (Its art as its canvases last drew it: the ring's frame from its sheet, the rift's sheet frame under the pieces.)
+        if (w.__stormArt?.ring >= 0) w.__storm.drawn++;
+        if (w.__stormArt?.rift >= 0 && !w.__storm.rift.includes(w.__stormArt.rift)) w.__storm.rift.push(w.__stormArt.rift);
         // (Its ring past the screen's edge is cut, never scrolled to: the review of #1009, S1.)
         const sw = document.documentElement.scrollWidth;
         if (sw > innerWidth && !w.__storm.wide.includes(sw)) w.__storm.wide.push(sw);
@@ -158,7 +161,7 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   }
   expect([...kinds].sort()).toEqual(["fire", "ice"]);
   expect(burnt, "a marked piece of yours burnt").toBe(true);
-  const rec = await page.evaluate(() => (window as any).__storm as { scene: number[]; outside: string[]; ring: number; burn: number; docks: string[]; wide: number[] });
+  const rec = await page.evaluate(() => (window as any).__storm as { scene: number[]; outside: string[]; ring: number; drawn: number; rift: number[]; burn: number; docks: string[]; wide: number[] });
   expect(rec.wide, "no sideways scroll while the storm's ring shows").toEqual([]);
   expect(rec.burn, "the burn drawn as his thinking began").toBeGreaterThan(5);
   // (Both kinds' words seen, after his name as each turn began and through your turn.)
@@ -170,6 +173,11 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   expect(ms).toBeLessThan(13_500);
   expect(rec.outside).toEqual([]);
   expect(rec.ring).toBeGreaterThan(60);
+  // Its art (drawn offline, played back): the ring drawn from its sheet through the storm; the rift torn open in the scene (the
+  // opening's frames, 12 on in its sheet), then whole on the storm's first turn (frames 0 to 3) and healing on its second (4 to 7).
+  expect(rec.drawn, "the ring's frames drawn from its sheet").toBeGreaterThan(60);
+  expect(rec.rift.some((f) => f >= 12), "the rift's opening").toBe(true);
+  expect([...new Set(rec.rift.filter((f) => f < 12).map((f) => Math.floor(f / 4)))].sort().slice(0, 2), "the rift's first two stages").toEqual([0, 1]);
   expect(errors).toEqual([]);
 });
 

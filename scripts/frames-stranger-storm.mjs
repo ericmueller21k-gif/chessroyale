@@ -1,7 +1,7 @@
 // The Stranger's Storm of Two Worlds frame by frame, on a phone (390 x 844 at 2x) or a computer: a solo battle with his ultimate brought
 // early (?power=storm: the warning as turn 2 begins, the storm as turn 3 does), played with real taps. Records every frame the browser
 // paints (Chrome's screencast) from the warning to the storm's last turn, saves stills at the opening scene's beats and each turn, a GIF of
-// the whole storm at real speed, and prints a timeline.
+// the whole storm at real speed and one of its opening alone (the swords' slams, the rift tearing open), and prints a timeline.
 //   node scripts/frames-stranger-storm.mjs <out-dir> [phone|desktop] [light|dark]
 // On a fire turn it leaves a marked piece where it stands when there is one (to watch it burn), else steps onto a mark.
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
@@ -54,6 +54,8 @@ cdp.on("Page.screencastFrame", async (f) => {
 });
 await p.goto(`${url}?debug&clock=60&nolanding&laststand=0&brain=stockfish&boss=stranger&wip=1&power=storm`);
 await p.getByRole("main").getByRole("button", { name: /^Boss Battle/ }).click();
+// (START only once the engine has loaded: a tap before does nothing.)
+for (let i = 0; i < 600 && (await p.getByText("Loading the engine").count()); i++) await p.waitForTimeout(200);
 await p.getByRole("main").getByRole("button", { name: "START" }).click();
 const t0 = Date.now();
 const phase = () => p.evaluate(() => window.match?.phase.kind ?? null);
@@ -174,11 +176,32 @@ for (let t = from; t <= to; t += 1000 / fps) {
   const f = list.filter((x) => x.t <= t).at(-1) ?? list[0];
   if (f) writeFileSync(join(dir, `${String(k++).padStart(5, "0")}.jpg`), Buffer.from(f.data, "base64"));
 }
-try {
+// (PERF=1 records no frames: no GIFs.)
+if (!PERF) try {
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", join(dir, "%05d.jpg"), "-vf", `scale=${which === "desktop" ? 720 : 390}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4`, join(outDir, `${tag}.gif`)]);
   console.log(`${tag}.gif: ${k} frames, ${((to - from) / 1000).toFixed(1)} s`);
 } catch (e) {
   console.log("gif failed", e.message);
+}
+// The opening alone, larger: from just before the fire sword's slam to the rift whole and the storm gathered (the scene's own clock).
+if (!PERF) try {
+  const start = sceneFrom + 1000;
+  const a = start + SCENE.fireAt - 700;
+  const b = start + SCENE.gripAt + 600;
+  const odir = join(outDir, `${tag}-opening-frames`);
+  rmSync(odir, { recursive: true, force: true });
+  mkdirSync(odir, { recursive: true });
+  const part = frames.filter((f) => f.t >= a - 200 && f.t <= b);
+  let n = 0;
+  for (let t = a; t <= b; t += 1000 / 20) {
+    const f = part.filter((x) => x.t <= t).at(-1) ?? part[0];
+    if (f) writeFileSync(join(odir, `${String(n++).padStart(5, "0")}.jpg`), Buffer.from(f.data, "base64"));
+  }
+  const crop = which === "desktop" ? "crop=iw*0.75:ih:iw*0.125:0,scale=810:-1" : "crop=iw:ih*0.64:0:ih*0.04,scale=585:-1";
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", "20", "-i", join(odir, "%05d.jpg"), "-vf", `${crop}:flags=neighbor,split[a][b];[a]palettegen=max_colors=200[p];[b][p]paletteuse=dither=bayer:bayer_scale=5`, join(outDir, `${tag}-opening.gif`)]);
+  console.log(`${tag}-opening.gif: ${n} frames, ${((b - a) / 1000).toFixed(1)} s`);
+} catch (e) {
+  console.log("opening gif failed", e.message);
 }
 await p.close();
 await browser.close();

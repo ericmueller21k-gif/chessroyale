@@ -29666,8 +29666,9 @@ piece.bd-smashed {
 
 /* ---------------- The Stranger's Storm of Two Worlds (components/Stranger.tsx) ---------------- */
 
-/* The storm's ring: one small canvas, scaled up as pixel art, the board and RING.margin (12%) past it each side, over the pieces (its band
-   reaches onto the edge squares a little), never taking a tap. Cut only by the screen's own edges. */
+/* The storm's ring: one small canvas, scaled up as pixels, the board and STORM_ART.margin (12%) past it each side, over the pieces (its
+   band reaches onto the edge squares a little), never taking a tap. See-through (STORM_ART.see: what it overlaps still shows, Eric,
+   Nov 27). Cut only by the screen's own edges. */
 /* (Past the screen's edge it's cut, never scrolled to, on a phone too: the review of #1009, S1. A computer's game page already clips:
    `.gm-main:has(.screen.game > .boss-dock)`.) */
 .gm-main:has(.sg-storm) {
@@ -29682,8 +29683,35 @@ piece.bd-smashed {
   image-rendering: pixelated;
   pointer-events: none;
   z-index: 3;
+  opacity: 0.88;
 }
-/* The board's cracks and the swords' ripples, in % of the board (the SVG's units), under his figure and the nudged pieces. */
+/* The storm's soft dim round the board (STORM_ART.dim; Eric, Nov 27: everything behind stays visible, "just dimmed a bit"): one still
+   shadow spread from the board's own box, none on the squares. */
+.power-board .sg-dim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: 0 0 0 200vmax rgba(10, 8, 22, 0.22);
+  animation: sg-dim-in 0.6s ease-out both;
+}
+@keyframes sg-dim-in {
+  from {
+    opacity: 0;
+  }
+}
+/* The storm's rift: one small canvas on the board, scaled up as pixels, under the pieces (a boss's under-layer: over the squares,
+   under the square marks and the pieces), never taking a tap. */
+.board-wrap > .sg-rift {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  image-rendering: pixelated;
+  pointer-events: none;
+  z-index: 1;
+}
+/* The swords' ripples, in % of the board (the SVG's units), under his figure and the nudged pieces. */
 .sg-cracks {
   position: absolute;
   inset: 0;
@@ -29691,24 +29719,6 @@ piece.bd-smashed {
   height: 100%;
   overflow: visible;
   z-index: 2;
-}
-.sg-crack {
-  fill: none;
-  stroke: #120b14;
-  stroke-width: 0.55;
-  stroke-linejoin: bevel;
-}
-.sg-glow {
-  fill: none;
-  stroke-width: 1.6;
-  stroke-linejoin: bevel;
-  opacity: 0.85;
-}
-.sg-glow.sg-fire {
-  stroke: #ff6a1e;
-}
-.sg-glow.sg-ice {
-  stroke: #5fd3ff;
 }
 .sg-ripple {
   fill: none;

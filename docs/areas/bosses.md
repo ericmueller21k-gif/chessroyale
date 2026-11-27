@@ -1045,9 +1045,13 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   his block; every third quiet move: his flourish (`kits.ts` `strangerAnim`, the kit's `animOf`). Shout: `gkHyuah`. Test link `&power=finisher[-kind]`.
   His storm (Nov 27, docs/decisions/2026-11-27-stranger-storm.md): its opening scene (`storm`, STORM_SCENE's beats, 11 s from his leap) is
   `components/Stranger.tsx` `stormMoment`: his leap to the board's middle (the nudged pieces drawn by it, off the board's own drawing:
-  `strangerBoard`), `stormPlant`/`stormCharge`/`stormPull`, one SVG of cracks and ripples; the ring is one small canvas on the shared frame
-  loop (`StormRing`, drawn from the clock alone); Ice reuses Ginger's ice (the rules' `iced`), Fire Grex's tile and burn. Dock line through
-  each turn: `refused.ts` `stormLine`. Frames: `node scripts/frames-stranger-storm.mjs <dir> phone` (stills and a real-speed GIF).
+  `strangerBoard`), `stormPlant`/`stormCharge`/`stormPull`, one SVG of the swords' ripples. Its art is drawn offline and only played back
+  (Nov 27, docs/decisions/2026-11-27-stranger-storm-art.md; GBA style: `scripts/storm-art/` `render.py`, `rift.py`, `pack.py` write
+  `characters/stranger-storm.webp` and `stranger-rift.webp`, loaded as his battle shows): the ring (`StormRing`, `STORM_ART`) is one 250 px
+  canvas, a few image draws a frame from the clock alone, the turn's element leading, 88% see-through, a soft dim round the board
+  (`.sg-dim`); the rift (`StormRift`, `RIFT_ART`, a boss under-layer) tears open with the swords, stays under the pieces and heals a stage
+  each turn. Ice reuses Ginger's ice (the rules' `iced`), Fire Grex's tile and burn. Dock line through each turn: `refused.ts` `stormLine`.
+  Frames: `node scripts/frames-stranger-storm.mjs <dir> phone` (stills, a real-speed GIF, the opening's GIF; `PERF=1`: frame times).
 
 - **Chandy** (Nov 16; art docs/decisions/2026-11-16-chandy-art.md, rules 2026-11-16-chandy-rules.md): rules `bosses/chandy.ts`
   (and `chandyBattle`: the meter, the queen lock's shot, Dodge's rounds), server `server/src/bosses/chandy.ts` (Dodge's timer and
