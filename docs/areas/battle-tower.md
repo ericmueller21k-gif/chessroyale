@@ -184,6 +184,8 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   (`lobby.ts` `hiddenRook`, the side's bosses); the reveal after your move draws every part's board layer (`Crowd.tsx`), so Hollow's dark
   stays on its squares while another boss is next. Checks: app `camo.test.ts`, `tower-side.test.ts`, server `smudgy-lobby.test.ts`,
   e2e `battle-tower.spec.ts` ("a shared floor with Smudgy"). [2026-11-21-smudgy-shared-mask.md](../decisions/2026-11-21-smudgy-shared-mask.md).
+  Another boss's rook move of the hidden rook reveals it (`followRook`); under `?paint` the others never move it (`paintHeld`, so the
+  e2e stays deterministic: [2026-11-27-flakes-shared-rook-dough.md](../decisions/2026-11-27-flakes-shared-rook-dough.md)).
 
 - **Eric's playtest fixes (Nov 20):** Wrangler has no ultimate on a floor of several (`BATTLE_TOWER.noUltimate: ["pig"]`: the runner marks
   his powers `noUlt` as a shared floor starts; his meter stays on the bar empty and dimmed, aria "Rage: no ultimate in the Battle Tower");
