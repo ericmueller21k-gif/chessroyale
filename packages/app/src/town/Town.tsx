@@ -42,6 +42,7 @@ import { UserIcon } from "../components/PixelIcon.tsx";
 import { openProfile } from "../profile-nav.ts";
 import { account, askForfeitFirst, myPawnColor, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, TOWN_PAINT_ASKED, testParams, testSwitchesAllowed } from "../test-switches.ts";
+import { setHooks } from "../window-hooks.ts";
 import { play, warmSounds } from "../sound.ts";
 import { preloadMusic, roomMusic, roomMusicLoad, splashDone, splashMusic, townMusic } from "../music.ts";
 import { AreaBanner, areaBannerOf, type AreaBannerText } from "./AreaBanner.tsx";
@@ -917,12 +918,19 @@ export function TownScreen({
       </>
     );
   };
-  // (Tests) The tower's floor room now: its floor, mode and bosses, and how far into its walk-in (ms).
-  if (testSwitchesAllowed())
-    (window as unknown as { __towerFloor?: () => unknown }).__towerFloor = () => {
+  // (Tests) The tower's floor room now: its floor, mode and bosses, and how far into its walk-in (ms). Gone as the town goes (Nov 27: set
+  // on every render and never taken away, it kept the whole town, its renderer and some 240 MB of its pictures, alive through every
+  // battle after it on an admin's phone, and a second town on top of it once back: test switches are on for admins).
+  useEffect(() => {
+    if (!testSwitchesAllowed()) return;
+    const hooks = window as unknown as { __towerFloor?: () => unknown };
+    const hook = () => {
       const s = floorS.current;
       return s && insideNow.current?.room.def.home === "tower" && insideNow.current.room.def.part === "top" ? { floor: s.floor, mode: s.mode, bosses: s.bosses, t: s.t0 === null ? null : performance.now() - s.t0, go: s.times?.go ?? null, mates: s.mates?.length ?? 0, arrow: s.arrow?.on ? { ...s.arrow } : null } : null;
     };
+    hooks.__towerFloor = hook;
+    return () => void (hooks.__towerFloor === hook && delete hooks.__towerFloor);
+  }, []);
   /** Leave a floor under way from the lobby's question: free (its bosses rest), or counted (under way elsewhere, nothing kept here). */
   const towerLeave = async (start: FloorStart, free: boolean) => {
     setTowerAsk(null);
@@ -1043,6 +1051,13 @@ export function TownScreen({
       t.stop();
       townMusic(false);
       roomMusic(null);
+      // (The town let go of as it closes, Nov 27: Preact keeps the last vnodes of a screen that's gone where an older render still
+      // points at them, and their handlers keep this screen's refs, so a ref to the town or its room would keep its renderer and some
+      // 240 MB of its pictures alive through the battle after it. Only refs: what's left is small.)
+      ctl.current = null;
+      shopCtl.current = null;
+      insideNow.current = null;
+      recluse.current = null;
     };
   }, []);
   const home = card && (card.kind === "boss" || card.kind === "home") ? HOMES[card.i]! : null;
@@ -2866,34 +2881,7 @@ function startTown(
     const p = plan(pickTap(x, y));
     return p ? { key: p.key, dest: p.dest, card: p.card?.kind ?? null } : null;
   };
-  const hooks = window as unknown as { __townPick?: typeof hookPick; __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townPace?: typeof hookPace; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere; __townReport?: typeof hookReport; __townPictureSum?: typeof hookPictureSum };
-  hooks.__townAt = hookAt;
-  hooks.__townPick = hookPick;
-  hooks.__townGlide = hookGlide;
-  hooks.__townGather = hookGather;
-  hooks.__townCam = hookCam;
-  hooks.__townSeat = hookSeat;
-  hooks.__townTables = hookTables;
-  hooks.__townCall = hookCall;
-  hooks.__townBots = hookBots;
-  hooks.__townTurns = hookTurns;
-  hooks.__townPlayer = hookPlayer;
-  hooks.__townFull = hookFull;
-  hooks.__townBossBack = hookBossBack;
-  hooks.__townTags = hookTags;
-  hooks.__townHold = hookHold;
-  hooks.__townPaint = hookPaint;
-  hooks.__townBench = hookBench;
-  hooks.__townWalk = hookWalk;
-  hooks.__townPace = hookPace;
-  hooks.__townHeading = hookHeading;
-  hooks.__townHush = hookHush;
-  hooks.__townStill = hookStill;
-  hooks.__townRide = hookRide;
-  hooks.__townYou = hookYou;
-  hooks.__townHere = hookHere;
-  hooks.__townReport = hookReport;
-  hooks.__townPictureSum = hookPictureSum;
+  const offHooks = setHooks({ __townAt: hookAt, __townPick: hookPick, __townGlide: hookGlide, __townGather: hookGather, __townCam: hookCam, __townSeat: hookSeat, __townTables: hookTables, __townCall: hookCall, __townBots: hookBots, __townTurns: hookTurns, __townPlayer: hookPlayer, __townFull: hookFull, __townBossBack: hookBossBack, __townTags: hookTags, __townHold: hookHold, __townPaint: hookPaint, __townBench: hookBench, __townWalk: hookWalk, __townPace: hookPace, __townHeading: hookHeading, __townHush: hookHush, __townStill: hookStill, __townRide: hookRide, __townYou: hookYou, __townHere: hookHere, __townReport: hookReport, __townPictureSum: hookPictureSum });
 
   /**
    * The loading screen (Nov 11, Eric: "loads it all in at once and then it stays there if you go in and out of buildings"): every
@@ -2909,6 +2897,9 @@ function startTown(
    */
   const loadTown = async () => {
     const t0 = performance.now();
+    // (Tests: how many times this page has loaded the street town; back from a tower floor it never loads twice, Nov 27.)
+    const w = window as unknown as { __townLoads?: number };
+    w.__townLoads = (w.__townLoads ?? 0) + 1;
     // (Your name now, as each frame sets it: the loading screen makes your tag's pictures, render.ts `makeLabels`.)
     town.you.name = playerName();
     const keep = (src: CanvasImageSource) => painter.keep?.(src);
@@ -3204,33 +3195,7 @@ function startTown(
       stopKeys();
       offHeld();
       offQuarter();
-      delete hooks.__townAt;
-      delete hooks.__townGlide;
-      delete hooks.__townGather;
-      delete hooks.__townCam;
-      delete hooks.__townSeat;
-      delete hooks.__townTables;
-      delete hooks.__townCall;
-      delete hooks.__townBots;
-      delete hooks.__townTurns;
-      delete hooks.__townPlayer;
-      delete hooks.__townFull;
-      delete hooks.__townBossBack;
-      delete hooks.__townTags;
-      delete hooks.__townHold;
-      delete hooks.__townPaint;
-      delete hooks.__townBench;
-      delete hooks.__townWalk;
-      delete hooks.__townPace;
-      delete hooks.__townHeading;
-      delete hooks.__townHush;
-      delete hooks.__townStill;
-      delete hooks.__townRide;
-      delete hooks.__townYou;
-      delete hooks.__townHere;
-      delete hooks.__townReport;
-      delete hooks.__townPictureSum;
-      delete hooks.__townPick;
+      offHooks();
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();
