@@ -14,7 +14,7 @@ import { PlayerName } from "../components/PlayerName.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
 import { ChatPanel, useMedia, type ChatPeople } from "../components/QuickChat.tsx";
 import { DuelOverlay, DuelVote } from "../components/DuelVote.tsx";
-import { DuelRankPill } from "../components/DuelRankPill.tsx";
+import { DuelRankButton, DuelRankPill } from "../components/DuelRankPill.tsx";
 import { DuelStage, type StageSide } from "../components/DuelStage.tsx";
 import { clockAt, type DuelQueue, type DuelSession, type DuelSide, type DuelSnapshot } from "../duel.ts";
 import { account } from "../account.ts";
@@ -226,7 +226,7 @@ function rankLine(snap: DuelSnapshot): string | null {
  * A player's strip: pawn, name, rank, and their clock (always in the same place, readable at a glance). `lead`: what sits just before the
  * clock on a computer (the mode and time control in the opponent's strip, "Your move" in yours).
  */
-function DuelStrip({ p, c, you, ms, running, clockShownNow, away, lead, tail }: { p: DuelSide; c: Color; you: boolean; ms: number; running: boolean; clockShownNow: boolean; away: boolean; lead?: ComponentChildren; tail?: ComponentChildren }) {
+function DuelStrip({ p, c, you, ms, running, clockShownNow, away, lead, tail, ranked }: { p: DuelSide; c: Color; you: boolean; ranked: boolean; ms: number; running: boolean; clockShownNow: boolean; away: boolean; lead?: ComponentChildren; tail?: ComponentChildren }) {
   const low = clockShownNow && ms < 20_000;
   return (
     <div class={`dv-strip${you ? " dv-you" : " dv-them"}`} data-side={c}>
@@ -235,7 +235,9 @@ function DuelStrip({ p, c, you, ms, running, clockShownNow, away, lead, tail }: 
       </span>
       <span class="dv-strip-who">
         <PlayerName name={p.name} uid={p.uid ?? undefined} you={you} bot={p.bot} class="dv-name" />
-        <DuelRankPill rank={you ? yourRankShown(p.rank) : p.rank} />
+        {/* (A ranked game's rank: the emblem and the Ranks pop-up. A town or bot game has no rank to show or open: its pill alone, as
+            before, so the emblem's box never takes a bot's or a casual player's name room; town.spec, a bot's whole name.) */}
+        {ranked ? <DuelRankButton rank={you ? yourRankShown(p.rank) : p.rank} who={you ? "You" : p.name} /> : <DuelRankPill rank={you ? yourRankShown(p.rank) : p.rank} />}
         {away && <span class="dv-away">away</span>}
       </span>
       {lead}
@@ -477,9 +479,9 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
       <DuelWide
         class={over ? " over" : ""}
         exit={exit}
-        top={<DuelStrip p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, now)} running={snap.running && toMove === them && !over} clockShownNow={set} away={!snap.bot && !snap.connected[them] && !over} lead={modeLine(clockLine)} />}
+        top={<DuelStrip ranked={!snap.town && !snap.bot} p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, now)} running={snap.running && toMove === them && !over} clockShownNow={set} away={!snap.bot && !snap.connected[them] && !over} lead={modeLine(clockLine)} />}
         board={board}
-        bottom={<DuelStrip p={snap.players[you]} c={you} you ms={clockAt(snap, you, now)} running={snap.running && toMove === you && !over} clockShownNow={set} away={false} lead={chip} />}
+        bottom={<DuelStrip ranked={!snap.town && !snap.bot} p={snap.players[you]} c={you} you ms={clockAt(snap, you, now)} running={snap.running && toMove === you && !over} clockShownNow={set} away={false} lead={chip} />}
         panel={
           <>
             {chat}
@@ -499,9 +501,9 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
         <MatchMenu exit={exit} />
       </div>
       <div class="board-area">
-        <DuelStrip p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, now)} running={snap.running && toMove === them && !over} clockShownNow={set} away={!snap.bot && !snap.connected[them] && !over} />
+        <DuelStrip ranked={!snap.town && !snap.bot} p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, now)} running={snap.running && toMove === them && !over} clockShownNow={set} away={!snap.bot && !snap.connected[them] && !over} />
         <div class="board-row">{board}</div>
-        <DuelStrip p={snap.players[you]} c={you} you ms={clockAt(snap, you, now)} running={snap.running && toMove === you && !over} clockShownNow={set} away={false} />
+        <DuelStrip ranked={!snap.town && !snap.bot} p={snap.players[you]} c={you} you ms={clockAt(snap, you, now)} running={snap.running && toMove === you && !over} clockShownNow={set} away={false} />
       </div>
       <div class="play-footer dv-panel">
         {status && (
@@ -589,9 +591,9 @@ function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHom
       <DuelWide
         class=" over dv-ended"
         exit={exit}
-        top={<DuelStrip p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, Date.now())} running={false} clockShownNow={snap.clock !== null} away={false} lead={modeLine(title)} />}
+        top={<DuelStrip ranked={!snap.town && !snap.bot} p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, Date.now())} running={false} clockShownNow={snap.clock !== null} away={false} lead={modeLine(title)} />}
         board={<Board fen={steps.fen} orientation={orientation} lastMove={steps.lastMove} small animate={false} />}
-        bottom={<DuelStrip p={snap.players[you]} c={you} you ms={0} running={false} clockShownNow={false} away={false} tail={<StepNav s={steps} />} />}
+        bottom={<DuelStrip ranked={!snap.town && !snap.bot} p={snap.players[you]} c={you} you ms={0} running={false} clockShownNow={false} away={false} tail={<StepNav s={steps} />} />}
         panel={endCol}
       />
     );
@@ -610,11 +612,11 @@ function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHom
           <MatchMenu exit={exit} />
         </div>
         <div class="board-area">
-          <DuelStrip p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, Date.now())} running={false} clockShownNow={snap.clock !== null} away={false} />
+          <DuelStrip ranked={!snap.town && !snap.bot} p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, Date.now())} running={false} clockShownNow={snap.clock !== null} away={false} />
           <div class="board-row">
             <Board fen={steps.fen} orientation={orientation} lastMove={steps.lastMove} small animate={false} />
           </div>
-          <DuelStrip p={snap.players[you]} c={you} you ms={0} running={false} clockShownNow={false} away={false} tail={<StepNav s={steps} />} />
+          <DuelStrip ranked={!snap.town && !snap.bot} p={snap.players[you]} c={you} you ms={0} running={false} clockShownNow={false} away={false} tail={<StepNav s={steps} />} />
         </div>
         {endCol}
       </div>
