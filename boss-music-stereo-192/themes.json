@@ -126,6 +126,17 @@
         "whistle": 1.481481,
         "roll": 13.333333
       }
+    },
+    "stranger": {
+      "boss": "The Stranger",
+      "source": "scripts/reel/music/song_ap.py",
+      "intro": null,
+      "loop": "stranger-loop",
+      "introSeconds": 0.0,
+      "loopSeconds": 160.0,
+      "bpm": 168,
+      "lufs": -16.4,
+      "peakDb": -1.2
     }
   }
 }

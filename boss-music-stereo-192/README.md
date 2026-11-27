@@ -143,3 +143,22 @@ theme's verse and chorus (it "quiets down") and its last two bars are back at th
 
 Eric heard the piece by itself (with a drum hit where the theme now comes in) and a demo of this wiring: the theme's
 chorus, the piece, and the theme from its top on the drop.
+
+## Nov 27: the Stranger's theme (`stranger`)
+
+`stranger-loop.mp3` / `.ogg` (stereo, 192 kbps), and its entry in this folder's `themes.json`: one loop of **160.0 s**
+(2:40), no intro piece (`introSeconds` 0), pad 0.5 as the others, bpm 168, -16.4 LUFS, peak -1.2 dBFS. Built by
+`python3 handoff.py --stereo --kbps 192 <folder> stranger` from `scripts/reel/music/song_ap.py` on `claude/trailer-v2`
+at ebcbbb829. Eric, of this version: "this Gothic hybrid v3, you can change it to the stranger, because that's what the
+boss is, and you can send it to the director to be wired into the stranger as his boss music."
+
+- The loop opens on 17 seconds of one voice over a low tone, no beat (0:00 to 0:17), and that comes round each time
+  the loop does: it is the song as he passed it. The last hit rings into it.
+- **Credits.** This is the first theme with sampled sound in it: the voice, strings, flute, oboe, violin and bell are
+  played from the song's own notes through the FluidR3_GM sound bank (Frank Wen; MIT license; Debian's
+  `fluid-soundfont-gm`). The game's credits need a line for it. The drums, bass, guitars, lead and fast pattern are
+  computed, as every other theme is.
+- Rebuilding it needs `apt-get install fluidsynth fluid-soundfont-gm` (scripts/reel/music/sampled.py); the game needs
+  nothing new: the files are plain MP3 and OGG like the others.
+- Checked on the built files: the audio is the master Eric approved (correlation 1.00000); the loop point is clean on
+  the MP3 and the OGG (the step across it is a fifteenth of the largest step nearby).
