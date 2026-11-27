@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { localSql, openBossRaid, submitMove, test } from "./helpers.ts";
+import { localSql, openBossRaid, submitMove, tapInTown, test } from "./helpers.ts";
 
 /**
  * The Stranger (Eric, Nov 27; docs/decisions/2026-11-27-stranger-rules.md), on a phone: his Frostfire strike (your piece frozen for your
@@ -259,8 +259,8 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   expect(errors).toEqual([]);
 });
 
-test("his locked card: a tap shows him and how to unlock him, every way to play greyed; won on Battle Tower floor 10 (his), he's yours to pick", { tag: "@phone-only" }, async ({ page }) => {
-  test.setTimeout(120_000);
+test("his locked card: a tap shows him and how to unlock him, every way to play greyed; floor 10 (his): out of the elevator with his two lines and his blades, won, his notice once, and he's yours to pick", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(300_000);
   await page.goto(`/?debug&wip=1`);
   await openBossRaid(page);
   const tiles = page.getByRole("radiogroup", { name: "Bosses" });
@@ -295,10 +295,87 @@ test("his locked card: a tap shows him and how to unlock him, every way to play 
   const nine = await climb();
   expect([nine.floor, nine.best, nine.unlocked]).toEqual([9, 9, []]);
   expect(nine.next).toMatchObject({ floor: 10, bosses: ["stranger"] });
-  const ten = await climb();
-  expect([ten.floor, ten.bosses, ten.best, ten.unlocked]).toEqual([10, ["stranger"], 10, ["stranger"]]);
+  // Floor 10 in the app (Eric, Nov 27: "he needs to come out of the elevator still ... the first thing he says is like 'you must be pretty
+  // strong to have gotten this far' ... then he says something cool, and then the fight starts ... he could draw his blades"): the
+  // clerk's Continue, up the elevator, his entrance; every frame of it recorded in the page from before it can begin.
+  await page.goto(`/town?debug&pace=quick&sky=day&win=1`);
+  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  const tower = await tapInTown(page, "home", "tower", page.getByRole("dialog", { name: "Battle Tower", exact: true }));
+  await tower.getByRole("button", { name: "Go in" }).click();
+  const room = page.locator("canvas.town-shop-canvas");
+  await expect(room).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+  await expect(room).toHaveAttribute("data-room", "tower");
+  const clerk = page.getByRole("dialog", { name: "Clerk", exact: true });
+  await expect(async () => {
+    if (await clerk.isVisible()) return;
+    const xy = await page.evaluate(() => (window as any).__shopAt?.("keeper") ?? null);
+    const cv = xy && (await room.boundingBox());
+    expect(xy && cv, "the clerk on screen").toBeTruthy();
+    await page.mouse.click(cv!.x + xy!.x, cv!.y + xy!.y);
+    await expect(clerk).toBeVisible({ timeout: 8000 });
+  }).toPass({ timeout: 40_000 });
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__entrance = [] as unknown[];
+    const look = () => {
+      const f = w.__towerFloor?.();
+      const cv = document.querySelector("canvas.town-shop-canvas")?.getBoundingClientRect();
+      if (f?.mode === "fight" && f.floor === 10 && f.t !== null) w.__entrance.push({ t: f.t, go: f.go, line: f.entrance?.line ?? null, anim: f.entrance?.anim ?? null, box: f.entrance && cv ? [f.entrance.x, f.entrance.y, f.entrance.x + f.entrance.w, f.entrance.y + f.entrance.h, cv.width, cv.height] : null });
+      if (w.__entrance.length < 4000) requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  await clerk.getByRole("button", { name: "Continue: floor 10" }).click();
+  // (STILLS=<dir>: his entrance's frames, true screenshots one after another, each named by its ms into the room, for its GIF.)
+  if (process.env.STILLS) {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const dir = `${process.env.STILLS}/entrance-${test.info().project.name}`;
+    mkdirSync(dir, { recursive: true });
+    for (let n = 0; n < 600 && (await phase(page)) !== "play"; n++) {
+      const t = await page.evaluate(() => (window as any).__towerFloor?.()?.t ?? null);
+      const shot = await page.screenshot({ type: "jpeg", quality: 90, scale: "css" });
+      if (t !== null) writeFileSync(`${dir}/${String(Math.round(t) + 100000)}.jpg`, shot);
+    }
+  }
+  await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
+  expect(await page.evaluate(() => (window as any).match.boss.id)).toBe("stranger");
+  type Seen = { t: number; go: number; line: string | null; anim: string | null; box: number[] | null };
+  const seen = (await page.evaluate(() => (window as any).__entrance)) as Seen[];
+  const drawn = seen.filter((f) => f.box);
+  // About 10 s from the room's first frame; his two lines one after the other, each up about 3 s; then his blades, held as the match begins.
+  expect(seen[0]!.go, "his entrance, about 10 s").toBeGreaterThan(8500);
+  expect(seen[0]!.go).toBeLessThan(11_500);
+  const lines = [...new Set(drawn.map((f) => f.line).filter(Boolean))];
+  expect(lines).toEqual(["You climbed this far. You must be strong.", "I crossed worlds for a real fight. Be one."]);
+  for (const l of lines) {
+    const up = drawn.filter((f) => f.line === l);
+    expect(up.at(-1)!.t - up[0]!.t, `"${l}" up about 3 s`).toBeGreaterThan(2500);
+  }
+  expect([...new Set(drawn.map((f) => f.anim))], "at rest, then his draw, then his blades held").toEqual(["idle", "draw", "ready"]);
+  expect(drawn.find((f) => f.anim === "draw")!.t, "his blades after his second line").toBeGreaterThan(drawn.filter((f) => f.line === lines[1]).at(-1)!.t);
+  // (His figure whole in the room's view at every frame: Eric, Nov 4, sprites always on screen.)
+  expect(drawn.filter((f) => f.box![0]! + (f.box![2]! - f.box![0]!) * 0.25 < 0 || f.box![2]! - (f.box![2]! - f.box![0]!) * 0.25 > f.box![4]! || f.box![1]! + (f.box![3]! - f.box![1]!) * 0.1 < 0 || f.box![3]! > f.box![5]!).length, "his figure in the room's view").toBe(0);
+  // Won (the test's quick mate): the floor's end, then his notice in the game's blue window, once.
+  await submitMove(page, "h5f7");
+  await expect(page.getByTestId("es-line")).toHaveText("Floor 10 cleared!", { timeout: 120_000 });
+  const notice = page.getByRole("dialog", { name: "The Stranger is now available in Boss Battle" });
+  await expect(notice).toBeVisible({ timeout: 30_000 });
+  await expect(notice).toHaveClass(/ff-window/);
+  await expect(notice.getByRole("button")).toHaveText(["▶ OK"]);
+  await notice.getByRole("button", { name: "OK" }).click();
+  await expect(notice).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("brc.unlock.told"))).toBe('["stranger"]');
+  // (Once: the server has him unlocked, this device has said so; nothing brings it back on this screen.)
+  await page.waitForTimeout(1500);
+  await expect(notice).toHaveCount(0);
+  const ten = await page.evaluate(async () => {
+    const state = await (await fetch("/api/tower", { credentials: "same-origin" })).json();
+    return { best: state.best.solo as number, unlocked: state.unlocked as string[] };
+  });
+  expect([ten.best, ten.unlocked]).toEqual([10, ["stranger"]]);
   // Back on the picker: his card unlocked, named as any other; a tap picks him, START's ways to play open.
-  await page.reload();
+  await page.goto(`/?debug&wip=1`);
+  await openBossRaid(page);
   await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   const open = tiles.getByRole("radio", { name: "The Stranger", exact: true });
   await expect(open).toBeVisible({ timeout: 20_000 });

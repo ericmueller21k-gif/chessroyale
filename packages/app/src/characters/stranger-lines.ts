@@ -26,3 +26,10 @@ export const STRANGER_LINES: Partial<Record<Beat, readonly string[]>> = {
   victory: ["Not you, then. I'll keep looking.", "Still not the one I came for.", "You were only a step toward home."],
   defeat: ["So the strength I felt was you.", "Hm. This world isn't so small after all."],
 };
+
+/**
+ * His entrance on a Battle Tower floor of his own (Eric, Nov 27: "he walks out and the first thing he says is like 'you must be pretty
+ * strong to have gotten this far' or something. And then he says something cool, and then the fight starts"): out of the elevator, the
+ * first, then the second, then his blades (town/shops/tower-floor.ts STRANGER_ENTRANCE). The floor room's alone, never a battle's beat.
+ */
+export const STRANGER_FLOOR_LINES = ["You climbed this far. You must be strong.", "I crossed worlds for a real fight. Be one."] as const;

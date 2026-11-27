@@ -17,7 +17,10 @@ import type { FxDraw, RoomFx } from "./ShopRoom.tsx";
 import { sideWalls } from "./side-walls.ts";
 import { SHOP_TOWER_FLOOR_ARROW_PALETTE, SHOP_TOWER_FLOOR_N, SHOP_TOWER_FLOOR_STOOL_PALETTE, SHOP_TOWER_FLOOR_TABLE_PALETTE, SHOP_TOWER_FLOOR_WALL_H, towerFloorWallGrid } from "./tower-floor-art.ts";
 import { BOSS_ZEBRA } from "./zebra-don.ts";
-import { FLOOR_TABLE, TOWER_FLOOR_FEEL, arrowBlink, bossAt, floorArrow, mateAt, piecesAt, type BossNow, type FloorMode, type FloorTimes } from "./tower-floor.ts";
+import { FLOOR_TABLE, STRANGER_ENTRANCE, TOWER_FLOOR_FEEL, arrowBlink, bossAt, floorArrow, mateAt, piecesAt, type BossNow, type FloorMode, type FloorTimes } from "./tower-floor.ts";
+import { STRANGER } from "../../characters/stranger.ts";
+import { STRANGER_FLOOR_LINES } from "../../characters/stranger-lines.ts";
+import { paintBubble } from "./bubble.ts";
 import { PAWN_FOOT, pawnImage } from "../render.ts";
 import { PARTY_COLORS } from "../../board/logic.ts";
 import type { RunKind } from "../../tower.ts";
@@ -45,10 +48,31 @@ export interface FloorScript {
   lives?: number;
   /** The floor arrow as drawn last (Nov 21; the scene writes it, the tests read it): the door it points at, its middle on the room's canvas; `on` false: not drawn. */
   arrow?: { on: boolean; to: "top" | "front"; x: number; y: number; a: number };
+  /**
+   * A boss's own entrance as drawn last (the Stranger's; the scene writes it, the tests read it): his line up now (null: none), his
+   * animation, and his drawing's box on the room's canvas.
+   */
+  entrance?: { line: string | null; anim: string; x: number; y: number; w: number; h: number };
 }
 
-/** A boss's town figure (his own; Don Dough's, met in his back room, his intro's), or null: a boss this app doesn't draw (drawn safely: not at all). */
-const figureOf = (id: string): Character | null => (id === "zebra" ? BOSS_ZEBRA : ((BOSS_ART as Partial<Record<string, Character>>)[id as TownBossId] ?? null));
+/**
+ * A boss's town figure (his own; Don Dough's, met in his back room, his intro's; the Stranger's, who has no town figure: his battle's own,
+ * Eric, Nov 27: "he needs to come out of the elevator still"), or null: a boss this app doesn't draw (drawn safely: not at all).
+ */
+const figureOf = (id: string): Character | null => (id === "zebra" ? BOSS_ZEBRA : id === "stranger" ? STRANGER : ((BOSS_ART as Partial<Record<string, Character>>)[id as TownBossId] ?? null));
+/** The Stranger's size in the floor room (squares his frame stands tall: his body about 2.3), and his head's top in his frame (art px over his feet). */
+const STRANGER_ROOM = { squares: 2.9, head: 104 } as const;
+/** An animation's frame at `ms` into it (held on its last when it doesn't loop). */
+function frameOf(ch: Character, anim: string, ms: number): number {
+  const a = ch.anims[anim]!;
+  const total = a.frames.reduce((t, f) => t + Math.max(16, f.ms), 0);
+  let u = a.loop ? ((ms % total) + total) % total : Math.min(Math.max(0, ms), total - 1);
+  for (let i = 0; i < a.frames.length; i++) {
+    u -= Math.max(16, a.frames[i]!.ms);
+    if (u < 0) return i;
+  }
+  return a.frames.length - 1;
+}
 
 interface Fig {
   ch: Character;
@@ -65,7 +89,7 @@ function figOf(id: string): Fig | null {
   if (ch?.anims.idle) {
     let t = 0;
     const ends = ch.anims.idle.frames.map((fr) => (t += Math.max(16, fr.ms)));
-    f = { ch, frames: ch.anims.idle.frames.map((_, i) => spriteCanvas(ch, "idle", i)), ends, loop: t, squares: TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[id] ?? 1) };
+    f = { ch, frames: ch.anims.idle.frames.map((_, i) => spriteCanvas(ch, "idle", i)), ends, loop: t, squares: id === "stranger" ? STRANGER_ROOM.squares : TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[id] ?? 1) };
   }
   figs.set(id, f);
   return f;
@@ -158,12 +182,51 @@ export function towerFloorFx(s: FloorScript): RoomFx {
       const u = now % f.loop;
       let j = 0;
       while (j < f.ends.length - 1 && u >= f.ends[j]!) j++;
-      const img = f.frames[j]!;
+      // (His own entrance, the Stranger's: at his draw's time his blades come out (his own draw animation), then held at the ready.)
+      const E = s.times.entrance;
+      const since = E ? t(now) - E.draw : -1;
+      const anim = since < 0 ? "idle" : since < STRANGER_ENTRANCE.drawMs ? "draw" : "ready";
+      const img = anim === "idle" ? f.frames[j]! : spriteCanvas(f.ch, anim, frameOf(f.ch, anim, anim === "draw" ? since : since - STRANGER_ENTRANCE.drawMs));
       const h = f.squares * pt.k;
       const w = (h * f.ch.w) / f.ch.h;
       // (A step's little lift as he walks, the town walkers' bob.)
       const hop = b.walking ? Math.abs(Math.sin((now / TOWN_FEEL.youStepMs) * Math.PI)) * 0.06 * pt.k : 0;
       const g = d.g;
+      if (E) {
+        // His two worlds under him, a small touch (never the storm): a warm pool at his left foot and a cold one at his right, soft,
+        // breathing, from his first step out; brighter as his blades come out, with one ring swept out round his feet, fire one
+        // side and ice the other.
+        const glow = b.a * (since < 0 ? 0.5 + 0.1 * Math.sin(now / 420) : 0.8);
+        const flat = 0.38;
+        g.save();
+        g.translate(0, pt.y * (1 - flat));
+        g.scale(1, flat);
+        for (const [dx, color] of [[-0.3, "255, 122, 42"], [0.3, "110, 200, 255"]] as const) {
+          const gx = pt.x + dx * w * 0.5;
+          const rx = w * 0.4;
+          const pool = g.createRadialGradient(gx, pt.y, 0, gx, pt.y, rx);
+          pool.addColorStop(0, `rgba(${color}, ${glow.toFixed(3)})`);
+          pool.addColorStop(1, `rgba(${color}, 0)`);
+          g.fillStyle = pool;
+          g.fillRect(gx - rx, pt.y - rx, rx * 2, rx * 2);
+        }
+        const swept = since / STRANGER_ENTRANCE.drawMs;
+        if (swept >= 0 && swept < 1.6) {
+          const u = swept / 1.6;
+          g.lineWidth = Math.max(1.5, pt.k * 0.07 * (1 - u));
+          g.globalAlpha = b.a * (1 - u);
+          for (const [from, color] of [[Math.PI / 2, "#ff7a2a"], [-Math.PI / 2, "#7fdcff"]] as const) {
+            g.strokeStyle = color;
+            g.beginPath();
+            g.arc(pt.x, pt.y, w * (0.15 + 0.55 * u), from, from + Math.PI);
+            g.stroke();
+          }
+        }
+        g.restore();
+        const line = E.say.findIndex(([from, to]) => t(now) >= from && t(now) < to);
+        const top = pt.y - (f.ch.foot[1] / f.ch.h) * h - hop;
+        s.entrance = { line: line < 0 ? null : STRANGER_FLOOR_LINES[line]!, anim, x: pt.x - (f.ch.foot[0] / f.ch.w) * w, y: top, w, h };
+      }
       g.save();
       g.globalAlpha = b.a;
       g.fillStyle = "rgba(14,16,20,0.28)";
@@ -263,6 +326,13 @@ export function towerFloorFx(s: FloorScript): RoomFx {
   };
   const list: { z: number; draw: (d: FxDraw, now: number) => void }[] = [];
   return {
+    // (His own entrance's line, in the town's speech bubble just over his head: over the room, as a challenge's line is.)
+    over: (d) => {
+      const e = s.mode === "fight" && s.times?.entrance ? s.entrance : null;
+      if (!e?.line) return;
+      const k = e.h / STRANGER.h;
+      paintBubble(d.g, d.W, e.line, e.x + STRANGER.foot[0] * k, e.y + (STRANGER.foot[1] - STRANGER_ROOM.head) * k, STRANGER_ROOM.head * k);
+    },
     figures: (now) => {
       list.length = 0;
       list.push(walls, arrowFig, north, desk, south);

@@ -49,6 +49,18 @@ export const TOWER_FLOOR_FEEL = {
   arrowLift: 0.16,
 } as const;
 
+/**
+ * A boss's own entrance on a floor that is his alone (the Stranger's, floors 10, 30, 50; Eric, Nov 27: "he needs to come out of the
+ * elevator still, and he should have a little special, like, 10-second thing where he walks out and the first thing he says is like
+ * 'you must be pretty strong to have gotten this far' ... And then he says something cool, and then the fight starts ... he could draw
+ * his blades right when the fight starts"), about 10 s from the room's first frame: he walks out slower than a floor's bosses do
+ * (`stepMs` a square), stands a beat (`beatMs`), says his first line (`readMs` each, `gapMs` between), then his second, draws his
+ * blades (`drawMs`, his own draw animation's length) and holds them (`readyMs`) as the pieces come up; then the match.
+ */
+export const STRANGER_ENTRANCE = { stepMs: 620, beatMs: 350, readMs: 3000, gapMs: 250, drawMs: 560, readyMs: 900 } as const;
+/** The boss whose own entrance a floor plays: the Stranger on a floor of his alone; null: the floor's usual walk-in. */
+export const ownEntrance = (bosses: readonly string[]): "stranger" | null => (bosses.length === 1 && bosses[0] === "stranger" ? "stranger" : null);
+
 /** The table: on the battle circle's middle. */
 export const FLOOR_TABLE: At = { c: 4.5, r: 4.5 };
 /** Your mark (south of the table, facing it, as a challenge's "facing" layout): the square you walk to, and the half square on. */
@@ -99,12 +111,14 @@ export interface FloorTimes {
   /** A party's others (Nov 20): each starts walking in after you, one after another, and is on their mark. */
   mateGo: number[];
   mateOn: number[];
+  /** A boss's own entrance (STRANGER_ENTRANCE): each of his lines from, to; his blades drawn from `draw`. None: the usual walk-in. */
+  entrance?: { say: (readonly [from: number, to: number])[]; draw: number };
 }
 
 const dist = (a: At, b: At) => Math.hypot(a.c - b.c, a.r - b.r);
 
 /** The floor's walk-in times: `youSteps`, the squares you walk from the way in to your mark. */
-export function floorTimes(n: number, youSteps: number, still: boolean, F = TOWER_FLOOR_FEEL, mates = 0): FloorTimes {
+export function floorTimes(n: number, youSteps: number, still: boolean, F = TOWER_FLOOR_FEEL, mates = 0, own: "stranger" | null = null): FloorTimes {
   const marks = bossMarks(n);
   const them = MATE_MARKS.slice(0, Math.max(0, Math.min(mates, MATE_MARKS.length)));
   if (still) {
@@ -115,14 +129,23 @@ export function floorTimes(n: number, youSteps: number, still: boolean, F = TOWE
   const youGo = F.insideMs;
   const youOn = youGo + youSteps * F.stepMs + F.settleMs;
   const bossGo = marks.map((_, i) => youGo + F.firstMs + i * F.gapMs);
-  const bossOn = marks.map((m, i) => bossGo[i]! + dist(FLOOR_DOOR, m) * F.stepMs);
+  const E = STRANGER_ENTRANCE;
+  const bossOn = marks.map((m, i) => bossGo[i]! + dist(FLOOR_DOOR, m) * (own ? E.stepMs : F.stepMs));
   const doorsOpen = bossGo[0]! - F.doorsMs;
   // (Clear of the doors: a square out.)
-  const doorsShut = bossGo[bossGo.length - 1]! + F.stepMs + F.doorsMs;
+  const doorsShut = bossGo[bossGo.length - 1]! + (own ? E.stepMs : F.stepMs) + F.doorsMs;
   // (Your party in after you, in seat order, one a step apart: Nov 20.)
   const mateGo = them.map((_, i) => youGo + (i + 1) * F.stepMs);
   const mateOn = them.map((m, i) => mateGo[i]! + dist(FLOOR_IN, m) * F.stepMs);
-  const board = Math.max(youOn, ...bossOn, ...mateOn) + F.beatMs;
+  const on = Math.max(youOn, ...bossOn, ...mateOn);
+  if (own) {
+    // (His two lines, one after the other, from everyone on their marks; then his blades as the pieces come up, and the match.)
+    const first = on + E.beatMs;
+    const second = first + E.readMs + E.gapMs;
+    const draw = second + E.readMs + E.gapMs;
+    return { youGo, youOn, bossGo, bossOn, doorsOpen, doorsShut, board: draw, go: draw + Math.max(E.drawMs + E.readyMs, F.boardMs + F.holdMs), mateGo, mateOn, entrance: { say: [[first, first + E.readMs], [second, second + E.readMs]], draw } };
+  }
+  const board = on + F.beatMs;
   return { youGo, youOn, bossGo, bossOn, doorsOpen, doorsShut, board, go: board + F.boardMs + F.holdMs, mateGo, mateOn };
 }
 

@@ -27052,6 +27052,19 @@ body.mo-on .mm-scrim {
   height: 96px;
   margin: 0 auto;
 }
+/* "The Stranger is now available in Boss Battle" (UnlockNotice.tsx): the same blue window, his face in it, drawn as pixels. */
+.unlock-notice .unlock-notice-art {
+  display: block;
+  width: 96px;
+  height: 96px;
+  margin: 0 auto;
+}
+.unlock-notice .unlock-notice-art .boss-portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
 /* A HunChess ride shows no purity (Eric, Nov 6), so no shiny glint over it either. */
 .hunchess .item-shine {
   display: none;

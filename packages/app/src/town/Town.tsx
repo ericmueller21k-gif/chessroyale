@@ -91,7 +91,7 @@ import { TowerHearts } from "../components/TowerHearts.tsx";
 import { enterPartyFloor, onPartyFloor, partyMates, rejoinTowerParty, towerParty, type PartyFloor } from "../tower-party.ts";
 import { TowerPartyUp } from "./TowerDesk.tsx";
 import type { FloorScript } from "./shops/tower-floor-scene.ts";
-import { FLOOR_YOU, TOWER_FLOOR_FEEL, floorTimes, upWords } from "./shops/tower-floor.ts";
+import { FLOOR_YOU, TOWER_FLOOR_FEEL, floorTimes, ownEntrance, upWords } from "./shops/tower-floor.ts";
 import type { LivePawn, RecluseScene } from "./shops/recluse-scene.ts";
 import { tooYoung } from "../account.ts";
 import { dressedPawn, lookKey, loopOf, offFace, offRide } from "./you-look.ts";
@@ -645,7 +645,8 @@ export function TownScreen({
     const off = { c: FLOOR_YOU.at.c - FLOOR_YOU.sq.c, r: FLOOR_YOU.at.r - FLOOR_YOU.sq.r };
     if (s.mode !== "fight") return void shopCtl.current?.walkTo?.(FLOOR_YOU.sq, off);
     const still = stillNow();
-    s.times = floorTimes(s.bosses.length, 1, still, undefined, s.mates?.length ?? 0);
+    // (A floor that is one boss's alone, the Stranger's: his own entrance, tower-floor.ts ownEntrance.)
+    s.times = floorTimes(s.bosses.length, 1, still, undefined, s.mates?.length ?? 0, ownEntrance(s.bosses));
     const at = (ms: number, fn: () => void) => towerTimers.current.push(window.setTimeout(() => insideNow.current?.n === n && floorS.current === s && fn(), ms));
     at(s.times.youGo, () => shopCtl.current?.walkTo?.(FLOOR_YOU.sq, off, TOWER_FLOOR_FEEL.stepMs));
     at(s.times.go, () => void floorGo(s, still));
@@ -921,7 +922,7 @@ export function TownScreen({
   if (testSwitchesAllowed())
     (window as unknown as { __towerFloor?: () => unknown }).__towerFloor = () => {
       const s = floorS.current;
-      return s && insideNow.current?.room.def.home === "tower" && insideNow.current.room.def.part === "top" ? { floor: s.floor, mode: s.mode, bosses: s.bosses, t: s.t0 === null ? null : performance.now() - s.t0, go: s.times?.go ?? null, mates: s.mates?.length ?? 0, arrow: s.arrow?.on ? { ...s.arrow } : null } : null;
+      return s && insideNow.current?.room.def.home === "tower" && insideNow.current.room.def.part === "top" ? { floor: s.floor, mode: s.mode, bosses: s.bosses, t: s.t0 === null ? null : performance.now() - s.t0, go: s.times?.go ?? null, mates: s.mates?.length ?? 0, arrow: s.arrow?.on ? { ...s.arrow } : null, entrance: s.entrance ? { ...s.entrance } : null } : null;
     };
   /** Leave a floor under way from the lobby's question: free (its bosses rest), or counted (under way elsewhere, nothing kept here). */
   const towerLeave = async (start: FloorStart, free: boolean) => {

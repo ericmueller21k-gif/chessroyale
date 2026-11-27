@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { BATTLE_TOWER, floorBossCount } from "@chessroyale/core";
 import { floorOutcome, floorRating, livesLeftWords, livesOf, lostWords, type FloorOutcome, type TowerEnd } from "../tower.ts";
 import type { GameView } from "../game.ts";
+import { unlockedNow, unlocksNow, unlocksToTell, wonUnlockFloor } from "../unlocks.ts";
 
 /** The next floor's line: "Next: floor 9 · 2 bosses · rating 1270". */
 const nextLine = (n: number) => `Next: floor ${n} · ${floorBossCount(n)} ${floorBossCount(n) === 1 ? "boss" : "bosses"} · rating ${floorRating(n)}`;
@@ -39,13 +40,28 @@ export function useTowerEnd(match: GameView): TowerEndView | null {
   useEffect(() => {
     if (!play) return;
     let on = true;
-    void play.settle().then((e) => on && setEnd(e));
+    // (A floor whose win could unlock a boss not yet said on this device, the Stranger's: the server's unlocks read first, so his
+    // notice comes only when this result is what unlocked him. unlocks.ts.)
+    const ph = match.phase;
+    const may = ph.kind === "results" && !ph.left && ph.bossResult && floorOutcome(ph.bossResult) === "won" ? unlocksToTell(play.floor, play.bosses) : [];
+    void (may.length ? unlocksNow() : Promise.resolve(null)).then((before) =>
+      play.settle().then((e) => {
+        if (may.length && e.outcome === "won" && !e.error) wonUnlockFloor(play.floor, play.bosses, before);
+        if (on) setEnd(e);
+      }),
+    );
     return () => {
       on = false;
     };
   }, [play]);
   const p = match.phase;
   const left = p.kind === "results" && !!p.left;
+  // (A party's floor: its room has written the result; won, the same notice, by what this device last knew of your unlocks.)
+  const party = match.towerParty && !play ? match.towerParty : null;
+  const partyWon = !!party && p.kind === "results" && !left && !!p.bossResult && floorOutcome(p.bossResult) === "won";
+  useEffect(() => {
+    if (party && partyWon) wonUnlockFloor(party.floor, party.bosses, unlockedNow());
+  }, [party?.floor, partyWon]);
   if (match.towerParty && !play) return partyEnd(match, left);
   if (!play) return null;
   const floor = play.floor;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { unlockFloor } from "@chessroyale/core";
+import { bossDef, floorUnlocks, unlockFloor } from "@chessroyale/core";
 import { towerApi } from "./tower.ts";
 import { testParams } from "./test-switches.ts";
 
@@ -46,3 +46,65 @@ export const unlockLine = (id: string): string => {
   const floor = unlockFloor(id);
   return floor ? `Beat him on Battle Tower floor ${floor}` : "";
 };
+
+// ---------------- "Now available in Boss Battle" (Eric, Nov 27) ----------------
+
+/**
+ * A boss just unlocked, said once (Eric, Nov 27: "when you beat him, it should have that same blue pop-up style we use for other things,
+ * and say the Stranger is now available in Boss Battle"): as a tower floor of his own is won and the server has taken its result. Once:
+ * only when the server didn't already have him unlocked before that result (`before`: its list read just before the result is sent;
+ * null: couldn't be read), and never twice on a device (`brc.unlock.told`: a notice shown, not the unlock itself, which stays the
+ * server's).
+ */
+const TOLD_KEY = "brc.unlock.told";
+const told = (): string[] => {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(TOLD_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+let notice: string | null = null;
+const noticeSubs = new Set<() => void>();
+
+/** The bosses a win of this floor could unlock that this device hasn't said yet: none, and nothing need be read before its result. */
+export const unlocksToTell = (floor: number, bosses: readonly string[]): string[] => floorUnlocks(floor, bosses).filter((b) => !told().includes(b));
+
+/** The server's unlocks now, read fresh (before a result that may add one); null: no answer. */
+export const unlocksNow = (): Promise<readonly string[] | null> => towerApi.state().then((a) => (a.ok ? (a.body.unlocked ?? []) : null));
+
+/** The floor's won and its result taken: each boss it newly unlocked gets his notice (the first shows; one boss has floors of his own today). */
+export function wonUnlockFloor(floor: number, bosses: readonly string[], before: readonly string[] | null): void {
+  const news = unlocksToTell(floor, bosses).filter((b) => !before?.includes(b));
+  // (The picker's cards follow: asked again now.)
+  refreshUnlocks();
+  if (!news.length) return;
+  try {
+    localStorage.setItem(TOLD_KEY, JSON.stringify([...told(), ...news]));
+  } catch {
+    // (No storage: said this once all the same.)
+  }
+  notice = news[0]!;
+  noticeSubs.forEach((f) => f());
+}
+
+/** The notice's words. */
+export const unlockNoticeText = (id: string): string => `${bossDef(id)?.name ?? "A new boss"} is now available in Boss Battle`;
+
+/** The boss whose notice is up (null: none), and its OK. */
+export function useUnlockNotice(): [string | null, () => void] {
+  const [, redraw] = useState(0);
+  useEffect(() => {
+    const f = () => redraw((n) => n + 1);
+    noticeSubs.add(f);
+    return () => void noticeSubs.delete(f);
+  }, []);
+  return [
+    notice,
+    () => {
+      notice = null;
+      noticeSubs.forEach((f) => f());
+    },
+  ];
+}
