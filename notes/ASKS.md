@@ -37,4 +37,4 @@
 - Nov 27 09:10 crates: staff barber-pole twist; Welcome Crate on first visit, open at level 5 (view before); opening: still strip -> rubber-band pull-back -> spin [crates-nov27]
 - Nov 27 · Chub & Chirp: 5-carrot line "Chub & Chirp wins" (was "they win") · PR #1021
 - Nov 27 · Animated items in Chess Town (tube, candy cane first) · PR #1022 (it finished before the pause), CI running. Next: crown flames, parrot, tommy gun, confetti (a table line each)
-- Nov 27 · Stranger storm redrawn (GBA ring, rift, opening crack animation) · BUILDING (Fable), approved round 4
+- Nov 27 · Stranger storm redrawn (GBA ring, rift, opening crack animation) · PR #1023, Eric OK'd the live opening GIF (~19:40); quick review + CI, then merge
