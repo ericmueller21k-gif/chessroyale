@@ -273,8 +273,9 @@ export function CratesPanel() {
         {picks === 0 && pickRow}
         {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
         {moreBoss.map(bossRow)}
-        {/* (The Mythic Crate, Nov 27: with "Show unowned" while you hold none, as the boss crates: its page shows its odds.) */}
-        {showUnowned && heldOf(locker, MYTHIC_CRATE) === 0 && seriesRow(MYTHIC_CRATE)}
+        {/* (The Mythic Crate, Nov 27: always listed while you hold none, greyed with a padlock as the series crates, never behind "Show
+            unowned": nothing hidden (Eric's rule; the boss crates are his one exception, Nov 24). Its page shows its odds.) */}
+        {heldOf(locker, MYTHIC_CRATE) === 0 && seriesRow(MYTHIC_CRATE)}
         {!showUnowned && <p class="small muted no-boss-crates">{heldBoss.length ? MORE_BOSS_CRATES_LINE : NO_BOSS_CRATES_LINE}</p>}
         <p class="small muted crates-how">
           Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward, and an opening sometimes gives a bonus crate (with its key if it needs one). A daily quest
@@ -641,7 +642,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           <span class="small crate-held" data-held={held} data-keys={keys}>
             {!held
               ? crate.id === MYTHIC_CRATE.id
-                ? "You have none. The shop's Crate + Key Bundle has a chance at one."
+                ? "You have none. None can be earned yet: it comes with the shop's bundles."
                 : "You have none. Leveling up and the daily reward give you crates."
               : !keys
                 ? `You have ${heldWords}. You need a crate key to open one: ${everyLevel(XP.levelRewardEvery)} gives you one.`
@@ -665,7 +666,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
                 </span>
                 <span class="odds-text">
                   <strong>Transcendent</strong>
-                  <span class="odds-tier">A second spin: Legendary or Mythic</span>
+                  <span class="odds-tier">{liveStrip(crate).every((x) => x.tier === FISCHER) ? "Legendary or Mythic" : "A second spin: Legendary or Mythic"}</span>
                 </span>
                 <span class="odds-pct">{pct(presentChance(crate, tier))}</span>
               </div>

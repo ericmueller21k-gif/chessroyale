@@ -1414,21 +1414,25 @@ test("the coin boost in the Crates tab (Nov 26): the boost lines always there, g
   await expect(dialog).toHaveCount(0);
 });
 
-test("the Mythic Crate (Nov 27): with Show unowned its page shows its odds, the Banana Suit 2%; an admin grants one, it opens with a key, every opening a Transcendent spin, to one of its items", { tag: "@phone-only" }, async ({ page }) => {
+test("the Mythic Crate (Nov 27): listed while unowned (greyed, never behind Show unowned), its page shows its odds, the Banana Suit 2%; an admin grants one, it opens with a key, every opening a Transcendent spin, to one of its items", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await asServerAdmin(page);
   await page.goto("/shop?crates");
   const row = page.locator('.series-crate-row[data-crate="mythic"]');
-  // None held: only with "Show unowned", greyed, as the boss crates.
+  // None held: listed, greyed with a padlock as the series crates, whether "Show unowned" is ticked or not (nothing hidden: the review
+  // of #998); its page says none can be earned yet (nothing sells the bundle).
   await expect(page.locator(".crates")).toContainText("Ready to open");
-  await expect(row).toHaveCount(0);
-  await page.getByRole("checkbox", { name: "Show unowned" }).check();
   await expect(row).toContainText("You have none");
   await expect(row).toHaveClass(/none/);
+  await page.getByRole("checkbox", { name: "Show unowned" }).check();
+  await expect(row).toHaveCount(1);
   await page.getByRole("checkbox", { name: "Show unowned" }).uncheck();
-  await expect(row).toHaveCount(0);
+  await expect(row).toHaveCount(1);
+  await row.click();
+  await expect(page.locator(".crate-held")).toContainText("None can be earned yet");
+  await page.goto("/shop?crates");
   // An admin's test grants: Mythic Crates and a key; its row under Ready to open.
   const grants = page.getByRole("region", { name: "Admin test grants" });
   await grants.getByRole("combobox", { name: "Crate" }).selectOption("mythic");

@@ -123,7 +123,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - **The Mythic Crate** (Nov 27; [2026-11-27-banana-suit-prize.md](../decisions/2026-11-27-banana-suit-prize.md); core's `MYTHIC_CRATE`, look `mythic`):
   every opening a Transcendent spin over the series crates' Legendary (80) and Mythic (20) items, the Banana Suit `MYTHIC_CRATE_ODDS.bananaSuit`
   (2) of the Mythic share (`CrateDef.prize`, `fischerOdds`). Held in `series_crates` ("mythic") and opened with a key by `openCrate`; not in
-  `CRATES`, so no reward or bonus gives it. The Crates tab lists it held (or with "Show unowned"); its page and the FAQ show its odds; admins'
+  `CRATES`, so no reward or bonus gives it. The Crates tab lists it held, or greyed with a padlock when none is held, as the series crates (never behind "Show unowned": nothing hidden), its page saying none can be earned yet; its page and the FAQ show its odds; admins'
   grants give it. Tests: core `crates.test.ts`, server `mythic-crate.test.ts`, `e2e/shop.spec.ts` ("the Mythic Crate").
 - **Rides** (Oct 31: [2026-10-31-rides.md](../decisions/2026-10-31-rides.md); Nov 1, every boss's:
   [2026-11-01-rides-v2.md](../decisions/2026-11-01-rides-v2.md)): items in the `ride` slot, one at a time, that your pawn sits on,
