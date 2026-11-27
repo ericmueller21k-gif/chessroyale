@@ -7,6 +7,7 @@ import { InviteButton, useProfileActions } from "../components/Friends.tsx";
 import { ItemArt } from "../components/Items.tsx";
 import { Recent, RecluseForms, ReportSheet, WearingRows } from "../components/ProfileParts.tsx";
 import { RankEmblem } from "../components/RankEmblem.tsx";
+import { Sheet } from "../components/Sheet.tsx";
 import { SELECT_TINT } from "../characters/boss-select.ts";
 import { account, fetchProfile, onAccountChange, type PublicProfile } from "../account.ts";
 import type { ProfileTarget } from "../profile-nav.ts";
@@ -444,29 +445,7 @@ function CosmeticsCard({ p, loading, onAll }: { p: PublicProfile | null; loading
 
 // ---------------- Sheets ----------------
 
-/** A sheet over the page (the full list of matches, or each worn item's details): ✕, Escape or a tap outside closes it. */
-function Sheet({ id, title, onClose, children }: { id: string; title: string; onClose: () => void; children: ComponentChildren }) {
-  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
-  useLayoutEffect(() => {
-    // (Its Escape is its own, heard first: nothing under it (a page layer, a screen, the town) acts on it too.)
-    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopImmediatePropagation(), onClose());
-    addEventListener("keydown", key, true);
-    return () => removeEventListener("keydown", key, true);
-  }, []);
-  return (
-    <div class="fd-sheet-scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div class="fd-sheet" role="dialog" aria-modal="true" aria-labelledby={id}>
-        <div class="fd-sheet-head">
-          <h2 id={id}>{title}</h2>
-          <button type="button" class="fd-icon-btn" aria-label="Close" onClick={onClose}>
-            ✕
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
+// (`Sheet`: components/Sheet.tsx, shared with the 1 v 1 Ranks pop-up since Nov 26.)
 
 // ---------------- The page ----------------
 
