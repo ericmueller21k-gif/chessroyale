@@ -57,3 +57,5 @@ side, ice crystals on the other), three heal stages, painterly and GBA versions;
 **Eric, ~18:40:** picked **B (the GBA pass)**. The crack in the GBA style only.
 **Eric, ~18:45:** follow his reference's crack closely: one central impact (board chunks flying from it), a wide lava fissure to the
 lower left (flames out of it) and a wide ice fissure to the upper right (ice crystals erupting), thinner branches, real depth; GBA style.
+**Eric, ~19:05:** round 4 approved ("a million times better"): .go to wire. Plus: draw the opening's crack as an animation (the slam,
+the rift tearing out from the impact along both fissures, chunks bursting up), GBA frames, ending on stage 1; a GIF of the opening for Eric.
