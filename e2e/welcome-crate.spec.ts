@@ -71,6 +71,8 @@ test("the Welcome Crates: the first given on the first visit (its notice, Go to 
   const row1 = rowOf(1);
   const row2 = rowOf(2);
   await expect(page.locator(".crates-ready .welcome-crate-row")).toHaveCount(1);
+  // (It can't open yet, so: review of #1012, N4.)
+  await expect(page.locator(".crates-ready .crates-none")).toHaveText("Nothing to open right now.");
   await expect(row1).toContainText("Welcome Crate 1");
   await expect(row1).toHaveAttribute("data-welcome", "ready");
   await expect(row1).toHaveClass(/level-locked/);
