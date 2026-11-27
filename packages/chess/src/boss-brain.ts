@@ -3,9 +3,93 @@
  * spoken to over text by HumanUciEngine) is on offer. The boss's own top-8 Stockfish search stays the referee: the
  * guarded brains veto from it, and every fallback is today's Stockfish move.
  */
-import { BOSS_BRAIN, type BossBrain, type BossBrainSettings, type BrainGuard } from "@chessroyale/core";
+import { BATTLE_TOWER, BOSS_BRAIN, type BossBrain, type BossBrainSettings, type BrainGuard, type Rng } from "@chessroyale/core";
+import { Chess, type Move, type Square } from "chess.js";
 import { moveLoss } from "./bosses/base.ts";
 import type { MoveScore } from "./uci.ts";
+
+/** Pieces' worth in pawns for the gift check's static exchange (a king never taken: legal moves only). */
+const WORTH: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+
+/**
+ * What the side to move wins on `sq` by taking there first (a static exchange: each side takes with its cheapest legal capture,
+ * or stops when taking would lose; legal moves, so pins, checks and pieces behind the first come in as they should). 0: nothing.
+ */
+function exchangeOn(c: Chess, sq: Square): number {
+  const target = c.get(sq);
+  if (!target) return 0;
+  const cheapest = cheapestTake(c, sq);
+  if (!cheapest) return 0;
+  c.move(cheapest);
+  const gain = WORTH[target.type]! - exchangeOn(c, sq);
+  c.undo();
+  return Math.max(0, gain);
+}
+
+/** The side to move's cheapest legal capture on `sq` (a pawn promoting as a queen), or null. */
+function cheapestTake(c: Chess, sq: Square): Move | null {
+  const takes = c.moves({ verbose: true }).filter((m: Move) => m.to === sq && (!m.promotion || m.promotion === "q"));
+  return takes.length ? takes.reduce((a, b) => (WORTH[b.piece]! < WORTH[a.piece]! ? b : a)) : null;
+}
+
+/**
+ * After every legal capture on `sq` by the other side, the mover has a mate in one (a sacrifice that mates: chess.js's "#"). Every one,
+ * not only the cheapest (the second review of #991: Nxc4 allows Re8# but Rxc4 just wins the queen, a gift all the same).
+ */
+function matesAfterTake(c: Chess, sq: Square): boolean {
+  const takes = c.moves({ verbose: true }).filter((m: Move) => m.to === sq && (!m.promotion || m.promotion === "q"));
+  if (!takes.length) return false;
+  return takes.every((take) => {
+    c.move(take);
+    const mate = c.moves().some((san) => san.endsWith("#"));
+    c.undo();
+    return mate;
+  });
+}
+
+/**
+ * How much a move gives away with the piece it moves (BATTLE_TOWER's gift check, no engine): when it moves one of `pieces` (a queen or
+ * rook), what the other side wins taking it on its new square (exchangeOn), less what the move itself took; 0 for any other piece, a
+ * mate, a sacrifice that mates (a mate in one after every capture on its square: matesAfterTake), or a position chess.js can't
+ * read. A piece left hanging elsewhere isn't counted (a missed threat is allowed).
+ */
+export function giftedMaterial(fen: string, move: string, pieces: readonly string[] = BATTLE_TOWER.giftPieces): number {
+  try {
+    const c = new Chess(fen);
+    const from = move.slice(0, 2) as Square;
+    const to = move.slice(2, 4) as Square;
+    const piece = c.get(from);
+    if (!piece || !pieces.includes(piece.type)) return 0;
+    const made = c.move({ from, to, ...(move[4] ? { promotion: move[4] } : {}) });
+    if (c.isCheckmate()) return 0;
+    const lost = exchangeOn(c, to) - (made.captured ? WORTH[made.captured]! : 0);
+    return lost > 0 && !matesAfterTake(c, to) ? lost : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** A gift (BATTLE_TOWER.giftLoss): the move gives away at least that many pawns with the queen or rook it moves. */
+export const isGift = (fen: string, move: string, s: Pick<typeof BATTLE_TOWER, "giftPieces" | "giftLoss"> = BATTLE_TOWER): boolean =>
+  giftedMaterial(fen, move, s.giftPieces) >= s.giftLoss;
+
+/**
+ * Maia's move drawn again without the gift (a Battle Tower floor's noGift): from its listed moves (its likeliest, `moves`) that it may
+ * play and that aren't gifts, each weighed by its probability at the draw's temperature (p^(1/T), as the box weighs a draw), with `rng`
+ * (the boss move's random source: the seeded one online, so the checker draws the same). Null: every listed move is a gift.
+ */
+export function redrawWithoutGift(fen: string, moves: readonly HumanCandidate[], ok: (m: string) => boolean, temperature: number, rng: Rng): string | null {
+  const left = moves.filter((c) => ok(c.move) && !isGift(fen, c.move));
+  if (!left.length) return null;
+  const t = Math.max(0.05, temperature);
+  const w = left.map((c) => Math.pow(Math.max(c.p, 1e-6), 1 / t));
+  let r = rng() * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < left.length; i++) {
+    r -= w[i]!;
+    if (r < 0) return left[i]!.move;
+  }
+  return left[left.length - 1]!.move;
+}
 
 /** One of Maia's candidates: a move and how likely a human of its rating is to play it. */
 export interface HumanCandidate {
@@ -78,6 +162,8 @@ export function brainGuard(brain: BossBrain, s: Pick<BossBrainSettings, "light" 
  *   turned down: no extra search is made for it. None allowed by the guard: null, "guard" (Stockfish's best).
  * `allowed`: the moves a power leaves the boss (null: any); Maia was asked for those only, but nothing else is played.
  * No candidate of Maia's allowed at all: null, "none allowed" (today's Stockfish move).
+ * `noGift` (a Battle Tower floor, maia-raw): a draw that gives away the queen or rook it moves (isGift) is drawn again from Maia's other
+ * listed moves (redrawWithoutGift; `vetoed` 1); every listed move a gift: null, "guard" (Stockfish's best).
  */
 export function humanBrainMove(
   brain: BossBrain,
@@ -85,6 +171,7 @@ export function humanBrainMove(
   top: readonly MoveScore[],
   allowed: readonly string[] | null,
   s: BossBrainSettings = BOSS_BRAIN,
+  noGift: { fen: string; temperature: number; rng: Rng } | null = null,
 ): { move: string; rank?: number; vetoed: number } | { move: null; vetoed: number; why: "guard" | "none allowed" } {
   const ok = (m: string | null): m is string => !!m && (!allowed || allowed.includes(m));
   const rankOf = (m: string) => {
@@ -94,6 +181,10 @@ export function humanBrainMove(
   if (brain === "stockfish") return { move: null, vetoed: 0, why: "none allowed" };
   if (brain === "maia-raw") {
     const m = ok(answer.best) ? answer.best : answer.moves.find((c) => ok(c.move))?.move ?? null;
+    if (m && noGift && isGift(noGift.fen, m)) {
+      const again = redrawWithoutGift(noGift.fen, answer.moves, (x) => ok(x) && x !== m, noGift.temperature, noGift.rng);
+      return again ? { move: again, ...rankOf(again), vetoed: 1 } : { move: null, vetoed: 1, why: "guard" };
+    }
     return m ? { move: m, ...rankOf(m), vetoed: 0 } : { move: null, vetoed: 0, why: "none allowed" };
   }
   const guard = brainGuard(brain, s)!;

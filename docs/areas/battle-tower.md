@@ -80,7 +80,11 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 - **The deal:** a seeded deck of the pool, in order, a new deck when it runs out: every boss once before any twice, never the same boss
   on two floors in a row, never an `apart` pair (a deck that would leave a pair waiting at its end is shuffled again).
 - **In the runner** (`settings.towerFloor`, set by `startFloor`): every boss at the floor's strength (`elo` the floor's rating, no
-  offset or difficulty; the brain Maia at that rating for one player or a party alike, Stockfish from floor 51; "best" from 80). A side
+  offset or difficulty; the brain Maia at that rating for one player or a party alike, Stockfish from floor 51; "best" from 80).
+  **Bad players first** (Eric, Nov 26; docs/decisions/2026-11-26-tower-easy-floors.md): Maia's draw is the floor's (`floorDraw`,
+  `carelessDraw`: temperature 1.6 and top-p 1 on floor 1, BOSS_BRAIN's 0.8 and 0.9 from floor 10), and on every Maia floor a drawn
+  queen or rook move that's simply lost (`giftPieces`, `giftLoss`: boss-brain.ts `isGift`, a chess.js static exchange) is drawn again
+  from Maia's other listed moves; a piece already hanging may stay so. The plan carries it (`BossBrainPlan.draw`, `NetBossBrain.draw`). A side
   core's `sideRefusal` refuses still throws in `startSide` (test switch, tests); a room never gets there (finding 7).
 - Calls made: [2026-11-19-tower-climb-rules.md](../decisions/2026-11-19-tower-climb-rules.md).
 

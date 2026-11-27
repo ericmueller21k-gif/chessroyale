@@ -132,7 +132,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     sooner (one player never meets the strict guard: Stockfish takes over at a strength of 2800).
     Stockfish's share of the moves follows the strength: none up to `bridgeShareFrom` (2500), then growing in a line to
     all of them (`bridgeStockfishShare`) just under `stockfishFrom` (2800); from 2800 Stockfish, as before. The guards
-    veto from the boss's own top-8 search (no extra search): Maia's next likely move, else Stockfish's best.
+    veto from the boss's own top-8 search (no extra search): Maia's next likely move, else Stockfish's best. A Battle Tower floor
+    draws its own way (`BossBrainCall.draw`: looser on floors 1 to 10, never a gift: [battle-tower.md](battle-tower.md), "In the runner").
   - **Within the powers:** Maia is asked for the allowed moves only (`searchmoves`), and nothing else is played; none of
     its moves allowed: today's Stockfish move. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra
     move and Big Boy's bounce keep their own Stockfish picks; a reply its power's search scored (Wrangler's to the
@@ -150,7 +151,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     rng, Maia's Seed, and `eloDraw` for Stockfish at a strength, its T scaled by `eloDrawScale` to match UCI_LimitStrength,
     `reports/elo-draw.md`); the checker's request skips his powers' extras on turns that have none. Same move: it plays; two differ:
     the better, but Maia's against a fallback within `maiaGap` (0.25; `bossMove.by` heard on Maia moves only, the server draws the
-    bridge share: `bossRequest.share`); a throw (`throwLoss` 0.8) or a junk move: a strike; a missed window: replaced, `missStrikes`
+    bridge share: `bossRequest.share`); a throw (`throwLoss` 0.8; none on a battle drawn looser, `drawLooser`, when a Maia answer is one of the two: a tower floor's first; today an online floor is a party room with no checker, its host's move alone, unvouched) or a junk move: a strike; a missed window: replaced, `missStrikes`
     a strike, one more asked once; a new host: its whole window; none: unvouched; no verdict: the host's, unvouched. His powers' extras
     are always the host's: when another device's move plays, the host is asked for that move's (`allowed: [move]`), and the other's
     only if it can't answer in time. `boss-check.test.ts`, `delta2-review-fable-b3.test.ts`.
