@@ -31,3 +31,12 @@ The design (the director's, Eric: "I'll just trust you to kind of build it"); ev
 - Judge and fair play: the storm's turns are power turns (no fair-play signal, no Last Stand), as Frostfire's.
 Tests: the boss kit, unit tests for the picks and the fairness check, his e2e (an ult with both kinds of turn), boss-smoke with him.
 Stills on `stills/stranger-ult`. `.pr-body.md` at most 40 lines, then `.done`.
+
+**Also in this PR (#1000's delta re-review leftovers: `REVIEW-2.md` on `claude/stranger-rules-review`):**
+- SF1: pin the party plan pool (`squads-do.ts` `towerPoolNow`): in `tower-party-do.test.ts`, without TEST_SWITCHES a party regrouping on
+  a copy dealt `["stranger"]` on floor 10 is re-dealt without him; with it, he stays. (Moot once he's live, but keep the test honest:
+  write it for whatever admins-first boss the roster has, or for the live rule.)
+- SF2: pin the burn's `handed` guard (`chess/src/bosses/stranger.ts` ~:124): `frostfireOutcome("4k3/8/8/8/8/8/3p4/K2N4 b - - 0 1", "d1")`
+  is `spared: true`.
+- N-a/N-b: remove boss-smoke.spec's `powersOf` helper and his skip (he gets the smoke); update `chess/test/stranger.test.ts`'s
+  "a placeholder that never fires". N-c: trim `docs/decisions/2026-11-27-stranger-unlock-win.md` to about 120 words.
