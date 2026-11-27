@@ -55,8 +55,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   and the bundle, the full price struck through beside the discounted one; at 0 no ribbons and no strike. **Limited items**
   (`SHOP.limited`: Gift, Beta): a gold clock in the card's top-left corner; its tap opens "Limited: a rotating shop item. It leaves the
   shop when its time is up." (OK, Escape or a tap outside close either pop-up; nothing moves). Prices: `SHOP.prices` (full, in coins; Nov 18, the payments design's table 8: key 100, HunChess 50, Gift and Beta 75, boss crate 200, bundle 400; [2026-11-18-coin-prices.md](../decisions/2026-11-18-coin-prices.md)). The coin is
-  `Coin` (components/Coin.tsx: a king's head on a boss-token-style gold coin, Nov 17), in the top bar, price pills and Buy buttons. **The Mythic Crate** (`MythicCrateArt`: purple and black, gold crown, the HunChess crate's glint tinted lilac) is
-  defined only in the decision note for now (a Fischer Random pull; each of the bundle's crates `SHOP.bundleMythicChance` likely).
+  `Coin` (components/Coin.tsx: a king's head on a boss-token-style gold coin, Nov 17), in the top bar, price pills and Buy buttons. **The Mythic Crate** (`MythicCrateArt`: purple and black, gold crown, the HunChess crate's glint tinted lilac;
+  each of the bundle's crates `SHOP.bundleMythicChance` likely, with purchases) rolls since Nov 27: see "The Mythic Crate" below.
   `BossCrateArt({ boss })` lays a boss's token over the seal (for the inventory, not wired there yet).
 - **Crates** (`core/crates.ts`): two series, **Beta Crate · Series 001** (listed first; it ships in batches, the plan
   is in the history: complete since Oct 14, 28 items: the Classics, the secret agent, the pirate, the ninja and a
@@ -119,7 +119,12 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   drawn (`Avatar`, the town, the profiles' rows); the rest stay equipped underneath. **Secret** (Eric's exception to "nothing hidden"): the
   locker's Outfit tab shows only once you own an outfit (`ownsOutfit`); with one on, other items greyed with "Hidden by your outfit"
   (`hiddenByOutfit`). Drawn with the rides' kit (`components/rides/banana-suit.tsx`, the pawn's head in its face hole), in every view, even
-  where rides aren't. **Banana Suit**: Mythic, the Mythic Crate's secret item (`MYTHIC_CRATE_ITEMS`; the crate is still look-only: no roll yet).
+  where rides aren't. **Banana Suit**: Mythic, the Mythic Crate's secret prize (`MYTHIC_CRATE_ITEMS`), in no other crate.
+- **The Mythic Crate** (Nov 27; [2026-11-27-banana-suit-prize.md](../decisions/2026-11-27-banana-suit-prize.md); core's `MYTHIC_CRATE`, look `mythic`):
+  every opening a Transcendent spin over the series crates' Legendary (80) and Mythic (20) items, the Banana Suit `MYTHIC_CRATE_ODDS.bananaSuit`
+  (2) of the Mythic share (`CrateDef.prize`, `fischerOdds`). Held in `series_crates` ("mythic") and opened with a key by `openCrate`; not in
+  `CRATES`, so no reward or bonus gives it. The Crates tab lists it held (or with "Show unowned"); its page and the FAQ show its odds; admins'
+  grants give it. Tests: core `crates.test.ts`, server `mythic-crate.test.ts`, `e2e/shop.spec.ts` ("the Mythic Crate").
 - **Rides** (Oct 31: [2026-10-31-rides.md](../decisions/2026-10-31-rides.md); Nov 1, every boss's:
   [2026-11-01-rides-v2.md](../decisions/2026-11-01-rides-v2.md)): items in the `ride` slot, one at a time, that your pawn sits on,
   all Mythic, with a color, a purity and shine like every item: **Riding Chirp**, **Moon's Ride**, and (Nov 1) **Hollow's Bulb** (two
