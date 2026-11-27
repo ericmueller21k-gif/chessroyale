@@ -4,7 +4,7 @@ import { SQUADS_PROTOCOL, type PartyServerMessage } from "@chessroyale/chess/squ
 import { legalMoves, type BoardScore, type MatchRunner, type ServerMessage } from "@chessroyale/chess";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
-import { commitPartyFloor, finishTowerFloor, holdsPartyCopy, membersOf, partyFloorWrite, partyPlan, preparePartyFloor, startTowerFloor, stopTower, towerMoves, towerState, type Fight, type PartyFloorPrep } from "../src/tower.ts";
+import { commitPartyFloor, finishTowerFloor, holdsPartyCopy, membersOf, partyFloorWrite, partyPlan, preparePartyFloor, startTowerFloor, stopTower, towerMoves, towerState, towerUnlocks, type Fight, type PartyFloorPrep } from "../src/tower.ts";
 import { TownChat } from "../src/town-chat.ts";
 import { forgetTownCache, partyCodesOf, townOpenParties } from "../src/town-chat-api.ts";
 import { PartyCore, TOWER_PARTY_LINES, newPartyRecord } from "../src/squads-party.ts";
@@ -40,16 +40,16 @@ const best = async (sql: Sql, uid: string, kind: string) => (await sql.first<{ f
 
 let fights = 0;
 /** A party floor begun for `uids` (prepare, then commit; `ended`: who agreed to end their own climb). */
-async function begin(sql: Sql, uids: string[], now: number, ended: string[] = [], seed = 777): Promise<{ prep: PartyFloorPrep; fight: Fight; ok: boolean }> {
-  const read = await preparePartyFloor(sql, uids, now, { pool: POOL, seed });
+async function begin(sql: Sql, uids: string[], now: number, ended: string[] = [], seed = 777, pool = POOL): Promise<{ prep: PartyFloorPrep; fight: Fight; ok: boolean }> {
+  const read = await preparePartyFloor(sql, uids, now, { pool, seed });
   if (!read.ok) throw new Error(`refused: ${JSON.stringify(read)}`);
   const fight: Fight = { id: `f${String(++fights).padStart(17, "0")}`, startedAt: now, lobby: "ROOMA" };
   const ok = await commitPartyFloor(sql, read.prep, fight, now, new Set(ended));
   return { prep: read.prep, fight, ok };
 }
 /** The room's end of a party floor for every member: the party's result. */
-async function end(sql: Sql, fight: Fight, uids: string[], outcome: "won" | "lost" | "drawn", now: number) {
-  for (const uid of uids) await partyFloorWrite(sql, now, fight.id, { uid, outcome }, { pool: POOL });
+async function end(sql: Sql, fight: Fight, uids: string[], outcome: "won" | "lost" | "drawn", now: number, pool = POOL) {
+  for (const uid of uids) await partyFloorWrite(sql, now, fight.id, { uid, outcome }, { pool });
 }
 
 describe("one run, a copy each", () => {
@@ -227,6 +227,40 @@ describe("one run, a copy each", () => {
     await partyFloorWrite(sql, T0 + 60_000, fight.id, { uid: bo.id, outcome: "lost" }, { pool: POOL, crate });
     expect(paid).toEqual([`${ann.id}:25`]);
     expect(await best(sql, ann.id, "party")).toBe(25);
+  });
+});
+
+describe("the Stranger's unlock in a party (Eric, Nov 27: \"you have to beat him to unlock him\")", () => {
+  it("his floor 10 won by the party unlocks each member in it at the end; one who left it after the party's 2nd move (a life) doesn't; a copy played on alone that wins it does", async () => {
+    // (A test server's pool: him before his art, on his floors.)
+    const HIM = towerPool(undefined, undefined, true);
+    const sql = await world();
+    const [ann, bo, cy] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com"), await signedIn(sql, "cy@example.com")];
+    const all = [ann.id, bo.id, cy.id];
+    let t = T0;
+    for (let f = 1; f < 10; f++) {
+      const { fight, ok } = await begin(sql, all, (t += 1000), [], 777, HIM);
+      expect(ok).toBe(true);
+      await end(sql, fight, all, "won", (t += 1000), HIM);
+    }
+    expect((await towerState(sql, ann.id, HIM)).runs.party).toMatchObject({ floor: 10, bosses: ["stranger"] });
+    // Cy plays floor 10 on alone (the device's word, as a solo floor) and beats him.
+    const start = await startTowerFloor(sql, cy.id, (t += 1000), { pool: HIM, kind: "party" });
+    expect((start.body as { bosses: string[] }).bosses).toEqual(["stranger"]);
+    const f = (start.body as { fight: { id: string } }).fight.id;
+    expect((await finishTowerFloor(sql, cy.id, (t += 1000), { fight: f, outcome: "won" }, { pool: HIM, minWinMs: 0, kind: "party" })).status).toBe(200);
+    expect(await towerUnlocks(sql, cy.id)).toEqual(["stranger"]);
+    // Ann and Bo take it on together: Bo leaves after the party's 2nd move (a loss, a life), Ann's party wins it.
+    const { fight, ok } = await begin(sql, [ann.id, bo.id], (t += 1000), [], 777, HIM);
+    expect(ok).toBe(true);
+    await partyFloorWrite(sql, (t += 1000), fight.id, { uid: bo.id, outcome: "left", moves: BATTLE_TOWER.leaveFreeBefore }, { pool: HIM });
+    await partyFloorWrite(sql, (t += 1000), fight.id, { uid: ann.id, outcome: "won" }, { pool: HIM });
+    expect(await copyOf(sql, bo.id)).toMatchObject({ floor: 11, status: "open" });
+    expect([await towerUnlocks(sql, ann.id), await towerUnlocks(sql, bo.id)]).toEqual([["stranger"], []]);
+    expect((await towerState(sql, bo.id, HIM)).unlocked).toEqual([]);
+    // (The room's write again changes nothing.)
+    await partyFloorWrite(sql, (t += 1000), fight.id, { uid: bo.id, outcome: "won" }, { pool: HIM });
+    expect(await towerUnlocks(sql, bo.id)).toEqual([]);
   });
 });
 
