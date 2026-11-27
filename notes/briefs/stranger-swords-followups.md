@@ -16,3 +16,12 @@ thinking minimum). The review: `REVIEW.md` on branch `claude/stranger-swords-rev
    sounds; if one line in it can also read the board effects his moments use, do it; if not, say so in the PR body.
 Tests: the changed unit tests, `e2e/stranger.spec.ts` (phone). One GIF of the cut finisher after the change on `stills/stranger-swords-2`.
 `.pr-body.md` at most 40 lines, then `.done`.
+
+5. **Eric, Nov 27 ~07:30: "is it possible to time Stranger's moves and instead of the piece moving after have it capture the moment he
+   kills it".** Today his capturing piece slides in only once he's home (the held move plays at the hold's end). Make his piece slide onto
+   the square at the kill (the finisher's `gone` moment), as one hit. The director's design: the finisher event also carries the move's
+   `from` (the server and solo know the pending move when the finisher is marked); from `gone` on, the board shows his piece on the
+   square (the same slide animation as a normal move, started at `gone`), and when the held move arrives at the hold's end the board
+   already matches it, so nothing animates twice. The turn's timing (the hold, the crowd's clock) is unchanged, so solo and online stay
+   in sync; a late join or reconnect mid-finisher just shows the board as it is. Test: the e2e "his finisher" checks his piece is on
+   the square before he's home; a unit test that the event's `from` is the held move's.
