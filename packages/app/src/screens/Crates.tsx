@@ -12,6 +12,8 @@ import {
   GOD_KING_SHOP,
   PAWN_COLORS,
   PURITY_BANDS,
+  PURITY_EXACT,
+  purityOddsText,
   sideOfPawn,
   SHOP_ITEMS,
   SLOT_NAMES,
@@ -798,7 +800,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         >
           Colors and purity
         </summary>
-        <p class="small">Every item also rolls a color and a purity, 0-100%. The lower its purity, the more it's blotched (at 0%, all over: one color, a shade darker). At 90% or more it's shiny ✨ (about 1 in 250). Exactly 100% and exactly 0% are each 1 in 5,000.</p>
+        <p class="small">Every item also rolls a color and a purity, 0-100%. The lower its purity, the more it's blotched (at 0%, all over: one color, a shade darker). At 90% or more it's shiny ✨ (about 1 in 250). Exactly 100% and exactly 0% are each {purityOddsText(PURITY_EXACT)}.</p>
         <div class="color-odds">
           {ITEM_COLORS.map((c) => (
             <span key={c.id} class="color-chip">
@@ -810,7 +812,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         <div class="color-odds">
           {PURITY_BANDS.map((b) => (
             <span key={b.low} class="color-chip">
-              {b.low === b.high ? `Purity ${b.low}%: about 1 in ${Math.round(100 / b.weight).toLocaleString("en-US")}` : `Purity ${b.low}-${b.high}%${b.low >= 90 ? " ✨" : ""}: ${b.weight}%`}
+              {`Purity ${b.low === b.high ? b.low : `${b.low}-${b.high}`}%${b.low >= 90 ? " ✨" : ""}: ${purityOddsText(b.weight)}`}
             </span>
           ))}
         </div>

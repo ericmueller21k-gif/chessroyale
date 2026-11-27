@@ -8,6 +8,7 @@ import {
   ITEM_COLORS,
   ITEM_DEFS,
   PURITY_BANDS,
+  purityOddsText,
   TIERS,
   cleanLook,
   crateDef,
@@ -310,6 +311,13 @@ describe("crates", () => {
     expect(rollBlemish(() => (top.weight * 1.0001) / total)).toBe(0.1);
     expect(rollBlemish(() => (total - zero.weight / 2) / total)).toBe(100);
     expect(rollBlemish(() => (total - zero.weight * 1.5) / total)).toBe(99.9);
+    // (Unchanged per tenth: 99.0-99.9 each 0.004/11 %, 0.1-4.9 each 0.02%.)
+    const b99 = PURITY_BANDS.find((b) => b.low === 99)!;
+    expect(b99.weight / 10).toBeCloseTo(0.004 / 11, 12);
+    const b0 = PURITY_BANDS.find((b) => b.low === 0.1)!;
+    expect(b0.weight / 49).toBeCloseTo(0.02, 12);
+    // (Shown exactly, never a long float: the review of #1007.)
+    expect(PURITY_BANDS.map((b) => purityOddsText(b.weight))).toEqual(["1 in 5,000", "1 in 27,500", "0.376%", "9.6%", "80%", "9%", "0.98%", "1 in 5,000"]);
     expect(chance((low) => low >= 30 && low < 70)).toBe(80);
     // The lowest draw is perfect, the highest 0%, and every value is in tenths within 0-100.
     expect(rollBlemish(() => 0)).toBe(0);

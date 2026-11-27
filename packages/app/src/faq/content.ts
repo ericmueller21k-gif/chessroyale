@@ -61,6 +61,8 @@ import {
   PREGAME_VOTES,
   PRIOR_RATING,
   PURITY_BANDS,
+  PURITY_EXACT,
+  purityOddsText,
   RAID_SETTINGS,
   RANKED_1V1,
   RANKING,
@@ -1182,7 +1184,8 @@ function crates(src: FaqSources): FaqSection {
   const colors = src.colors.map((c) => `| ${c.name} | ${pct(c.weight / cTotal)} |`).join("\n");
   const pTotal = sum(src.purity.map((b) => b.weight)) || 1;
   // (Exactly 0% and exactly 100%, bands of one value each, Nov 27: shown as "1 in".)
-  const purity = src.purity.map((b) => (b.low === b.high ? `| exactly ${num(b.low, 1)}% | 1 in ${Math.round(pTotal / b.weight).toLocaleString("en-US")} |` : `| ${num(b.low, 1)}% to ${num(b.high, 1)}% | ${pct(b.weight / pTotal, 3)} |`)).join("\n");
+  // (Each chance exact: under 0.1% as "1 in N", purityOddsText; the review of #1007.)
+  const purity = src.purity.map((b) => `| ${b.low === b.high ? `exactly ${num(b.low, 1)}%` : `${num(b.low, 1)}% to ${num(b.high, 1)}%`} | ${purityOddsText(b.weight, pTotal)} |`).join("\n");
   const shiny = sum(src.purity.filter((b) => b.low >= 90).map((b) => b.weight)) / pTotal;
   // Boss tokens and boss crates (Nov 2): each boss crate's ride, the only item behind its Fischer Random.
   const bt = src.bossTokens;
@@ -1216,7 +1219,7 @@ Every item from a crate rolls three things, each on its own:
 
 1. **Its tier, which decides the item.** The strip lands on a tier's box, which opens to one of that tier's items, each as likely as the others. Or it lands on **Transcendent**, a second spin for the rarest items: ${fischerWords}.
 2. **Its color.**
-3. **Its purity:** 100% less a blemish (blotches over that share of its color). From 90% it's **shiny**. Exactly 100% and exactly 0% (blotched all over, one color a shade darker) are each 1 in 5,000.
+3. **Its purity:** 100% less a blemish (blotches over that share of its color). From 90% it's **shiny**. Exactly 100% and exactly 0% (blotched all over, one color a shade darker) are each ${purityOddsText(PURITY_EXACT)}.
 
 | Box | ${src.crates.map((c) => c.name).join(" | ")} |
 |${src.crates.map(() => "---|").join("")}---|

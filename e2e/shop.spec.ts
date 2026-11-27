@@ -2078,6 +2078,8 @@ test("a crate page (Nov 27): Open sits under the crate, its box's width; a tap o
   // "Colors and purity" is open by default; a tap closes it, and after a reload it is still closed.
   const colors = page.locator(".odds-more");
   await expect(colors).toHaveJSProperty("open", true);
+  // (Each purity chip's chance exact and short: "1 in N" or a percent to 3 decimals, never a long float; the review of #1007.)
+  for (const chip of await colors.locator(".color-chip").filter({ hasText: "Purity" }).allTextContents()) expect(chip).toMatch(/: 1 in [\d,]+$|: \d+(\.\d{1,3})?%$/);
   await colors.locator("summary").click();
   await expect(colors).toHaveJSProperty("open", false);
   await page.reload();
