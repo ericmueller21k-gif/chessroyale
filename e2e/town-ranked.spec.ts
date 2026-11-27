@@ -125,6 +125,7 @@ test("two players found from two tables sit at the first's for a third visitor, 
   await still(cy, "seated-pair-far");
   // Cy walks up (two squares before it) and taps Ann, seated there: her table's card offers Spectate (who's playing), not a seat.
   await walkUpTo(cy, 3);
+  await still(cy, "seated-pair");
   await tapInTown(cy, "player", annId, card(cy), { glide: [19, 29] });
   await expect(card(cy)).toContainText(/Ann vs Bo|Bo vs Ann/);
   await expect(card(cy).getByRole("button", { name: "Ranked" })).toHaveCount(0);
