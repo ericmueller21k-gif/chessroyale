@@ -1,5 +1,5 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
-import { asSignedIn, localSql, test, townReady, townTap } from "./helpers.ts";
+import { asSignedIn, localSql, tapInTown, test, townReady, townTap } from "./helpers.ts";
 
 /**
  * Ranked at the town's tables (Eric, Nov 27: "let's wire up the actual chessboards in town for ranked ... it just does an overlay ...
@@ -47,7 +47,14 @@ const TABLE_COL: Record<number, number> = { 3: 19, 4: 26 };
 async function walkUpTo(page: Page, i: number) {
   const c = TABLE_COL[i]!;
   expect(await townTap(page, "square", [c, 29]), `the square before table ${i}`).toBe(true);
-  await expect.poll(() => youAt(page), { timeout: 10_000 }).toBe(`${c},29`);
+  // (There, or beside it if someone stands on it: within a square or two.)
+  await expect
+    .poll(async () => {
+      const [x, y] = (await youAt(page)).split(",").map(Number);
+      const still = await page.evaluate(() => !(window as unknown as { __townYou: () => { moving: boolean } | null }).__townYou()?.moving);
+      return still && Math.abs(x! - c) <= 2 && Math.abs(y! - 29) <= 2;
+    }, { timeout: 10_000, message: `you walk up to table ${i}` })
+    .toBe(true);
 }
 
 /**
@@ -56,8 +63,7 @@ async function walkUpTo(page: Page, i: number) {
  */
 async function rankedAt(page: Page, i: number, waits = true) {
   await walkUpTo(page, i);
-  expect(await townTap(page, "table", i), `table ${i} is drawn`).toBe(true);
-  await expect(card(page)).toBeVisible();
+  await tapInTown(page, "table", i, card(page), { glide: [TABLE_COL[i]!, 29] });
   await expect(card(page).getByRole("button", { name: "Casual", exact: true })).toBeDisabled();
   await expect(canvas(page)).toHaveAttribute("data-sit", "1", { timeout: 8000 });
   await card(page).getByRole("button", { name: "Ranked", exact: true }).click();
@@ -119,7 +125,7 @@ test("two players found from two tables sit at the first's for a third visitor, 
   await still(cy, "seated-pair-far");
   // Cy walks up (two squares before it) and taps Ann, seated there: her table's card offers Spectate (who's playing), not a seat.
   await walkUpTo(cy, 3);
-  expect(await townTap(cy, "player", annId)).toBe(true);
+  await tapInTown(cy, "player", annId, card(cy), { glide: [19, 29] });
   await expect(card(cy)).toContainText(/Ann vs Bo|Bo vs Ann/);
   await expect(card(cy).getByRole("button", { name: "Ranked" })).toHaveCount(0);
   await still(cy, "seated-pair-card");
