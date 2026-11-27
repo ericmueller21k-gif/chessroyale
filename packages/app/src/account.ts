@@ -1135,6 +1135,8 @@ export interface PublicProfile {
     bestMove: string | null;
     bossElo: number | null;
     bossId?: string | null;
+    /** The Hidden Boss's fight: how many of his three forms it beat (3: won); null or missing for every other row and his older ones. */
+    formsBeaten?: number | null;
     playedAt: number;
     /** It counted for ranking (false: under 30% real players, solo or practice; null: from before the rule). */
     ranked?: boolean | null;

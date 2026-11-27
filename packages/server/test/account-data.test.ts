@@ -168,7 +168,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   reports: "id reporter target reason at match line line_at",
   refunds: "op_id session_id user_id kind cents coins stripe_ref status comment created_at",
   results:
-    "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar abandoned play_ms moves xp_before xp_parts xp_none xp_rewards coins solo_game",
+    "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar abandoned play_ms moves xp_before xp_parts xp_none xp_rewards coins solo_game forms_beaten",
   series_crates: "user_id crate n",
   sessions: "token_hash user_id created_at expires_at",
   solo_battles: "user_id id started_at",

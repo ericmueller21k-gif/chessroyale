@@ -95,6 +95,8 @@ describe("the migration, on a copy of the schema as it was before (live data, ev
     const kept = Object.fromEntries(["wallets", "ledger", "ledger_accounts", "results"].map((t) => [t, rowsBefore(t)]));
     // (The wallet's rows gain the coin boost's three counts, at 0: payments PR 4, Nov 26.)
     kept.wallets = kept.wallets!.map((r) => ({ ...(r as object), boost_crates: 0, boost_minutes: 0, crate_bonus: 0 }));
+    // (A result's row gains the Hidden Boss's forms count, NULL on every older row (no backfill): #990, Nov 27.)
+    kept.results = kept.results!.map((r) => ({ ...(r as object), forms_beaten: null }));
 
     // (As a request runs it: the D1 binding, its batches.)
     const live = d1Sql(d1);
