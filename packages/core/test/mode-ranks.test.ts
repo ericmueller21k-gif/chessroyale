@@ -266,7 +266,7 @@ describe("mode ranks: Squads", () => {
     expect(ch.get("gone")!.change.points!).toBeLessThan(0);
     expect(ch.get("gone")!.next.wins).toBe(0);
     expect(ch.get("o1")!.change.opponents).toBe(2);
-    expect(ch.get("o1")!.change.points!).toBeLessThan(0); // behind the leaver's squad, which finished 1st
+    expect(Math.abs(ch.get("o1")!.change.points!)).toBeLessThanOrEqual(1); // 2nd of 3 equal squads: behind the leaver's (1st), ahead of p
     expect(squadStrength(squads[0]!, NOW).rating).toBeCloseTo(1500, 9);
   });
 
