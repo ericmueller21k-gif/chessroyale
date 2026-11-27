@@ -2302,3 +2302,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 27 02:36: #993 mode ranks review: blocker + 3 should-fix; HELD, fix round queued (not started: 20 min to the 02:55 stop). Ask Eric: should a last place in 50v50 ever gain RP (equal perMove case)?
 - Nov 27 02:42: #997 review: blocker (profile ride count 36->41) fixed add6239c; nits 4 fixed; HELD for Eric: where the riders go (Beta is ~never earned) + Tommy Gun/Parrot rarer.
 - Nov 27 02:45: #995 rare frames MERGED 7c813c68.
+- Nov 27 02:46: #1000 chess(2) failed: king-save-altered audit missing stranger; director added it (7dd399ac), 39/39 pass. CI re-running.
