@@ -112,7 +112,9 @@ async function battle(floorSettings: Partial<Settings>, seed: number, rating: nu
   const engines = [engine];
   const r = new MatchRunner({ settings, rng: mulberry32(seed), engines, library, entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
   const plan = r.bossBrainPlan("", true)!;
-  if (plan.brain !== "stockfish" && plan.rating !== null) r.humanBrain = { brain: plan.brain, rating: plan.rating, engine: maia };
+  // (The floor's own draw (floorDraw: looser on the first floors, never a gift), unless TOWER_DRAW=off runs the draw before Nov 26.)
+  const draw = process.env.TOWER_DRAW === "off" ? {} : plan.draw ? { draw: plan.draw } : {};
+  if (plan.brain !== "stockfish" && plan.rating !== null) r.humanBrain = { brain: plan.brain, rating: plan.rating, engine: maia, ...draw };
   const opts = { temperature: BOSS_BRAIN.temperature, topP: BOSS_BRAIN.topP, multipv: 1 };
   const fen = () => r.boards.get(r.state.boards[0]!)!.fen;
   if (process.env.TOWER_DEBUG) console.log("start", fen(), r.state.bosses?.map((b) => b.elo) ?? r.boss?.elo, plan);

@@ -2565,7 +2565,7 @@ export class LobbyCore {
     const maia = BOSS_BRAIN.forPlayers || (people.length > 0 && people.every((h) => h.admin));
     const plan = this.runner?.bossBrainPlan("", maia);
     if (!plan || plan.rating === null || plan.brain === "stockfish") return null;
-    return { brain: plan.brain, rating: plan.rating, ...(plan.stockfishShare ? { stockfishShare: plan.stockfishShare } : {}) };
+    return { brain: plan.brain, rating: plan.rating, ...(plan.stockfishShare ? { stockfishShare: plan.stockfishShare } : {}), ...(plan.draw ? { draw: plan.draw } : {}) };
   }
 
   /**
