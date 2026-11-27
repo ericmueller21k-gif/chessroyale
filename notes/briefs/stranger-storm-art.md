@@ -47,3 +47,5 @@ page and margins around the board (deepest at the edges and corners) so the fire
 **Eric, ~17:25, after the first mockup (he likes it):** keep the storm overlapping the screen (Moves, his figure, the strip): "That's
 what makes it cool. So don't have it get rid of that." Keep the ice as is. The opening's crack (lava-orange / ice-blue) stays on the
 board, under the pieces, through the storm's 3 turns and heals a little each turn; when it has fully healed the storm goes away.
+**Eric, ~17:30:** too dark in the computer video. Like his reference: everything behind the storm stays visible, just dimmed a bit
+("opacity changed"): a soft see-through dim, and the flames and frost see-through where they overlap the screen.
