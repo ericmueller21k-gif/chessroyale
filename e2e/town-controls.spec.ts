@@ -13,7 +13,7 @@ const PLAN_HOME_COUNT = (JSON.parse(readFileSync(new URL("../packages/app/src/to
  * - locking a new view: a look round let go snaps to the nearest quarter (split at 45°, Nov 6: "about like 45 degrees"); a tap, a run or
  *   an arrow next makes it the base heading, which the arrows follow; a building's in and out resets it to north;
  * - the minimap: on by default, top right, your dot moving with you; its button hides it (remembered); a tap opens it large with the
- *   boss portraits, the Colosseum and the park; a tap closes it, and on a portrait walks you to that home (Nov 11); it never covers
+ *   boss portraits, the Colosseum and the park; a tap closes it, and on a portrait walks you to that home (Nov 11), on the park's chessboard to the park (Nov 27); it never covers
  *   the arrows, the zoom pair or the chat.
  * Phone (touch, through the browser's touch events) and computer (the mouse's left button), on WebGL (the street town's only drawing).
  * `STILLS=docs/street-controls-map` writes the stills and GIFs.
@@ -488,6 +488,23 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   expect(off(end[0], home[0]!), `by ${pick.id} across (${end} vs ${home})`).toBeLessThanOrEqual(3);
   expect(off(end[1], home[1]!), `by ${pick.id} along (${end} vs ${home})`).toBeLessThanOrEqual(3);
   if (STILLS) await page.screenshot({ path: `${STILLS}/map-walk-2-arrived-${test.info().project.name}.png` });
+
+  // (Eric, Nov 27.) The park is a small chessboard, and a tap on it closes the map and walks you to the park's middle.
+  await small.click();
+  await expect(big).toBeVisible();
+  if (STILLS) await page.screenshot({ path: `${STILLS}/map-open-${test.info().project.name}.png` });
+  const meP = await dot(page, ".tm-big .tm-you");
+  const pk = (await page.locator(".tm-big [data-icon=park]").boundingBox())!;
+  const pkx = pk.x + pk.width / 2;
+  const pky = pk.y + pk.height / 2;
+  const fromP = await you(page);
+  const parkSq = [Math.round(fromP[0] + (pkx - meP.x) / sq), Math.round(fromP[1] - (pky - meP.y) / sq)];
+  await page.mouse.click(pkx, pky);
+  await expect(big, "the map closes").toHaveCount(0);
+  await settle(page);
+  const inPark = await you(page);
+  expect(off(inPark[0], parkSq[0]!), `in the park across (${inPark} vs ${parkSq})`).toBeLessThanOrEqual(3);
+  expect(off(inPark[1], parkSq[1]!), `in the park along (${inPark} vs ${parkSq})`).toBeLessThanOrEqual(3);
 });
 
 test("the minimap never covers the arrows, the zoom pair, the focus button or the chat, at every phone size and on computers", async ({ browser }) => {

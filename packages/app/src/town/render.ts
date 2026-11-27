@@ -40,6 +40,9 @@ import { MAP_BOX } from "./minimap.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { PIECE_ART, statueSpot } from "./houses/coliseum.ts";
 import { COLISEUM_CHIP, artOf } from "./houses/index.ts";
+import { HOUSE_ZEBRA_CHIP } from "./houses/zebra.ts";
+import { HOUSE_RECLUSE_CHIP } from "./houses/recluse.ts";
+import { HOUSE_TOWER_CHIP } from "./houses/tower.ts";
 import { CLOSE, QUOTE_INK, STATUE_W, quoteFace, statueArt, statueFrame, statueH, statueSteps } from "./houses/statues.ts";
 import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
 import { look, mixLights, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
@@ -118,13 +121,10 @@ function portraitFace(h: Home & { id: TownBossId }): readonly [x: number, y: num
 }
 export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: number]> = {
   ...(Object.fromEntries(ALL_HOMES.filter(hasTownBoss).map((h) => [h.id, portraitFace(h)])) as Record<TownBossId, readonly [number, number, number]>),
-  // The homes with nobody out front: a box in the home's own picture (chipFace).
-  // (Rolling Dough: Don Dough is in his back room; its bakery's door, the eyes peeking through its blinds.)
-  zebra: [72, 82, 44],
-  // (The Walk-up: the Hidden Boss is upstairs; the top floor's lit window, the child's, under its hood.)
-  recluse: [32, 34, 44],
-  // (The Battle Tower: its glass door under the sunburst.)
-  tower: [46, 500, 52],
+  // The homes with nobody out front: a box in the home's own picture (chipFace), kept with its drawing.
+  zebra: HOUSE_ZEBRA_CHIP,
+  recluse: HOUSE_RECLUSE_CHIP,
+  tower: HOUSE_TOWER_CHIP,
 };
 
 // ---- Colors (the prototype's, sampled from Eric's reference picture).

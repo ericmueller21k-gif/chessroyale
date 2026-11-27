@@ -76,6 +76,8 @@ export const HOUSE_TOWER_DOOR = 72;
 const SIGN = { x: 38, y: 519, w: 68, h: 20 } as const;
 /** The door: its gold frame's box; the glass inside. */
 const DOOR = { x0: 54, x1: 89, y0: 541, y1: 581 } as const;
+/** Its chip and large-map face (x, y, side): nobody is out front, so its glass door under the sign and the sunburst. */
+export const HOUSE_TOWER_CHIP = [HOUSE_TOWER_DOOR - 28, DOOR.y0 - 30, 56] as const;
 /** The lobby windows (glass boxes, inclusive). */
 const LOBBY = [
   { x0: 14, x1: 31 },

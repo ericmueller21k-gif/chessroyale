@@ -397,3 +397,19 @@ describe("the minimap, built from the plan (street-plan.json): north up, the Col
     M.resetMapOn();
   });
 });
+
+describe("the large map's and the chips' faces (Nov 27: Chandy's hand-set box had drifted off his head)", () => {
+  it("each town boss's box is the middle of its portrait window, inside its figure's frame", async () => {
+    const { BOSS_ART, BOSS_FACE } = await import("../src/town/render.ts");
+    const { portraitOf } = await import("../src/characters/portraits.ts");
+    const { BOSS_ROSTER } = await import("@chessroyale/core");
+    // (Chandy's town figure is his board figure without the rifle's room on the right: the same origin, so his window as it is.)
+    const face = portraitOf(BOSS_ROSTER.find((b) => b.id === "chandy")!.kit)!.face;
+    const [x, y, s] = BOSS_FACE.chandy;
+    expect([x + s / 2, y + s / 2]).toEqual([face[0] + face[2] / 2, face[1] + face[3] / 2]);
+    for (const [id, ch] of Object.entries(BOSS_ART)) {
+      const [bx, by, bs] = BOSS_FACE[id as keyof typeof BOSS_FACE];
+      expect(bx >= 0 && by >= 0 && bx + bs <= ch.w && by + bs <= ch.h, `${id}'s box inside its frame`).toBe(true);
+    }
+  });
+});
