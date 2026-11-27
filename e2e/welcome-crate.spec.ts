@@ -39,11 +39,23 @@ test("the Welcome Crates: the first given on the first visit (its notice, Go to 
   await named(page, "Tess");
   await page.goto("/");
   await asSignedIn(page, "welcome", { welcomeNotice: true });
-  await page.reload();
+  // (With the walkthrough open over home, review of #1012 S4: the notice waits under it, and the walkthrough's Escape leaves it unseen.)
+  const seenPosts: string[] = [];
+  page.on("request", (r) => r.url().includes("/api/locker/welcome/seen") && seenPosts.push(r.url()));
+  const me = page.waitForResponse((r) => r.url().includes("/api/me"));
+  await page.goto("/?tour=1");
+  const tour = page.getByRole("dialog", { name: "Welcome walkthrough" });
+  await expect(tour).toBeVisible();
+  await me;
+  await page.waitForTimeout(500);
+  const notice = page.locator(".welcome-notice");
+  await expect(notice, "held while the walkthrough is open").toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(tour).toHaveCount(0);
 
   // The first visit signed in: the first Welcome Crate is given, and home says so once, with a way to the inventory.
-  const notice = page.locator(".welcome-notice");
   await expect(notice).toBeVisible({ timeout: 20_000 });
+  expect(seenPosts, "not marked seen by the walkthrough's Escape").toEqual([]);
   await expect(notice).toContainText(WELCOME_TEXT.waiting);
   await expect(notice).toContainText("Thank you for being an early tester!");
   await expect(notice).toContainText("open it at level 5");

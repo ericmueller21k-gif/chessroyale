@@ -299,7 +299,6 @@ describe("the prize: a HunChess colorway of every ride, never tradeable, no puri
     // (Its list is these less an admins-first boss's rides, Nov 23: the exact list in core crates.test.ts.)
     expect(HUNCHESS_RIDES.map((d) => d.id)).toEqual(expect.arrayContaining([...WELCOME_CRATE.items]));
     expect(WELCOME_TEXT).toMatchObject({ name: "HunChess Welcome Crate", thanks: "Thank you for being an early tester!", notTradeable: "Not tradeable" });
-    expect(WELCOME_TEXT.progress(3)).toBe("Finish 5 games to earn your Welcome Crate: 3/5");
   });
 
   it("never tradeable or listable: the crate and every HunChess ride refuse; every other item may", () => {
@@ -332,11 +331,10 @@ describe("the prize: a HunChess colorway of every ride, never tradeable, no puri
 });
 
 describe("the second Welcome Crate, at 25 (Eric: \"the first one you get after 5 games, the next one you get after 25\")", () => {
-  it("at exactly 25 finished games, not at 24; once; the progress names the next milestone", async () => {
+  it("at exactly 25 finished games, not at 24; once", async () => {
     const { sql, db, id } = await account();
     await play(sql, id, 5);
     expect(await welcomeState(sql, id)).toMatchObject({ next: 25, unopened: 1, status: "ready" });
-    expect(WELCOME_TEXT.progress(7, 25)).toBe("Finish 25 games for your second Welcome Crate: 7/25");
     expect((await play(sql, id, 19)).some(Boolean)).toBe(false);
     expect(rows(db, id)).toBe(1);
     expect(await play(sql, id, 1)).toEqual([true]);

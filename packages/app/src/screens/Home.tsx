@@ -909,6 +909,8 @@ export function HomeScreen({
   const questsOn = questsForYou();
   // (Never opening by itself over the queue or another notice: it waits for the next home visit. Review of #575, m3.)
   const quests = useQuests(questsOn === true, queueing);
+  // (The walkthrough is open: the Welcome Crate's notice waits under it until it closes; review of #1012, S4.)
+  const [tourUp, setTourUp] = useState(false);
   // (A computer's entry is Daily Quests in its side menu (Eric, Nov 10: FrontMenu.tsx); a phone's is in the top bar.)
   useEffect(() => {
     if (intent?.kind === "quests") quests.show();
@@ -995,7 +997,7 @@ export function HomeScreen({
       {/* (A moderator's warning or chat ban, once: chat moderation's.) */}
       <ChatNotice />
       {/* (The Welcome Crate earned, Nov 6: its one-time notice; WelcomeNotice.tsx.) */}
-      <WelcomeNotice />
+      <WelcomeNotice held={tourUp} />
       {chatSheet && !computer && <ChatSheet onSignIn={onSignIn} onClose={() => setChatSheet(false)} />}
       {quests.open && quests.answer && !queueing && (
         <QuestsOverlay
@@ -1301,7 +1303,7 @@ export function HomeScreen({
        * through Profile). No coins: the shop and your profile show them. A computer has the logo, the shop, Play with
        * friends and Settings in its side menu, your pawn top right, and friends in its live panel.)
        */}
-      <Walkthrough onShop={onShop} />
+      <Walkthrough onShop={onShop} onOpenChange={setTourUp} />
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">

@@ -109,9 +109,14 @@ describe("the last slide's Welcome Crates (Nov 27)", () => {
       ["Level 5", 2, 5, false],
       ["25 games", 7, 25, false],
     ]);
-    expect(tutorialCrateRows(9, 30).map((b) => [b.done, b.reached])).toEqual([
-      [5, true],
-      [25, true],
+    expect(tutorialCrateRows(9, 30).map((b) => [b.done, b.reached, b.progress])).toEqual([
+      [5, true, "5 of 5"],
+      [25, true, "25 of 25"],
+    ]);
+    // A guest has neither yet: empty bars, "Sign in" (review of #1012, N5).
+    expect(tutorialCrateRows(1, 0, false).map((b) => [b.label, b.fraction, b.progress])).toEqual([
+      ["Level 5", 0, "Sign in"],
+      ["25 games", 0, "Sign in"],
     ]);
   });
 });

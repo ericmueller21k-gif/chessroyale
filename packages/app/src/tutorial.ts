@@ -114,13 +114,12 @@ export const TUTORIAL_CRATE_LABEL = (goal: number) => `${goal} games`;
 
 /**
  * The last slide's two Welcome Crates (Nov 27): the first is given on the first visit and opens at level 5, so its bar is your level
- * ("Level 5", 2 of 5); the second's is your games toward 25 ("25 games").
+ * ("Level 5", "2 of 5"); the second's is your games toward 25 ("25 games"). A guest has neither (they come with an account): empty bars
+ * and "Sign in" (review of #1012, N5).
  */
-export function tutorialCrateRows(level: number, games: number): (TutorialCrateBar & { label: string })[] {
+export function tutorialCrateRows(level: number, games: number, signedIn = true): (TutorialCrateBar & { label: string; progress: string })[] {
   const open = WELCOME_GIFT.openLevel;
   const second = WELCOME_GIFT.milestones[1];
-  return [
-    { ...crateBars(level, [open])[0]!, label: `Level ${open}` },
-    { ...crateBars(games, [second])[0]!, label: TUTORIAL_CRATE_LABEL(second) },
-  ];
+  const row = (bar: TutorialCrateBar, label: string) => (signedIn ? { ...bar, label, progress: `${bar.done} of ${bar.goal}` } : { ...bar, done: 0, fraction: 0, label, progress: "Sign in" });
+  return [row(crateBars(level, [open])[0]!, `Level ${open}`), row(crateBars(games, [second])[0]!, TUTORIAL_CRATE_LABEL(second))];
 }

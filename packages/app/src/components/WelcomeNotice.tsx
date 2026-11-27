@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { WELCOME_GIFT, WELCOME_TEXT } from "@chessroyale/core";
+import { WELCOME_GIFT, WELCOME_TEXT, welcomeOpens } from "@chessroyale/core";
 import { refreshProfile, welcomeNoticeSeen } from "../account.ts";
 import { useAccount } from "../screens/Profile.tsx";
 import { play } from "../sound.ts";
@@ -18,18 +18,22 @@ import { InventoryLayer } from "./PageLayer.tsx";
  * (level 5); the second keeps "You earned a Welcome Crate!". Beside OK, **Go to inventory** closes it for good too and opens your
  * inventory's Crates tab as a layer over this screen (`InventoryLayer`, as the reward card's), whose Back returns here.
  */
-export function WelcomeNotice({ refresh = false }: { refresh?: boolean }) {
-  const welcome = useAccount().profile?.locker?.welcome;
+export function WelcomeNotice({ refresh = false, held = false }: { refresh?: boolean; held?: boolean }) {
+  const profile = useAccount().profile;
+  const welcome = profile?.locker?.welcome;
   useEffect(() => {
     if (!refresh) return;
     // (A solo result reloads your profile itself; an online room writes its results a moment after: ask again then.)
     const timers = [2_500, 7_000].map((ms) => setTimeout(() => void refreshProfile().catch(() => undefined), ms));
     return () => timers.forEach(clearTimeout);
   }, [refresh]);
-  const due = welcome?.notice === true && welcome.status !== "locked";
+  // (`held`: home's walkthrough is open over it. It waits, unseen and with no Escape of its own, until that closes; review of #1012, S4.)
+  const due = welcome?.notice === true && welcome.status !== "locked" && !held;
   // (The first crate's notice while the second is still to earn; both earned: the second's words.)
   const first = welcome?.next === WELCOME_GIFT.milestones[1];
   const title = first ? WELCOME_TEXT.waiting : WELCOME_TEXT.earned;
+  // (The level words only below the level it opens at, for either crate; review of #1012, N3.)
+  const below = !welcomeOpens(profile?.xp ?? 0);
   const [inventory, setInventory] = useState(false);
   const ok = useRef<HTMLButtonElement>(null);
   const close = () => {
@@ -57,7 +61,7 @@ export function WelcomeNotice({ refresh = false }: { refresh?: boolean }) {
         </p>
         <p class="small welcome-thanks">{WELCOME_TEXT.thanks}</p>
         <p class="small">
-          It's in your inventory's Crates{first ? `: see what's inside now, and open it at level ${WELCOME_GIFT.openLevel}` : ""}. {WELCOME_TEXT.notTradeable}.
+          It's in your inventory's Crates{below ? `: see what's inside now, and open it at level ${WELCOME_GIFT.openLevel}` : ""}. {WELCOME_TEXT.notTradeable}.
         </p>
         <div class="locker-dialog-actions">
           <button type="button" class="ff-button small" ref={ok} onClick={close}>

@@ -244,7 +244,8 @@ export function CratesPanel() {
   const heldSeries = [...CRATES, MYTHIC_CRATE].filter((c) => heldOf(locker, c) > 0);
   const boostCrates = locker?.boostCrates ?? 0;
   const boostRow = <BoostCrateRow held={boostCrates} onOpen={() => setBoostOpen(true)} />;
-  const nothingReady = !readyWelcome.length && !heldSeries.length && !heldBoss.length && !picks && !boostCrates;
+  // ("Nothing to open" counts only what opens: a Welcome Crate held below level 5 is listed, but can't; review of #1012, N4.)
+  const nothingReady = !readyWelcome.some((r) => r.canOpen) && !heldSeries.length && !heldBoss.length && !picks && !boostCrates;
   const welcomeRow = (row: WelcomeRowView) => <WelcomeRow key={`w${row.n}`} row={row} onOpen={() => setWelcomeOpen(row.n)} />;
   const seriesRow = (c: CrateDef) => <SeriesCrateRow key={c.id} crate={c} held={heldOf(locker, c)} keys={keysOf(locker)} onOpen={() => setOpen(c)} />;
   const bossRow = (c: BossCrateDef) => <BossCrateRow key={c.id} crate={c} held={heldOf(locker, c)} onOpen={() => setOpen(c)} />;
@@ -405,7 +406,8 @@ function Padlock() {
 /**
  * One of the two Welcome Crate rows in the Crates tab (Eric, Nov 6), both there from the start for every player (shown, not hidden):
  * the gold-and-black crate, its name, "Thank you for being an early tester!", "Not tradeable", its own meter and its state: locked (a
- * padlock, greyed a little: "Finish 5 games to unlock"; a guest's "Sign in to earn"), ready ("Ready"), or opened ("Opened" and its ride).
+ * padlock, greyed a little: "Given on your first visit", "Finish 25 games to unlock"; a guest's "Sign in to get it", "Sign in to earn"),
+ * ready ("Ready"; held below level 5, greyed with the padlock: "Reach level 5 to open"), or opened ("Opened" and its ride).
  */
 function WelcomeRow({ row, onOpen }: { row: WelcomeRowView; onOpen: () => void }) {
   return (
@@ -841,7 +843,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
 
 /**
  * A Welcome Crate's page (Eric, Nov 6): the crate, its name, "Thank you for being an early tester!", "Not tradeable", its meter and state
- * ("Finish 5 games to unlock", "Ready", "Opened" with its ride), and every ride it can give (each as likely), in the HunChess colorway,
+ * (its row's line: "Finish 25 games to unlock", "Reach level 5 to open", "Ready", "Opened" with its ride), and every ride it can give (each as likely), in the HunChess colorway,
  * with no purity anywhere. "▶ Open" opens a ready one (greyed until then, and once it's opened), with the Crates tab's own strip and reveal.
  */
 function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Unseen; onBack: () => void }) {

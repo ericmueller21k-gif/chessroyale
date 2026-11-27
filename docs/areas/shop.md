@@ -240,8 +240,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     the row sits under Ready to open greyed with a padlock, "Reach level 5 to open", its meter your level, its page showing every ride). The 25 counts in any mode or against any boss (an online `results` row not marked `abandoned`,
     a solo one only with `XP.minMoves` (10) moves and `WELCOME_GIFT.soloMinSeconds` (60) of the server's own time (`play_ms`; Nov 10:
     empty posts had earned crates; idle open timers still count, accepted while items aren't traded), or a ranked 1 v 1 game), by the server only: one statement inserts a `welcome_crates` row per milestone reached (keyed by account and
-    milestone) only while it's signed in, and does nothing for one that's there. The second's ride is never the first's. The app's
-    `welcomeProgress()` answers `{ next: 5 | 25 | null, done }`. Checked on every `/api/me` (the backfill) and after every
+    milestone) only while it's signed in, and does nothing for one that's there. The second's ride is never the first's. Checked on every `/api/me` (the backfill) and after every
     saved result, ranked game and Squads placement. Guests and bots never get one. A match room marks a player gone too long, idle or
     removed mid-match as `abandoned` (not counted); a resignation counts.
   - **The notice** (`components/WelcomeNotice.tsx`): the first's **"A Welcome Crate is waiting in your inventory"** with **Go to inventory**

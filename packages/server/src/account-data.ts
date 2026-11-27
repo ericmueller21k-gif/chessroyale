@@ -170,7 +170,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u) => questDeletes(u.id),
   },
   {
-    // The Welcome Crates (welcome.ts, Nov 6: at 5 and 25 finished games): for each, when the player earned it and the finished
+    // The Welcome Crates (welcome.ts, Nov 6; Nov 27: the first on the first visit, the second at 25 finished games): for each, when the player earned it and the finished
     // games counted then, when they closed its notice, and when they opened it and the ride it gave (that ride is in their items).
     name: "welcomeCrate",
     tables: ["welcome_crates"],

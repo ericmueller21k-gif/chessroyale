@@ -147,7 +147,8 @@ function holeOf(s: SpotBox) {
   return { x: s.left + (s.width - w) / 2, y: s.top + (s.height - h) / 2, width: w, height: h, rx: s.radius * s.scale };
 }
 
-export function Walkthrough({ onShop }: { onShop: () => void }) {
+/** `onOpenChange`: told whenever it opens or closes (home holds the Welcome Crate's notice while it's open). */
+export function Walkthrough({ onShop, onOpenChange }: { onShop: () => void; onOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = useState<boolean>(
     () => takeReplay() || tourRequested(location.search) || shouldShowTutorial(readSeen()),
   );
@@ -162,6 +163,8 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
   const slide = slides[step];
   const isLast = step === slides.length - 1;
   const reduce = reducedMotion();
+
+  useLayoutEffect(() => onOpenChange?.(open), [open]);
 
   useEffect(() => {
     const again = () => {
@@ -267,7 +270,7 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
     : slide.kind === "anywhere" ? TUTORIAL_ANYWHERE_SLIDE.body
     : null;
   const isCrates = slide.kind === "crates";
-  const bars = isCrates ? tutorialCrateRows(levelOf(account().profile?.xp ?? 0), account().profile?.locker?.welcome?.games ?? 0) : null;
+  const bars = isCrates ? tutorialCrateRows(levelOf(account().profile?.xp ?? 0), account().profile?.locker?.welcome?.games ?? 0, !!account().profile?.user.signedIn) : null;
   const holes = spots.map(holeOf);
   const spotClass = (s: SpotBox) => ["wt-spot", s.scale !== 1 ? "wt-spot-lit" : "", gliding ? "wt-glide" : ""].join(" ").trim();
 
@@ -338,7 +341,7 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
                     <span class="wt-crate-text">
                       <strong>{b.label}</strong>
                       <span class="wt-bar"><span style={{ width: `${b.fraction * 100}%` }} /></span>
-                      <span class="wt-progress">{b.done} of {b.goal}</span>
+                      <span class="wt-progress">{b.progress}</span>
                     </span>
                   </li>
                 ))}
