@@ -7,7 +7,7 @@ import { Region, LINE, lw } from "../item-paint.tsx";
 
 const IDLE_N = 4;
 const MOVE_N = 8;
-const PAWN_Y = -3;
+const PAWN_Y = -4;
 const CUT = 88;
 
 const GRIP = "#2b2b30";
@@ -20,7 +20,7 @@ function pose(anim: "idle" | "move", f: number): RiderPose {
   return { dx: (100 * f) / MOVE_N, dy: f % 4 === 1 ? -0.6 : 0, pawnX: 1, pawnY: PAWN_Y, pawnTilt: 5, cut: CUT };
 }
 
-const DECK = "M 6 80 Q 9 85 18 85 L 82 85 Q 91 85 94 80 L 96 81.5 Q 93 89 82 89 L 18 89 Q 7 89 4 81.5 Z";
+const DECK = "M 6 79 Q 9 84 18 84 L 82 84 Q 91 84 94 79 L 97 80.5 Q 94 90 82 90 L 18 90 Q 6 90 3 80.5 Z";
 
 function Wheel({ x, a }: { x: number; a: number }) {
   const r = (a * Math.PI) / 180;
@@ -40,11 +40,11 @@ function Front({ p, anim, f }: RiderProps) {
   const a = anim === "move" ? f * 60 : 0;
   return (
     <g>
-      <path d="M 20 89 L 30 89 L 27.5 92 L 22.5 92 Z M 70 89 L 80 89 L 77.5 92 L 72.5 92 Z" fill={TRUCK} {...LINE} {...lw(1.6)} />
+      <path d="M 20 90 L 30 90 L 27.5 92.5 L 22.5 92.5 Z M 70 90 L 80 90 L 77.5 92.5 L 72.5 92.5 Z" fill={TRUCK} {...LINE} {...lw(1.6)} />
       <Wheel x={25} a={a} />
       <Wheel x={75} a={a + 90} />
       <Region p={p} name="deck" d={[DECK]} />
-      <path d="M 9 84 Q 12 86 18 86 L 82 86 Q 88 86 91 84" fill="none" stroke={GRIP} stroke-linecap="round" {...lw(1.8)} />
+      <path d="M 8 82.5 Q 11 85 18 85 L 82 85 Q 89 85 92 82.5" fill="none" stroke={GRIP} stroke-linecap="round" {...lw(1.2)} />
       <path d={DECK} fill="none" {...LINE} {...lw(2.4)} />
     </g>
   );
@@ -56,7 +56,7 @@ function endPose(anim: "idle" | "move", f: number): RiderPose {
   return { dx: 0, dy: anim === "move" && f % 4 === 1 ? -0.6 : 0, pawnX: 0, pawnY: PAWN_Y, pawnTilt: anim === "move" ? (f < 4 ? 1.5 : -1.5) : 0, cut: CUT };
 }
 
-const END_DECK = "M 33 84 Q 50 83 67 84 L 68 88 Q 50 89.5 32 88 Z";
+const END_DECK = "M 32 83 Q 50 82 68 83 L 69 89 Q 50 90.5 31 89 Z";
 
 function EndFront({ p }: RiderProps) {
   return (
@@ -65,7 +65,7 @@ function EndFront({ p }: RiderProps) {
       <rect x={30} y={90} width={6} height={7.5} rx={2.4} fill={WHEEL} {...LINE} {...lw(2)} />
       <rect x={64} y={90} width={6} height={7.5} rx={2.4} fill={WHEEL} {...LINE} {...lw(2)} />
       <Region p={p} name="deck" d={[END_DECK]} />
-      <path d="M 34 84.6 Q 50 83.6 66 84.6" fill="none" stroke={GRIP} stroke-linecap="round" {...lw(1.6)} />
+      <path d="M 34 84 Q 50 83 66 84" fill="none" stroke={GRIP} stroke-linecap="round" {...lw(1.2)} />
       <path d={END_DECK} fill="none" {...LINE} {...lw(2.4)} />
     </g>
   );

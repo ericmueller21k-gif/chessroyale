@@ -20,14 +20,14 @@ function bob(anim: "idle" | "move", f: number): number {
 /** The rug's middle line at x, rippling (the ripple runs back along it, frame by frame). */
 const wave = (x: number, ph: number, amp: number) => 85 + amp * Math.sin(x / 14 - ph);
 
-/** The rug from x0 to x1, its top edge a ripple, 4.5 thick. */
+/** The rug from x0 to x1, its top edge a ripple, 7 thick. */
 function rug(x0: number, x1: number, ph: number, amp: number): string {
   const top: string[] = [];
   const bot: string[] = [];
   for (let x = x0; x <= x1 + 0.01; x += (x1 - x0) / 10) {
     const y = wave(x, ph, amp);
     top.push(`${x.toFixed(1)} ${y.toFixed(2)}`);
-    bot.unshift(`${x.toFixed(1)} ${(y + 4.5).toFixed(2)}`);
+    bot.unshift(`${x.toFixed(1)} ${(y + 7).toFixed(2)}`);
   }
   return `M ${top.join(" L ")} L ${bot.join(" L ")} Z`;
 }
@@ -52,7 +52,7 @@ function Back({ anim, f }: RiderProps) {
 }
 
 function Tassels({ x, y, p2hex }: { x: number; y: number; p2hex: string }) {
-  return <path d={`M ${x} ${y} l -3 2 M ${x} ${y + 2.2} l -3 2 M ${x} ${y + 4.4} l -3 1.6`} fill="none" stroke={p2hex} stroke-linecap="round" {...lw(1.6)} />;
+  return <path d={`M ${x} ${y + 0.5} l -4 1 M ${x} ${y + 2.5} l -4.5 1 M ${x} ${y + 4.5} l -4.5 1 M ${x} ${y + 6.5} l -4 1`} fill="none" stroke={p2hex} stroke-linecap="round" {...lw(1.6)} />;
 }
 
 function Front({ p, p2, anim, f }: RiderProps) {
@@ -60,7 +60,7 @@ function Front({ p, p2, anim, f }: RiderProps) {
   const amp = anim === "move" ? 2.2 : 1.4;
   const d = rug(8, 92, ph, amp);
   const mid: string[] = [];
-  for (let x = 10; x <= 90.01; x += 8) mid.push(`${x} ${(wave(x, ph, amp) + 2.25).toFixed(2)}`);
+  for (let x = 10; x <= 90.01; x += 8) mid.push(`${x} ${(wave(x, ph, amp) + 3.5).toFixed(2)}`);
   const y0 = wave(8, ph, amp);
   const y1 = wave(92, ph, amp);
   return (
@@ -83,7 +83,7 @@ function endPose(anim: "idle" | "move", f: number): RiderPose {
   return { dx: 0, dy: bob(anim, f), pawnX: 0, pawnY: PAWN_Y, pawnTilt: anim === "move" ? Math.sin(phase(anim, f)) : 0, cut: CUT };
 }
 
-const END = "M 14 85 Q 50 82 86 85 L 86 90 Q 50 87 14 90 Z";
+const END = "M 14 84 Q 50 81 86 84 L 86 91 Q 50 88 14 91 Z";
 
 function EndBack({ anim, f }: RiderProps) {
   return <Shadow anim={anim} f={f} rx={30} />;
@@ -91,7 +91,7 @@ function EndBack({ anim, f }: RiderProps) {
 
 function EndFront({ p, p2, anim, f }: RiderProps) {
   const sway = anim === "move" ? Math.sin(phase(anim, f)) : 0;
-  const tassels = [20, 30, 40, 50, 60, 70, 80].map((x) => `M ${x} ${88.6 - Math.abs(x - 50) * 0.04} l ${sway} 3.5`).join(" ");
+  const tassels = [20, 30, 40, 50, 60, 70, 80].map((x) => `M ${x} ${89.6 - Math.abs(x - 50) * 0.04} l ${sway} 4`).join(" ");
   return (
     <g>
       <Region p={p} name="rug" d={[END]} />

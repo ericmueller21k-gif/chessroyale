@@ -207,8 +207,8 @@ const BASE_ITEM_DEFS: readonly ItemDef[] = [
   // start. Its line is the drawing's.)
   { id: "birdie-train", name: "Birdie's Train", tier: "mythic", slot: "ride", description: "A little yellow diesel that always runs on time. The tracks are imaginary; the punctuality is not." },
   // Crate riders (Nov 27; Eric, Nov 9-10: "a few riders that have nothing to do with the bosses ... in the regular crates"; "I want 5
-  // riders... crate exclusives"; he liked the shopping cart): in the regular crates' Fischer Random (CRATES), no boss's, no HunChess
-  // colorway (CRATE_RIDES). docs/decisions/2026-11-27-crate-riders.md. Their names and lines are the drawings'.
+  // riders... crate exclusives"; he liked the shopping cart): in the Beta Crate's Fischer Random (CRATES: each item in one crate), no
+  // boss's, no HunChess colorway (CRATE_RIDES). docs/decisions/2026-11-27-crate-riders.md. Their names and lines are the drawings'.
   { id: "shopping-cart", name: "Shopping Cart", tier: "mythic", slot: "ride", description: "One wheel has a mind of its own. The other three have given up arguing." },
   { id: "robot-vacuum", name: "Robo Vac", tier: "mythic", slot: "ride", description: "Cleans the board as it goes. Has mapped every square and still bumps into the king." },
   { id: "magic-carpet", name: "Magic Carpet", tier: "mythic", slot: "ride", colors: 2, description: "Hand-woven, tassels and all, in two colors. Flies anywhere; still won't let you skip a square." },
@@ -220,7 +220,7 @@ const BASE_ITEM_DEFS: readonly ItemDef[] = [
 ];
 
 /**
- * The crate riders (Nov 27; Eric, Nov 10: "crate exclusives"): rides with no boss, only in the regular crates (CRATES' Fischer Random).
+ * The crate riders (Nov 27; Eric, Nov 10: "crate exclusives"): rides with no boss, only in the Beta Crate (its Fischer Random's Mythic).
  * No HunChess colorway (so the Welcome Crate's odds stay as they are, and they stay the crates' own).
  */
 export const CRATE_RIDES: readonly string[] = ["shopping-cart", "robot-vacuum", "magic-carpet", "skateboard", "rocket"];
@@ -330,6 +330,8 @@ export const CRATES: readonly CrateDef[] = [
       "ninja-gi",
       // A one-off.
       "smiley-face",
+      // The crate riders (Nov 27): behind Fischer Random's Mythic, its 20 shared evenly (tier odds as before).
+      ...CRATE_RIDES,
     ],
     fischer: [
       { tier: "legendary", weight: 80 },

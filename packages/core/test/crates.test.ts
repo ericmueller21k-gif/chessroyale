@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CRATE_RIDES,
   CRATES,
   ITEM_SLOTS,
   SLOT_NAMES,
@@ -98,7 +99,7 @@ describe("crates", () => {
     expect(itemChance(beta, "antlers")).toBe(0);
   });
 
-  it("Beta, complete (28 items): each box's items and every item's chance, each tier's items rarer than the one below's", () => {
+  it("Beta, complete (33 items): each box's items and every item's chance, each tier's items rarer than the one below's", () => {
     const boxes = Object.fromEntries((["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const).map((t) => [t, beta.items.filter((id) => itemDef(id)?.tier === t)]));
     expect(boxes).toEqual({
       common: ["party-hat", "wizard-hat", "top-hat", "fake-mustache", "fedora", "bandana", "ninja-headband", "shuriken"],
@@ -106,12 +107,12 @@ describe("crates", () => {
       rare: ["dark-shades", "wire-earpiece", "cutlass", "spyglass", "katana"],
       epic: ["suit-and-tie", "captains-coat", "ninja-hood", "ninja-gi"],
       legendary: ["pirate-hat", "smiley-face"],
-      mythic: ["tommy-gun", "parrot"],
+      mythic: ["tommy-gun", "parrot", ...CRATE_RIDES],
     });
-    expect(beta.items).toHaveLength(28);
+    expect(beta.items).toHaveLength(33);
     // Boxes 40/26/18/14 shared evenly (5, 3.71, 3.6 and 3.5% each); Fischer Random 2%: Legendary 80 (0.8% each),
-    // Mythic 20 (0.2% each).
-    const chance: Record<string, number> = { common: 0.05, uncommon: 0.26 / 7, rare: 0.036, epic: 0.035, legendary: 0.008, mythic: 0.002 };
+    // Mythic 20 (0.2% before the five crate riders joined it, Nov 27; now 0.4% over seven, about 0.057% each).
+    const chance: Record<string, number> = { common: 0.05, uncommon: 0.26 / 7, rare: 0.036, epic: 0.035, legendary: 0.008, mythic: 0.004 / 7 };
     for (const [tier, ids] of Object.entries(boxes)) for (const id of ids) expect(itemChance(beta, id), id).toBeCloseTo(chance[tier]!, 6);
     // The ladder holds item by item: any one item is rarer than any one item of the tier below.
     const each = TIERS.map((t) => chance[t.id]!);
@@ -119,8 +120,7 @@ describe("crates", () => {
     expect(fischerOdds(beta)).toEqual([
       { item: "pirate-hat", weight: 40 },
       { item: "smiley-face", weight: 40 },
-      { item: "tommy-gun", weight: 10 },
-      { item: "parrot", weight: 10 },
+      ...["tommy-gun", "parrot", ...CRATE_RIDES].map((item) => ({ item, weight: expect.closeTo(20 / 7, 9) })),
     ]);
   });
 
@@ -276,7 +276,7 @@ describe("crates", () => {
     expect(itemDef("suit-and-tie")?.colors).toBe(2);
     expect(itemDef("tommy-gun")?.colors).toBe(2);
     expect(itemDef("parrot")?.colors).toBe(2);
-    expect(ITEM_DEFS.filter((d) => crateDef("beta-001")!.items.includes(d.id) && d.colors === 2).map((d) => d.id)).toEqual(["suit-and-tie", "tommy-gun", "parrot"]);
+    expect(ITEM_DEFS.filter((d) => crateDef("beta-001")!.items.includes(d.id) && d.colors === 2).map((d) => d.id)).toEqual(["suit-and-tie", "tommy-gun", "parrot", "magic-carpet", "rocket"]);
     expect(cleanLook({ head: { def: "present", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBe("cobalt");
     expect(cleanLook({ head: { def: "santa-hat", color: "red", color2: "cobalt", blemish: 3, seed: 1 } }).head?.color2).toBeUndefined();
   });
@@ -432,7 +432,7 @@ describe("boss crates", () => {
 });
 
 describe("rides (Oct 31)", () => {
-  it("a slot of their own, one ride at a time, Mythic, in no crate yet (admins only until its crate comes)", () => {
+  it("a slot of their own, one ride at a time, Mythic; a boss's in no series crate (its boss crate), the crate riders in Beta's", () => {
     expect(ITEM_SLOTS).toEqual(["head", "face", "skin", "weapon", "ride", "outfit"]);
     expect(SLOT_NAMES.ride).toBe("Ride");
     // (Nov 6: each ride's HunChess colorway is a ride too, made from it: welcome.test.ts. These are the rides themselves.)
@@ -457,12 +457,21 @@ describe("rides (Oct 31)", () => {
       ["log-roller", "The Log Roller", "mythic"],
       ["pen-pony", "Pen Pony", "mythic"],
       ["birdie-train", "Birdie's Train", "mythic"],
+      // (Nov 27: the crate riders, no boss's: docs/decisions/2026-11-27-crate-riders.md.)
+      ["shopping-cart", "Shopping Cart", "mythic"],
+      ["robot-vacuum", "Robo Vac", "mythic"],
+      ["magic-carpet", "Magic Carpet", "mythic"],
+      ["skateboard", "Skateboard", "mythic"],
+      ["rocket", "Rocket", "mythic"],
     ]);
     for (const d of rides) {
-      expect(CRATES.some((c) => c.items.includes(d.id)), d.id).toBe(false);
-      for (const c of CRATES) expect(itemChance(c, d.id)).toBe(0);
-      // (One color, but Hollow's Bulb: its glow is the second, as drawn.)
-      expect(d.colors).toBe(d.id === "hollow-bulb" ? 2 : undefined);
+      // (A crate rider: the Beta Crate's only, never a boss's crate nor a HunChess colorway; a boss's ride: in no series crate.)
+      const crate = CRATE_RIDES.includes(d.id);
+      expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toEqual(crate ? ["beta-001"] : []);
+      if (crate) expect(BOSS_CRATES.some((c) => c.items.includes(d.id)) || HUNCHESS_RIDES.some((h) => h.hunchess === d.id), d.id).toBe(false);
+      else for (const c of CRATES) expect(itemChance(c, d.id)).toBe(0);
+      // (One color, but Hollow's Bulb: its glow is the second, as drawn; and the carpet's border and the rocket's fins and nose.)
+      expect(d.colors).toBe(["hollow-bulb", "magic-carpet", "rocket"].includes(d.id) ? 2 : undefined);
       expect(d.faceLayer).toBeUndefined();
     }
   });
