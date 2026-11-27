@@ -2438,7 +2438,18 @@ export const BOSS_POWERS = {
    *   never a loss no game can have: spared). No piece fits: it waits a turn.
    * - The judge counts a piece left on the tile on the flee turn as gone (its value at `burnPawnLogit` log-odds a pawn, the fire's
    *   way), and always scores the moves that save it.
-   * His ultimate: Eric's, still to come (the `strangerult` placeholder never fires; his meter fills as every boss's).
+   * His ultimate, the Storm of Two Worlds (Eric, Nov 27: "every turn it toggles between scattering spots on the board where anything
+   * that's left there will freeze or burn ... it kind of forces you to find a good move that does exist"; "He can use it up to 2 times a
+   * game ... you lose like a pawn at most of value each time"; docs/decisions/2026-11-27-stranger-storm.md): the rage meter's, at most
+   * `stormMax` a battle; `stormTurns` of your turns, Fire and Ice by turns, the first of them from the seed.
+   * - Ice: all your pieces but the king and `iceFree` are frozen that turn; one of the free ones holds the engine's best move.
+   * - Fire: `fireMarks` squares marked (3 or 4, from the seed), burning whatever stands on them after your move (the Frostfire's burn and
+   *   its guards): never his pieces, at most one of yours, the piece of the engine's best move (which moves it off), the rest empty.
+   * - The fairness check (the engine's `stormLines` top moves at `stormNodes`, with his move: the host's engines online, this device's
+   *   solo): your best move under the storm within `fairPawns` of your best without it, and your next best within `decentPawns` (or no
+   *   worse than the position's own second best by more than `fairPawns`). Up to `stormTries` picks; none passes: a milder one (Ice: the
+   *   pieces of your top three moves free; Fire: one mark fewer, none where your top three moves land). No answer: that turn is calm.
+   * - The host gets `stormTimeMs` more for the request that asks for it. His Frostfire waits from the warning to `stormRest` turns after.
    */
   stranger: {
     strikeFrom: 3,
@@ -2446,6 +2457,17 @@ export const BOSS_POWERS = {
     freezeTurns: 1,
     fleeTurns: 1,
     burnPawnLogit: 1,
+    stormMax: 2,
+    stormTurns: 3,
+    iceFree: 2,
+    fireMarks: [3, 4] as readonly number[],
+    stormLines: 10,
+    stormNodes: 60_000,
+    fairPawns: 0.35,
+    decentPawns: 1.25,
+    stormTries: 8,
+    stormTimeMs: 4_000,
+    stormRest: 2,
   },
 } as const;
 
@@ -2461,10 +2483,8 @@ export const BOSS_POWERS = {
 // (docs/decisions/2026-11-16-chandy-rules.md): in the roster now, an admin's in every mode until Eric says go.)
 // (Nov 23: "birdie": his rules, art and the fall's cutscene wiring, his armored power and the cutscene's art still to come: an admin's
 // in every mode until Eric says go, as Chandy.)
-// (Nov 27: "stranger": his rules and art in, his ultimate Eric's still to come ("every boss ults every game"): an admin's until it lands.
-// He's unlocked by a win, so for an admin his tower floors deal him and his Boss Battle card follows his unlock; anyone else meets
-// neither: core boss.ts unlockReady.)
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy", "birdie", "stranger"];
+// (Nov 27: "stranger" was here until his ultimate, the Storm of Two Worlds, landed the same day: live for everyone since.)
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy", "birdie"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the
