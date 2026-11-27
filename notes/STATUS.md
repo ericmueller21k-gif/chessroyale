@@ -2284,3 +2284,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 27 01:06: #990 fix round done (e4a4ab07): fall counts the fallen form; View all one height; soloFormsBeaten test. Delta re-review session_01JuCWRrqatokCtGYA6vsqtd + full CI. #991 fix round running. Opus: 2.
 - Nov 27 01:16: main d699d71c (#988) GREEN, live.
 - Nov 27 01:25: #990 delta review clean (5/5 fixed); accounts page nit fixed by director 838eeb0d; final CI bbsgrtlhx then merge. Rare items restarted (Opus high). Tower fix round finishing.
+- Nov 27 01:34: #991 fix round done (528321af): online draw, no strike on loose floors 1-9, mate-sac skip. Touches fair play -> full-e2e label + fair-play delta review session_01JuCWRrMN1d86huAzTvYs9r. Opus: rare items (high) + #991 review (xhigh).
