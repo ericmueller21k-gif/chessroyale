@@ -19,11 +19,11 @@
 - Nov 10 · Auto chess: play against people (unranked, in match history) + a landing page (queue with a bot or search) · NEVER BUILT · ask Eric if still wanted (was parked "only on Eric's word")
 - Nov 12 · Rare items: a gold/diamond tier frame + tap to preview on a pawn (with the rider) · queued (paused 23:45 for the tower: restart fresh from claude/rare-frames-preview if it pushed anything)
 - Nov 13 · Hidden Boss in match history: his three forms, the beaten ones greyed · PR #990 (full lane: full-e2e + independent review session_01JuCWRvcCrZx64VEpCK4d1c running)
-- Nov 25 · 1 v 1: rank emblem by every name in game + tap a rank for the ranks pop-up · MERGED #988 d699d71c (deploying)
+- Nov 25 · 1 v 1: rank emblem by every name in game + tap a rank for the ranks pop-up · LIVE #988 d699d71c (main green)
 - Nov 11 · Landing page: sound toggle · WAITING ON ERIC: the reel files have no audio; pick chiptune or orchestra (both sent Nov 26 23:40, from stills/reel-music; audio on design/trailer-music reel-music/), then mux + toggle
 - Nov 10 · Banana Suit as the secret crate's prize (nothing rolls it) · PARTLY · queued
 ## Waiting on Eric (re-ask in the next message)
 - Turf mockup (Nov 22) · beta bots 6 decisions (+ "expect more bots" note) · burst cheat detection build y/n (Nov 11) · Boss Battle select 2x vs bigger (Nov 12) · Boingo room revisions (Nov 12) · trailer v2 edits + Song C (Nov 11) · Settings cleanup look (Nov 25) · lossless music masters location (Nov 16) · Discord webhook (Nov 10) · payments: Access bypass, Stripe Tax, LLC details
 - Nov 26 · OK to merge #978 (ranked flake fix edits the vote-zone guard test; the guarded check unchanged)? · WAITING ON ERIC
 - Nov 26 · Battle Tower: bad players on floors 1-8/10 (a 1000 player breezes 1-6), no queen gifts but missed threats OK, then a felt climb, not too slow by 30 · PR #991 (boss-lane review session_01JuCWRt3BSThe4a2DyAezB4; CI)
-- Nov 27 · Ranks pop-up: a rough Elo range next to each rank ("Elo approximation") · MERGED #988 d699d71c (deploying)
+- Nov 27 · Ranks pop-up: a rough Elo range next to each rank ("Elo approximation") · LIVE #988 d699d71c (main green)
