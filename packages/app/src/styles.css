@@ -29638,6 +29638,11 @@ piece.bd-smashed {
 
 /* The storm's ring: one small canvas, scaled up as pixel art, the board and RING.margin (12%) past it each side, over the pieces (its band
    reaches onto the edge squares a little), never taking a tap. Cut only by the screen's own edges. */
+/* (Past the screen's edge it's cut, never scrolled to, on a phone too: the review of #1009, S1. A computer's game page already clips:
+   `.gm-main:has(.screen.game > .boss-dock)`.) */
+.gm-main:has(.sg-storm) {
+  overflow-x: clip;
+}
 .power-board .sg-storm {
   position: absolute;
   left: calc(var(--board-size, 100%) * -0.12);

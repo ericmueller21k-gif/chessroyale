@@ -83,7 +83,7 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   // (Every frame from the start, recorded in the page: the scene's own element and his figure's box, the ring, the dock's words.)
   await page.addInitScript(() => {
     const w = window as any;
-    w.__storm = { scene: [] as number[], outside: [] as string[], ring: 0, burn: 0, docks: [] as string[] };
+    w.__storm = { scene: [] as number[], outside: [] as string[], ring: 0, burn: 0, docks: [] as string[], wide: [] as number[] };
     const look = () => {
       const fig = document.querySelector(".pm-storm .sg-fig");
       if (document.querySelector(".pm-storm")) w.__storm.scene.push(Date.now());
@@ -92,7 +92,12 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
         const r = fig.getBoundingClientRect();
         if (r.left + r.width * 0.25 < -1 || r.right - r.width * 0.25 > innerWidth + 1 || r.top + r.height * 0.1 < -1 || r.bottom > innerHeight + 1) w.__storm.outside.push(`${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.right)},${Math.round(r.bottom)}`);
       }
-      if (document.querySelector(".sg-storm")) w.__storm.ring++;
+      if (document.querySelector(".sg-storm")) {
+        w.__storm.ring++;
+        // (Its ring past the screen's edge is cut, never scrolled to: the review of #1009, S1.)
+        const sw = document.documentElement.scrollWidth;
+        if (sw > innerWidth && !w.__storm.wide.includes(sw)) w.__storm.wide.push(sw);
+      }
       // (The fire turn's burn, drawn as his thinking begins.)
       if (document.querySelector(".pm-storm-burn .pw-burns")) w.__storm.burn++;
       // (The storm's words in the dock: each one whole, never cut short.)
@@ -153,7 +158,8 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   }
   expect([...kinds].sort()).toEqual(["fire", "ice"]);
   expect(burnt, "a marked piece of yours burnt").toBe(true);
-  const rec = await page.evaluate(() => (window as any).__storm as { scene: number[]; outside: string[]; ring: number; burn: number; docks: string[] });
+  const rec = await page.evaluate(() => (window as any).__storm as { scene: number[]; outside: string[]; ring: number; burn: number; docks: string[]; wide: number[] });
+  expect(rec.wide, "no sideways scroll while the storm's ring shows").toEqual([]);
   expect(rec.burn, "the burn drawn as his thinking began").toBeGreaterThan(5);
   // (Both kinds' words seen, after his name as each turn began and through your turn.)
   expect(rec.docks.length).toBeGreaterThanOrEqual(4);

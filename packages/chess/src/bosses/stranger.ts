@@ -18,8 +18,8 @@
  *   a pawn, the fire's way), his piece left there as a gain; and it always scores the moves that save the piece. The frozen turn and
  *   the flee turn don't count for fair play (powerTurn), and the God King's Last Stand sits out on them.
  *
- * His ultimate: Eric's, still to come. `strangerult` is a placeholder: its hook never fires (his rage meter fills as every boss's,
- * and the admins' trigger waits). Eric's ult lands in the next PR.
+ * His ultimate (Eric, Nov 27): the Storm of Two Worlds, `strangerult`: three of your turns of ice and fire, below (`stormPick`,
+ * `stormCheck`); its numbers in settings.ts.
  */
 import { BOSS_POWERS, mulberry32, type BalloonShape, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type StormKind, type StrangerState } from "@chessroyale/core";
 import { BOSS_OPENING, boardEnd, newBoard, type BoardState } from "../boards.ts";

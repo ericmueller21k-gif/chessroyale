@@ -112,11 +112,12 @@ const PIECE_NAMES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop
 
 /**
  * The Stranger's storm, a turn of it now (Nov 27): the dock's words through your turn, in place of "Your move." (`STORM_LINES`), and as the
- * turn begins, after his name (`STORM_SHORT`, the boss screen's: "Stranger: Ice: 2 + king."). Each whole in the dock on a 360 px phone
+ * turn begins, after his name (`STORM_SHORT`, the boss screen's: "Stranger: Ice: a few + king."). Each whole in the dock on a 360 px phone
  * (e2e/stranger.spec.ts measures them).
  */
-export const STORM_LINES = { ice: "Ice: 2 pieces + king move.", fire: "Fire: marked squares burn!" } as const;
-export const STORM_SHORT = { ice: "Ice: 2 + king.", fire: "Fire: marks burn!" } as const;
+// (No count in the ice words: the mild pick frees up to 3, a few movers can free 1; the review of #1009, S2.)
+export const STORM_LINES = { ice: "Ice: few pieces + king move.", fire: "Fire: marked squares burn!" } as const;
+export const STORM_SHORT = { ice: "Ice: a few + king.", fire: "Fire: marks burn!" } as const;
 export const stormLine = (boss: { id?: string; powers?: { turn?: number; stranger?: { pick?: { turn: number; kind: "fire" | "ice"; squares: readonly string[] } | null } | null } | null } | null | undefined): string | null => {
   const pick = boss?.powers?.stranger?.pick;
   return pick && pick.turn === boss?.powers?.turn && pick.squares.length ? STORM_LINES[pick.kind] : null;
