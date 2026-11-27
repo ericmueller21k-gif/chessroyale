@@ -1,0 +1,4 @@
+Turf built (claude/hopper-turf): prints and crowned pawns on the board, the count and hold pills in the bar, the hop-around every
+4 of his turns, Long legs / Short fuse / Double hop at 32 / 40 / 48, solo and online (optional protocol fields), off in the tower.
+#883 nits folded in (and Chandy's lock now follows a bounced pawn on a shared floor). Sim: no change in his results; 48 never reached.
+Stills: branch stills/hopper-turf. PR body: .pr-body.md. CI not watched (per the brief): the PR runs the whole suite.
