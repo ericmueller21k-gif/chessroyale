@@ -49,3 +49,5 @@ what makes it cool. So don't have it get rid of that." Keep the ice as is. The o
 board, under the pieces, through the storm's 3 turns and heals a little each turn; when it has fully healed the storm goes away.
 **Eric, ~17:30:** too dark in the computer video. Like his reference: everything behind the storm stays visible, just dimmed a bit
 ("opacity changed"): a soft see-through dim, and the flames and frost see-through where they overlap the screen.
+**Eric, ~17:40:** "slightly too good... a bit more Game Boy Advance style, but still keep the details": a GBA pass (lower resolution,
+nearest-neighbor, a small palette per element, ordered dithering, hard glow bands), both versions in the next mockup; Eric picks.
