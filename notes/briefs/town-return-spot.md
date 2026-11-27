@@ -17,3 +17,20 @@ into the town, it should take you right back there."
 Tests: unit tests for the saved spot (save, load, a bad spot), one e2e (a tower floor's end → Back to town → in the tower at the clerk,
 town loaded once; a reload → still there). `.pr-body.md` (at most 40 lines), a short decision note, area pages, `.done`. Commits end only
 with your Claude-Session line.
+
+**UPDATE, Eric ~22:40 UTC (now the top job; it happened twice in a row):** "I just triggered to beat him [the Stranger, his tower
+floor], and then it reloaded the game right after ... I hit back to the battle tower, and then I tried to move for a second, it just
+glitched and it reloaded the game again. ... we need to see why this is getting redrawn so much, or where the bugs are happening when
+you exit from the end game and try to get back into the battle tower. Maybe it needs its own unique load ... it looks and says, okay,
+you are on floor whatever, and then it actually does a full reload onto that thing, so you're not running into these glitchy situations."
+- He's on a phone (iPhone Safari likely). "Reloaded the game" on its own, twice, right after a boss battle and again on moving in the
+  town, smells like the tab being killed for memory (iOS reloads a page that ran out of memory) or an uncaught error that resets the app.
+  Rule each in or out with evidence: measure memory across a tower floor (a boss with big art: the Stranger's storm sheets ~19.5 MB,
+  released on unmount since #1023; Big Boy) → end screen → Back to the tower → walking (the town's atlas pages are 16 MB each); look
+  for anything not released (boss art caches, canvases, ImageBitmaps, the town's atlases kept while a battle runs, listeners). Also any
+  error path that reloads the page (`location.reload`, an error boundary, a service worker update) after a battle.
+- Fix the causes. Eric's idea, which you should build: going back to the tower from a floor's end screen is its own clean entry,
+  "you are in the Battle Tower on floor N", that tears the battle down first and loads the tower inside directly (in front of the
+  clerk), never via the plaza and never twice. Prove: a test that the town/tower loads once; a memory number before/after on a slowed
+  phone profile (heap and decoded images) across battle → tower → walk, twice in a row.
+Effort high. The ranked tables job is paused for this.
