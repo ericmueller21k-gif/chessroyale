@@ -27,6 +27,17 @@ describe("the move list's rows from the match's history", () => {
     expect(promo[8]).toMatchObject({ piece: "p", to: "h8", captured: "r", promo: "q" });
   });
 
+  it("a pawn sent on past its move's step (Long legs, Wrangler's long pull: the next base has it further on its file) is named where it landed", () => {
+    // (Chub & Chirp's e7 to e4: the board plays e7e5, the next base has the pawn on e4.)
+    const base = "rnbqkbnr/pppp1ppp/8/8/4p3/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 2";
+    const rows = plyRows(newPlyCache(), "k", ["g1f3", "e7e5", "b1c3"], [{ ply: 2, fen: base }]);
+    expect(rows[1]).toMatchObject({ piece: "p", to: "e4", move: "e7e5" });
+    // (Without a base there, the step as played; a bounce back is never named forward.)
+    expect(plyRows(newPlyCache(), "k", ["g1f3", "e7e5", "b1c3"])[1]).toMatchObject({ to: "e5" });
+    const bounced = plyRows(newPlyCache(), "k", ["e2e4", "a7a6"], [{ ply: 1, fen: "rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR b KQkq - 0 1" }]);
+    expect(bounced[0]).toMatchObject({ to: "e4" });
+  });
+
   it("works out only new plies, and redoes them from a move taken back or a new base", () => {
     const cache = newPlyCache();
     const first = plyRows(cache, "b", GAME.slice(0, 6));

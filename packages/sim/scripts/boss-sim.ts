@@ -79,8 +79,14 @@
  */
 import { BOSS_ALONE_SCORING, BOSS_CLOCK, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossClockSettings, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, attackedSquares, capturedSquare, exchangeNet, fenAtPly, lockAge, locksAfter, shotTarget, darkSquares, touchesDark, scrambleOn, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, isHop, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, attackedSquares, capturedSquare, exchangeNet, fenAtPly, lockAge, locksAfter, shotTarget, darkSquares, touchesDark, scrambleOn, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, hopperStepKind, isHop, legalMoves, turfCount, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
+
+/** A hopper row's Turf, finished: his and your squares as the battle ended. */
+function turfEnd<T extends { endHis: number; endYours: number }>(b: { powers?: { turf?: { owner: string } | null } | null } | null | undefined, t: T): T {
+  const o = b?.powers?.turf?.owner;
+  return o ? { ...t, endHis: turfCount(o, "b"), endYours: turfCount(o, "c") } : t;
+}
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -536,6 +542,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       // a pawn of his nose to nose with one of the crowd's, and each such pawn that couldn't hop, by why: hopOptions's
       // reasons, and `cap` once his hops are spent.)
       const hopper = { max: BOSS_POWERS.hopMax, hops: [] as { at: number; from: string; over: string; to: string; of: number }[], noseTurns: 0, refused: {} as Record<string, number> };
+      // (Their Turf: hop-arounds, his turns by his holds then (0 to 3), his Long legs moves and Double hops, his most squares.)
+      const turf = { hopArounds: 0, holdTurns: [0, 0, 0, 0], legs: 0, doubles: 0, mostHis: 16, endHis: 16, endYours: 16 };
       // (Their Carrot Patch: the cast, each carrot's lead for him and fewest moves each side as it saw them, the pulls,
       // the end, the spin, and his race brain's looks: how many, how many changed his move, his last carrots taken.)
       const castAt = patch.cast ? patch.cast[0] + Math.floor(mulberry32(seed * 31 + g)() * (patch.cast[1] - patch.cast[0] + 1)) : null;
@@ -848,6 +856,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
               const h = runner.applyHop(pick?.fen ?? null)!;
               // (Their Pawn Bounce comes first when due: one a turn. Not a hop.)
               if (isHop(h)) hopper.hops.push({ at: h.at, from: h.from, over: h.over, to: h.to, of: candidates.length });
+              if (hopperStepKind(h) === "turfHop") turf.hopArounds++;
             }
           }
           // (Alfil's fusion is his move: then his turn is over.)
@@ -882,7 +891,16 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
               huntRow = { at: runner.boss!.crowdMoves, locks: huntLocks.length, caps: caps.length, net: nets.length ? Math.max(...nets) : null, inLines: lines.some((m) => caps.includes(m.move)), inMargin: lines.some((m) => caps.includes(m.move) && (loss(m.expected) ?? 99) <= BOSS_POWERS.chandy.takeMargin), capLoss: losses.length ? Math.min(...losses) : null, took: false, chased: false };
             }
             // (Chandy's first capture: its lock is marked as his move is about to show, so it's looked at then, as solo shows it.)
+            const t0 = bossId === "hopper" ? runner.boss!.powers?.turf : null;
+            if (t0) {
+              turf.holdTurns[t0.holdsAt === runner.boss!.crowdMoves ? t0.holds : 0]!++;
+              turf.mostHis = Math.max(turf.mostHis, turfCount(t0.owner, "b"));
+            }
             await runner.playBoss(engines[0], bossId === "chandy" ? async () => chandyLook() : undefined);
+            if (t0) {
+              const bd = runner.boards.get(runner.state.boards[0]!)!;
+              if (bd.lastMove && bd.lastMove !== bd.history.at(-1)) turf.legs++;
+            }
             if (bossId === "chandy") {
               const hist = runner.boards.get(runner.state.boards[0]!)!.history;
               const mv = hist.length > ply0 ? hist[ply0]! : null;
@@ -953,7 +971,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           continue;
         }
         if (runner.extraMoveDue()) {
-          await runner.playExtraMove(engines[0]);
+          if (await runner.playExtraMove(engines[0]) && bossId === "hopper") turf.doubles++;
           continue;
         }
         if (runner.funhouseDue()) {
@@ -1086,7 +1104,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           }
         : null;
       if (zs) for (const g of zs.gilds) ults.push({ kind: "goldPlate", turn: g.at });
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "bigboy" ? { bigboy } : {}), ...(bossId === "grex" ? { grex: { ...grex, hitsToBurn: BOSS_POWERS.candleHitsToBurn } } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gingerbread" ? { superFreeze: { used: b.powers?.superFreeze?.used ?? 0, last: b.powers?.superFreeze?.hit ? { after: b.powers.superFreeze.hit.at, squares: b.powers.superFreeze.hit.squares.length, held: b.powers.superFreeze.hit.held?.length ?? null } : null } } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "birdie" ? { birdie } : {}), ...(bossId === "stranger" ? { stranger } : {}), ...(bossId === "chandy" ? { chandy: { ...chandy, fifthAt: chandy.upgrades[BOSS_POWERS.chandy.upgradesMax - 1] ?? null, unlocked: b.powers?.chandy?.unlocked ?? [] } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots, turf: turfEnd(b, turf) } : {}), ...(bossId === "bigboy" ? { bigboy } : {}), ...(bossId === "grex" ? { grex: { ...grex, hitsToBurn: BOSS_POWERS.candleHitsToBurn } } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gingerbread" ? { superFreeze: { used: b.powers?.superFreeze?.used ?? 0, last: b.powers?.superFreeze?.hit ? { after: b.powers.superFreeze.hit.at, squares: b.powers.superFreeze.hit.squares.length, held: b.powers.superFreeze.hit.held?.length ?? null } : null } } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "birdie" ? { birdie } : {}), ...(bossId === "stranger" ? { stranger } : {}), ...(bossId === "chandy" ? { chandy: { ...chandy, fifthAt: chandy.upgrades[BOSS_POWERS.chandy.upgradesMax - 1] ?? null, unlocked: b.powers?.chandy?.unlocked ?? [] } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }
