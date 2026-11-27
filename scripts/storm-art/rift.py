@@ -204,11 +204,13 @@ class Rift:
         tall = (run + below) / R
         wall = np.clip(0.46 * tall, 0.0, 0.062)
         d = run / R
-        slabh = np.minimum(0.011, wall * 0.3)
+        # (Where it is only a crack there is no room for the board's edge or a lit wall: dark, with a thread of its floor.)
+        thin = tall < 0.03
+        slabh = np.where(thin, 0.0, np.minimum(0.011, wall * 0.3))
         on_slab = inside & (d < slabh)
         on_wall = inside & ~on_slab & (d < wall)
         floor = inside & ~on_slab & ~on_wall
-        wd = np.clip((d - slabh) / np.maximum(wall - slabh, 1e-5), 0, 1)
+        wd = np.where(thin, 1.0, np.clip((d - slabh) / np.maximum(wall - slabh, 1e-5), 0, 1))
         strata = 0.82 + 0.3 * unit(samp(self.grain, u * 0.9, v * 4.0, 0), 1.4)
         fire_wall = (np.array([120, 78, 54], np.float32) * (1 - wd[..., None]) ** 1.6 + np.array([14, 6, 12], np.float32) * (1 - (1 - wd[..., None]) ** 1.6)) * strata[..., None]
         ice_wall = (np.array([136, 196, 244], np.float32) * (1 - wd[..., None]) ** 1.6 + np.array([10, 28, 84], np.float32) * (1 - (1 - wd[..., None]) ** 1.6)) * strata[..., None]
