@@ -107,7 +107,7 @@ describe("Chub & Chirp are live", () => {
     expect(text).toContain("| 1 | a pawn 50%, nothing 50% | 0.5 |");
     expect(text).toContain("| 3 | a knight 40%, a bishop 40%, a rook 15%, a queen 5% | 3.6 |");
     expect(text).toContain("| 4 | a queen, every time | 9 |");
-    expect(text).toContain("| 5 | they win the battle on the spot |");
+    expect(text).toContain("| 5 | Chub & Chirp wins the battle on the spot |");
     // (Changed in the settings, changed in the FAQ.)
     expect(BOSS_BLOCKS.hopper!({ ...BOSS_POWERS, carrotMoves: 9 }, def)).toContain("Each side has 9 moves");
   });
