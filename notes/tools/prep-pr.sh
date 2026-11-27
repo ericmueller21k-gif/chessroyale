@@ -5,6 +5,8 @@ b=$1; w=$S/wt-$b
 cd /home/user/chessroyale && git fetch -q origin "$b" main && rm -rf "$w" && git worktree prune && git worktree add -q "$w" "origin/$b" 2>/dev/null
 cd "$w" && git checkout -q -B "$b" && git show HEAD:.pr-body.md | sed 's#session_01EKH5j59nMnRVnekEcuZbim#session_01JuCWRuPpvjpkJLcU3sM3cR#' > "$S/body-$(echo $b | tr / -).md"
 # (Every handoff marker at the root, by pattern, not a list: .done-mock, .done-r2 and .mock-ready slipped past the old list, Nov 26.)
+# (Stills never reach main: rules-common says a stills/ branch; Nov 26 the director's briefs said review/ and 9 images merged.)
+git cat-file -e HEAD:review 2>/dev/null && git rm -r -q review
 for f in $(git ls-tree --name-only HEAD | grep -E '^\.(pr-body\.md|review-fixes\.md|done.*|go|mock.*|question.*|ready.*)$'); do git rm -q "$f"; done
 git commit -qm "Drop the PR body file
 
