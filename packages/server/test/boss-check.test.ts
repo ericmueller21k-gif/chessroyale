@@ -5,8 +5,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Chess } from "chess.js";
-import { BOSS_CHECK, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, RAID_SETTINGS, mulberry32, type JudgeConfig, type Settings } from "@chessroyale/core";
-import { legalMoves, runJudgeJob, type BoardScore, type EngineLike, type MoveScore, type ServerMessage } from "@chessroyale/chess";
+import { BOSS_CHECK, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, RAID_SETTINGS, floorDraw, floorSettings, mulberry32, newRun, towerPartySettings, towerPool, type JudgeConfig, type Settings } from "@chessroyale/core";
+import { bossGuardFrom, bossMoveFrom, legalMoves, runJudgeJob, type BoardScore, type EngineLike, type HumanEngineLike, type MoveScore, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type ServerScoreRequest } from "../src/lobby.ts";
 import { library } from "./lobby-fixture.ts";
 
@@ -337,5 +337,73 @@ describe("the boss's move, played by two devices with one seed (the review's lyi
     expect(game.cap).toBe("solo");
     const vouched = lobbyXpGame({ ...L.core.record, unvouched: undefined, auto: { fillAt: null } }, { playerId: "p1", placement: 1, teamWon: true }, "user-1", { moves: 20, ms: 600_000 }, "boss", [], true, L.now());
     expect(vouched.cap).toBeNull();
+  });
+});
+
+describe("a Battle Tower floor online (the review of #991: the floor's draw to both devices; no throw strike on a looser draw)", () => {
+  type Req = Extract<Msg, { t: "bossRequest" }>;
+  /** A tower floor's room (its first floor's bosses; `floor`: the floor it plays as), two people on up-to-date apps, Maia loaded. */
+  function floorRoom(floor = 1) {
+    const L = raid({ server: true, settings: { ...towerPartySettings(floorSettings(newRun(5, towerPool()))), towerFloor: floor } });
+    twoPeople(L);
+    return L;
+  }
+  /** Boss turns (both devices honest) until one asks both for Maia's move: its key and the two requests. */
+  function maiaTurn(L: ReturnType<typeof raid>): { key: string; reqs: { id: string; r: Req }[] } {
+    for (let i = 0; i < 8; i++) {
+      untilBoss(L);
+      const key = L.core.record.bossKey!;
+      const reqs = ["p1", "p2"].flatMap((id) => L.take(id, "bossRequest").filter((r) => r.key === key).map((r) => ({ id, r })));
+      if (reqs.length === 2 && reqs.every((x) => x.r.brain)) return { key, reqs };
+      for (const { id, r } of reqs) L.core.message(id, { t: "bossMove", key, move: honestMove(r.fen, r.allowed ?? legalMoves(r.fen)) });
+      L.advance(1000);
+    }
+    throw new Error("no boss turn on Maia");
+  }
+  /** A Maia box as the app's: its likeliest moves (by worth) and its own draw from the seed at the temperature asked; `asked` records how. */
+  const maiaBox = (asked: { temperature: number; topP: number }[]): HumanEngineLike => ({
+    ready: () => true,
+    candidates: async (fen, _rating, allowed, o) => {
+      asked.push({ temperature: o.temperature, topP: o.topP });
+      const moves = [...(allowed ?? legalMoves(fen))].sort((a, b) => worth(fen, b) - worth(fen, a) || (a < b ? -1 : 1)).slice(0, 8);
+      const w = moves.map((_, i) => Math.pow(1 / (i + 1), 1 / o.temperature));
+      let r = mulberry32(o.seed!)() * w.reduce((a, b) => a + b, 0);
+      const best = moves.find((_, i) => (r -= w[i]!) < 0) ?? moves.at(-1)!;
+      return { best, moves: moves.map((move, i) => ({ move, p: w[i]! })), ms: 50 };
+    },
+  });
+  const struck = (L: ReturnType<typeof raid>) => ["p1", "p2"].map((id) => L.core.record.judges!.devices[id]!.strikes);
+  const played = (L: ReturnType<typeof raid>) => L.last("p2", "boss")?.boss.lastMove?.move;
+
+  it("floor 1: the host's and the checker's requests carry the floor's draw (brain.draw); from one position and seed, the two pick the same move, Maia asked at the floor's temperature", async () => {
+    const L = floorRoom(1);
+    expect(L.core.record.bossBrain).toMatchObject({ draw: floorDraw(1) });
+    const { reqs } = maiaTurn(L);
+    const [host, checker] = [reqs.find((x) => x.id === L.core.record.hostId)!.r, reqs.find((x) => x.id !== L.core.record.hostId)!.r];
+    expect(host.brain).toEqual({ brain: L.core.record.bossBrain!.brain, rating: expect.any(Number), draw: floorDraw(1) });
+    expect(checker.brain).toEqual(host.brain);
+    expect([checker.fen, checker.draw]).toEqual([host.fen, host.draw]);
+    // (Each device's pick as the app's hostBoss makes it: the request's brain, its seed for the random source and Maia's draw.)
+    const asked: { temperature: number; topP: number }[] = [];
+    const pick = (r: Req) => bossMoveFrom(fixed, r.fen, r.elo, r.nodes, r.stumble ? "stumble" : "elo", mulberry32(r.draw!), DEFAULT_SETTINGS.kingStrikeLoss, bossGuardFrom(DEFAULT_SETTINGS), r.allowed ?? null, { ...r.brain!, seed: r.draw!, engine: maiaBox(asked) }, null, null, true);
+    const [a, b] = [await pick(host), await pick(checker)];
+    expect(b).toBe(a);
+    expect(asked).toEqual([0, 1].map(() => ({ temperature: floorDraw(1).temperature, topP: floorDraw(1).topP })));
+  });
+
+  it("floor 1 (a looser draw): two different moves, one throw-sized worse, Maia's against a fallback or two Maia (an older app's draw): the better plays, nobody struck; floor 10 (BOSS_BRAIN's own draw): struck as anywhere", () => {
+    for (const [floor, both] of [[1, false], [1, true], [10, true]] as const) {
+      const L = floorRoom(floor);
+      const { key, reqs } = maiaTurn(L);
+      const r = reqs[0]!.r;
+      const allowed = r.allowed ?? legalMoves(r.fen);
+      const good = honestMove(r.fen, allowed);
+      const slip = allowed.find((m) => m !== good)!;
+      // (p1's Maia slips; p2's is a fallback to Stockfish, or Maia too.)
+      for (const { id } of reqs) L.core.message(id, { t: "bossMove", key, move: id === "p1" ? slip : good, ...(id === "p1" || both ? { by: "maia" as const } : {}) });
+      for (const req of L.asks.splice(0)) L.core.serverScored(req.id, req.moves.map((move) => ({ move, expected: move === slip ? 0.9 - BOSS_CHECK.throwLoss - 0.01 : 0.9 })));
+      expect([floor, both, played(L)]).toEqual([floor, both, good]);
+      expect([floor, both, struck(L)]).toEqual([floor, both, floor === 1 ? [0, 0] : [1, 0]]);
+    }
   });
 });
