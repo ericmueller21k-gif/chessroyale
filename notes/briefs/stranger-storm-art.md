@@ -51,3 +51,6 @@ board, under the pieces, through the storm's 3 turns and heals a little each tur
 ("opacity changed"): a soft see-through dim, and the flames and frost see-through where they overlap the screen.
 **Eric, ~17:40:** "slightly too good... a bit more Game Boy Advance style, but still keep the details": a GBA pass (lower resolution,
 nearest-neighbor, a small palette per element, ordered dithering, hard glow bands), both versions in the next mockup; Eric picks.
+**Eric, ~18:35, round 2:** the crack "looks like a joke... squiggly lines... like somebody ripped open the board... more graphical": redo
+it as offline-rendered art like his reference (a deep jagged rift, depth, lifted broken edges, floating board chips, lava glow on the fire
+side, ice crystals on the other), three heal stages, painterly and GBA versions; mockup again. A or B: not picked yet.
