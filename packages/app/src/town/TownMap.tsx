@@ -4,7 +4,8 @@
  * minimap, it comes to the center of your screen … all of Chess Town … put the little icon of which boss is at which shop … the Colosseum,
  * the park … tap it again or tap away, back to normal size"), each boss home with its boss's small portrait (the chips' faces), the
  * Colosseum and the park as small icons, you as the dot; no names. A tap on it or anywhere outside it closes it; a tap on a boss's
- * portrait or its home's block (Eric, Nov 11) closes it and walks you to that home, as a tap on the home in the town would.
+ * portrait or its home's block (Eric, Nov 11) closes it and walks you to that home, as a tap on the home in the town would; a tap on
+ * the park's icon walks you to the park (Nov 27).
  * The map button in the town's icon row (TownChatTools) turns it off and on (per device; on by default). Street town only.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -133,8 +134,11 @@ export function TownMap({ hidden, faces, onHome }: { hidden: boolean; faces: () 
   const pt = { x: 0, y: 0 };
   const faceSize = Math.round(Math.max(20, Math.min(40, bs * 3.4)));
   const spots = big && show ? faces().map((face) => (mapPoint(face.x, face.y, bs, pt), { face, x: pt.x, y: pt.y })) : [];
-  // A tap closes the large map; on a boss's portrait or its home's block (within 2 squares of the home's middle, or the portrait's
-  // reach if that's more), the nearest such home is walked to.
+  const iconPx = Math.round(Math.max(18, Math.min(34, bs * 2.8)));
+  const park = (parkPoint(bs, pt), { ...pt });
+  const col = (colosseumPoint(bs, pt), { ...pt });
+  // A tap closes the large map; on a boss's portrait or the park's icon or its home's block (within 2 squares of the home's middle, or the portrait's
+  // reach if that's more), the nearest such home (or the park) is walked to.
   const tapBig = (e: MouseEvent) => {
     setBig(false);
     const b = bigBox.current?.getBoundingClientRect();
@@ -144,18 +148,15 @@ export function TownMap({ hidden, faces, onHome }: { hidden: boolean; faces: () 
     const reach = Math.max(faceSize / 2, 2 * bs);
     let best: string | null = null;
     let bestD = reach;
-    for (const m of spots) {
+    for (const m of [...spots.map((m) => ({ id: m.face.id, x: m.x, y: m.y })), { id: "park", ...park }]) {
       const d = Math.hypot(m.x - x, m.y - y);
       if (d <= bestD) {
-        best = m.face.id;
+        best = m.id;
         bestD = d;
       }
     }
     if (best) onHome(best);
   };
-  const iconPx = Math.round(Math.max(18, Math.min(34, bs * 2.8)));
-  const park = (parkPoint(bs, pt), { ...pt });
-  const col = (colosseumPoint(bs, pt), { ...pt });
   return (
     <div class="tm-root" ref={anchor}>
       {show && (
@@ -199,15 +200,13 @@ function Face({ face, x, y, size }: { face: MapFace; x: number; y: number; size:
   );
 }
 
-/** The park: a round tree on a lawn (small, no words). */
+/** The park: a small chessboard, its chess tables (Eric, Nov 27: "a couple little chessboard indicators"; no words). */
 function ParkIcon({ x, y, size }: { x: number; y: number; size: number }) {
   return (
     <svg class="tm-icon tm-park" data-icon="park" viewBox="0 0 24 24" width={size} height={size} style={{ left: `${x}px`, top: `${y}px` }} aria-hidden="true">
       <circle cx="12" cy="12" r="11" fill="#f6f1e4" stroke="#3d6b2c" stroke-width="1.5" />
-      <rect x="10.9" y="12.5" width="2.2" height="6.5" rx="0.8" fill="#7a5130" />
-      <circle cx="12" cy="10" r="5.4" fill="#4f9a3a" />
-      <circle cx="9.6" cy="11.6" r="3" fill="#5fae47" />
-      <circle cx="14.5" cy="11.4" r="3.2" fill="#458a33" />
+      <rect x="6" y="6" width="12" height="12" fill="#efe0bd" stroke="#3d6b2c" stroke-width="1" />
+      <path d="M6 6h3v3H6zM12 6h3v3h-3zM9 9h3v3H9zM15 9h3v3h-3zM6 12h3v3H6zM12 12h3v3h-3zM9 15h3v3H9zM15 15h3v3h-3z" fill="#3d6b2c" />
     </svg>
   );
 }

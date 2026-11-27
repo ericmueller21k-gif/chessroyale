@@ -76,7 +76,7 @@ import { domPageIO, domSaveIO, idbShelf, pictureKey, restore, save, type Restore
 import { domPaintPool, workerCount, type PaintPool } from "./paint-pool.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, homeNear, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
+import { PARK, TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, homeNear, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
 import { afterFail, lossWatch } from "./gl-fail.ts";
 import { guestLimitMs, watchAway, watchGuest } from "./here-net.ts";
 import { FdButton } from "../components/FrontDoor.tsx";
@@ -3068,8 +3068,10 @@ function startTown(
      */
     walkHome: (id: string) => {
       const home = HOMES.find((h) => h.id === id);
-      if (!home || away) return;
-      const dest = destFor(town, town.you.walker, { kind: "home", home });
+      // (Eric, Nov 27: "if I click on it, it should bring me to the park": the park's middle, as a tap on it in the town walks you.)
+      const target: Target | null = id === "park" ? { kind: "square", c: Math.round(PARK.c0 + (PARK.w - 1) / 2), r: Math.round(PARK.r1 - (PARK.d - 1) / 2) } : home ? { kind: "home", home } : null;
+      if (!target || away) return;
+      const dest = destFor(town, town.you.walker, target);
       if (!dest) return;
       const b = lockIn(turn, look, performance.now());
       if (b !== null) base = b;
