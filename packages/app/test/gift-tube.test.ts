@@ -82,6 +82,15 @@ describe("the gift-wrap tube", () => {
     expect(TUBE_TILES.at(-1)! + TUBE_TWIST).toBeGreaterThanOrEqual(TUBE.bottom + TUBE_TWIST);
   });
 
+  it("its twist moves exactly one cell (TUBE_TWIST) a loop, so the loop has no seam, and stays still in the crate strip (review of #1012)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { TUBE_TWIST } = await import("../src/components/Items.tsx");
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    const end = /@keyframes ia-twist\s*\{\s*to\s*\{\s*transform:\s*translateY\((-?[\d.]+)px\)/.exec(css)?.[1];
+    expect(Number(end)).toBeCloseTo(-TUBE_TWIST, 5);
+    expect(css).toMatch(/\.cox-track \.ia-twist\s*\{\s*animation:\s*none;/);
+  });
+
   it("each painted set of stripes is blotched by the blemish, wherever the blobs fall (on the cell, as it's drawn)", async () => {
     const { TUBE, TUBE_CELL, TUBE_TWIST, blotchPath } = await import("../src/components/Items.tsx");
     const box: [number, number, number, number] = [TUBE.x0, 0, TUBE.x1 - TUBE.x0, TUBE_TWIST];

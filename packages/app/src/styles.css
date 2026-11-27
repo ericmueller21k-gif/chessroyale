@@ -9175,10 +9175,15 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
 }
 /* The Gift-Wrap Tube's twist (Eric, Nov 27: "like a barber shop pole"): its stripes scroll up it, one cell (TUBE_TWIST: two turns, 27.6
    units) every 3 s, on a loop with no seam. Wherever it's drawn, not only under `.ia-live` (like the shine); one transform, never with
-   reduced motion. */
+   reduced motion. Not in the crate strip (review of #1012, S1): at strip speed it can't be seen, and a Fischer spin can draw a
+   dozen tubes in each track (the blurred one under a filter); the reveal card still twists. gift-tube.test.ts checks the distance
+   against TUBE_TWIST. */
 @media (prefers-reduced-motion: no-preference) {
   .ia-twist {
     animation: ia-twist 3s linear infinite;
+  }
+  .cox-track .ia-twist {
+    animation: none;
   }
 }
 @keyframes ia-twist {
