@@ -29827,19 +29827,29 @@ piece.bd-smashed {
   z-index: 3;
   opacity: 0.88;
 }
-/* The storm's soft dim round the board (STORM_ART.dim; Eric, Nov 27: everything behind stays visible, "just dimmed a bit"): one still
-   shadow spread from the board's own box, none on the squares. */
-.power-board .sg-dim {
-  position: absolute;
+/* The storm's shade (STORM_ART.dim, dimIn, dimOut; Eric, Nov 27: "everything should get a little dulled, so it's more of a focus on the
+   board during those 3 turns"): one see-through layer over the whole page, added to the page itself by Stranger.tsx (keepShade), so
+   it neither blinks nor fades in again as the match's screens are drawn again. Everything on the page is under it (the boss strip, the
+   line and the moves under the board, the side panels) but the board's row, raised above it while it's up: the board, its pieces and
+   everything drawn on it (the ring, his figure, a banner) stay whole. Never takes a tap. Sheets and pop-ups (10 and up) open over both. */
+.sg-shade {
+  position: fixed;
   inset: 0;
+  z-index: 8;
   pointer-events: none;
-  box-shadow: 0 0 0 200vmax rgba(10, 8, 22, 0.22);
-  animation: sg-dim-in 0.6s ease-out both;
+  background: rgb(10 8 22 / 0.5);
+  opacity: 0;
+  transition: opacity 0.8s ease-in-out;
+  /* (A layer of its own for as long as it's on the page, so the page isn't laid out in layers again as its fade ends.) */
+  will-change: opacity;
 }
-@keyframes sg-dim-in {
-  from {
-    opacity: 0;
-  }
+.sg-shade.on {
+  opacity: 1;
+  transition-duration: 1.2s;
+}
+.sg-shading .board-row {
+  position: relative;
+  z-index: 9;
 }
 /* The storm's rift: one small canvas on the board, scaled up as pixels, under the pieces (a boss's under-layer: over the squares,
    under the square marks and the pieces), never taking a tap. */
@@ -29852,6 +29862,8 @@ piece.bd-smashed {
   image-rendering: pixelated;
   pointer-events: none;
   z-index: 1;
+  /* (RIFT_ART.see; Eric, Nov 27: "the crack is too distracting, so make it 50% opacity".) */
+  opacity: 0.5;
 }
 /* The swords' ripples, in % of the board (the SVG's units), under his figure and the nudged pieces. */
 .sg-cracks {
@@ -29871,6 +29883,10 @@ piece.bd-smashed {
 }
 .sg-ripple.sg-ice {
   stroke: #7fdcff;
+}
+/* His figure on the board: a layer of its own, so his hop (moved and scaled about his feet every frame) repaints nothing under him. */
+.sg-fig {
+  will-change: transform;
 }
 /* His red and blue aura as he charges, his grip on both hilts (a glow by turns, on his own small box). */
 .sg-fig.sg-charge {

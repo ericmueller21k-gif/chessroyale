@@ -18,7 +18,9 @@ const server = await createServer({ root: "packages/app", configFile: "packages/
 await server.listen();
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
-const SCENE = { fireAt: 1900, iceAt: 2700, gripAt: 5000, fullAt: 8000, pullAt: 8600, leapAt: 9200, homeAt: 9680, ms: 11000 };
+// (STORM_SCENE's beats, packages/chess/src/bosses/stranger.ts, and its banner's hold before them: the whole banner, BOSS_BANNER.ms.)
+const SCENE = { fireAt: 1650, iceAt: 2450, gripAt: 4750, fullAt: 7350, pullAt: 7850, leapAt: 8690, homeAt: 9170, ms: 10000 };
+const LEAD = 2250;
 
 const context = which === "desktop" ? { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 } : { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true };
 const tag = `storm-${which}`;
@@ -35,7 +37,16 @@ await p.addInitScript(() => {
     window.__gap = window.__gap ?? [];
     if (window.__last !== undefined) window.__gap.push([Date.now(), now - window.__last, !!document.querySelector(".pm-storm"), !!document.querySelector(".sg-storm")]);
     window.__last = now;
-    window.__storm.push({ t: Date.now(), phase: window.match?.phase?.kind ?? "", kinds: ev.map((e) => e.kind).join("+"), turn: b?.powers?.turn ?? 0, storm: st?.storm ?? null, pick: st?.pick ?? null, stage: document.querySelector(".pm-storm")?.getAttribute("data-stage") ?? "" });
+    // (Every frame, numbers for the frame-by-frame read: the ring's strength, the dim, his figure's box in his corner and on the board.)
+    const box = (el) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return [Math.round(r.x * 10) / 10, Math.round(r.y * 10) / 10, Math.round(r.width * 10) / 10, Math.round(r.height * 10) / 10];
+    };
+    const fig = document.querySelector(".sg-fig canvas");
+    const corner = document.querySelector(".boss-char .boss-char-sprite");
+    const dim = document.querySelector(".sg-shade");
+    window.__storm.push({ t: Date.now(), phase: window.match?.phase?.kind ?? "", kinds: ev.map((e) => e.kind).join("+"), turn: b?.powers?.turn ?? 0, storm: st?.storm ?? null, pick: st?.pick ?? null, stage: document.querySelector(".pm-storm")?.getAttribute("data-stage") ?? "", ring: window.__stormArt ? { ...window.__stormArt } : null, ringEl: !!document.querySelector(".sg-storm"), banner: !!document.querySelector(".fight-banner.storm"), dim: dim ? Number(getComputedStyle(dim).opacity) : -1, fig: box(fig), figAnim: fig?.getAttribute("data-frame") ?? "", corner: corner && getComputedStyle(corner).visibility !== "hidden" ? box(corner) : null, cornerAnim: corner?.getAttribute("data-frame") ?? "" });
     if (window.__storm.length > 20000) window.__storm.splice(0, 5000);
     requestAnimationFrame(look);
   };
@@ -79,7 +90,7 @@ async function move() {
   // (A storm turn: its marks or ice up a while first, and a still of them.)
   if (s.pick) {
     await p.waitForTimeout(1800);
-    await p.screenshot({ path: join(outDir, `${tag}-8-turn${s.pick.turn}-${s.pick.kind}.png`) });
+    if (!process.env.NOSTILLS) await p.screenshot({ path: join(outDir, `${tag}-8-turn${s.pick.turn}-${s.pick.kind}.png`) });
   }
   const chess = new Chess(s.fen);
   const legal = chess.moves({ verbose: true }).map((m) => ({ uci: m.from + m.to + (m.promotion ?? ""), from: m.from, to: m.to, piece: m.piece, captured: m.captured }));
@@ -108,12 +119,15 @@ async function move() {
   console.log(`${tag} +${Date.now() - t0}ms played ${pick.uci}${s.pick ? ` on a ${s.pick.kind} turn (${s.pick.squares.join(" ")})` : ""}`);
   return pick.uci;
 }
-// The scene's beats, 2x stills, taken as it reaches each (its stage shows from its banner's hold; its own clock a second later).
+// The scene's beats, 2x stills, taken as it reaches each (its stage shows from its banner's hold; its own clock LEAD later).
 const BEATS = [["1-leap", 300], ["2-fire-sword", SCENE.fireAt + 250], ["3-ice-sword", SCENE.iceAt + 300], ["4-gather", SCENE.gripAt - 300], ["5-charge", SCENE.gripAt + 1500], ["6-full", SCENE.fullAt + 300], ["7-back", SCENE.homeAt + 60]];
-const sceneShots = (async () => {
+// (NOSTILLS=1: no stills. A still taken mid-scene holds the screencast for about a quarter second, a hole in the GIF at that beat:
+// his leap, Nov 27. Make the GIFs with it, the stills in a run of their own.)
+const NOSTILLS = !!process.env.NOSTILLS;
+const sceneShots = NOSTILLS ? Promise.resolve() : (async () => {
   const s = Date.now();
   while (Date.now() - s < 120_000 && !(await p.locator(".pm-storm").count())) await p.waitForTimeout(30);
-  const start = Date.now() + 1000;
+  const start = Date.now() + LEAD;
   for (const [name, beat] of BEATS) {
     const wait = start + beat - Date.now();
     if (wait > 0) await p.waitForTimeout(wait);
@@ -121,14 +135,26 @@ const sceneShots = (async () => {
   }
 })();
 // (A fire turn's burn as the move lands: a still of it.)
-const burnShot = (async () => {
+const burnShot = NOSTILLS ? Promise.resolve() : (async () => {
   const s = Date.now();
   while (Date.now() - s < 150_000 && !(await p.evaluate(() => (window.match?.boss?.powers?.events ?? []).some((e) => e.kind === "stormBurn")))) await p.waitForTimeout(50);
   await p.waitForTimeout(450);
   await p.screenshot({ path: join(outDir, `${tag}-9-burn.png`) });
 })();
 await waitFor(["play"], 60_000);
-if (!PERF) await cdp.send("Page.startScreencast", { format: "jpeg", quality: 82, everyNthFrame: 1, maxWidth: 3200, maxHeight: 3200 });
+// The recording: true screenshots one after another (about 15 to 20 a second), each named by the page's clock. Not Chrome's screencast:
+// headless, it delivers no frames for a quarter second now and then (as a text box's line ends, Nov 27: the page draws every frame, a
+// trace's draws and commits have no gap), a hole in the GIF at whatever plays then, his leap for one. (CAST=1: the screencast all the same.)
+let recording = !PERF;
+const recorder = (async () => {
+  if (PERF) return;
+  if (process.env.CAST) return void (await cdp.send("Page.startScreencast", { format: "jpeg", quality: 88, everyNthFrame: 1, maxWidth: which === "desktop" ? 1440 : 585, maxHeight: 1300 }));
+  while (recording) {
+    const a = Date.now();
+    const shot = await p.screenshot({ type: "jpeg", quality: 90, scale: "css" }).catch(() => null);
+    if (shot) frames.push({ t: (a + Date.now()) / 2, data: shot.toString("base64") });
+  }
+})();
 for (let i = 0; i < 6; i++) {
   if ((await move()) === null) break;
   const turn = await p.evaluate(() => window.match?.boss?.powers?.turn ?? 0);
@@ -137,8 +163,11 @@ for (let i = 0; i < 6; i++) {
 await waitFor(["play"], 60_000);
 await p.waitForTimeout(1500);
 await Promise.race([Promise.all([sceneShots, burnShot]), p.waitForTimeout(5000)]);
-await cdp.send("Page.stopScreencast");
+recording = false;
+await recorder;
+if (process.env.CAST) await cdp.send("Page.stopScreencast");
 const log = await p.evaluate(() => window.__storm);
+writeFileSync(join(outDir, `${tag}-log.json`), JSON.stringify({ t0, log }));
 if (PERF) {
   const gaps = await p.evaluate(() => window.__gap);
   const stat = (name, xs) => {
@@ -176,6 +205,13 @@ for (let t = from; t <= to; t += 1000 / fps) {
   const f = list.filter((x) => x.t <= t).at(-1) ?? list[0];
   if (f) writeFileSync(join(dir, `${String(k++).padStart(5, "0")}.jpg`), Buffer.from(f.data, "base64"));
 }
+// (RAW=1: every painted frame round the scene, named by its ms from the scene's first frame, for contact sheets and slowed GIFs.)
+if (process.env.RAW && !PERF) {
+  const raw = join(outDir, `${tag}-raw`);
+  rmSync(raw, { recursive: true, force: true });
+  mkdirSync(raw, { recursive: true });
+  for (const f of frames) if (f.t >= sceneFrom - 1500 && f.t <= sceneTo + 3000) writeFileSync(join(raw, `${String(Math.round(f.t - sceneFrom) + 100000)}.jpg`), Buffer.from(f.data, "base64"));
+}
 // (PERF=1 records no frames: no GIFs.)
 if (!PERF) try {
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", join(dir, "%05d.jpg"), "-vf", `scale=${which === "desktop" ? 720 : 390}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4`, join(outDir, `${tag}.gif`)]);
@@ -185,7 +221,7 @@ if (!PERF) try {
 }
 // The opening alone, larger: from just before the fire sword's slam to the rift whole and the storm gathered (the scene's own clock).
 if (!PERF) try {
-  const start = sceneFrom + 1000;
+  const start = sceneFrom + LEAD;
   const a = start + SCENE.fireAt - 700;
   const b = start + SCENE.gripAt + 600;
   const odir = join(outDir, `${tag}-opening-frames`);

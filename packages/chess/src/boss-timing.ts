@@ -162,8 +162,9 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   // (Birdie's END OF THE LINE!, Nov 23: his train on your king, off the board before it leaves. His warning, his train on any other
   // piece and his fall have none: the crossing, the ride and the cutscene say it.)
   trainWin: [[0, 1500]],
-  // (The Stranger's STORM OF TWO WORLDS!, Nov 27: over his leap onto the board. His storm's turns and its burn have none: the dock says them.)
-  storm: [[0, 1500]],
+  // (The Stranger's STORM OF TWO WORLDS!, Nov 27: the whole banner before his leap, none of it over his landing and his swords: it
+  // covered the board's middle, where he lands. His storm's turns and its burn have none: the dock says them.)
+  storm: [[0, 0]],
 };
 
 /** How long a moment's own clock holds at its start while its banner shows longer (ms; 0 without one from its start). */
