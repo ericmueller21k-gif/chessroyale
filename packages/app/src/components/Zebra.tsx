@@ -147,20 +147,23 @@ export function goldClink(boss: BossView | null | undefined, fen: string, move: 
 
 // ---------------- The oven timers ----------------
 
-/** When this device last saw each lump's minutes (its roll plays as they drop), by battle and lump. */
-const seenLeft = new Map<string, number>();
+/** When this device last saw each lump's minutes, and the roll it started then (its name and start), by battle and lump. */
+const seenLeft = new Map<string, { left: number; run: string | null; at: number }>();
 const nn = (n: number) => String(Math.max(0, Math.min(15, n))).padStart(2, "0");
 
 /**
  * What a lump's timer plays as it shows `left` minutes (`seen`: its key in seenLeft): the roll from the minute before (`kRollNN`) if
- * its minute dropped since this device last showed it, else null (its still). Notes `left` as seen: called once per change of
- * minute (TimerCanvas's effect), never while drawing, so a redraw at the same minute doesn't cut the roll short.
+ * its minute dropped since this device last showed it, from now; at a minute already seen, the roll it started then, from its start
+ * (a timer drawn afresh mid-roll, as the screen changes from your move's to his turn's, plays the rest of it: #1026); else null (its
+ * still). Called once per change of minute or new timer (TimerCanvas's effect), never while drawing.
  */
-export function timerRun(seen: string, kind: DoughPiece, left: number): string | null {
+export function timerRun(seen: string, kind: DoughPiece, left: number, now = Date.now()): { run: string; at: number; again: boolean } | null {
   const before = seenLeft.get(seen);
-  seenLeft.set(seen, left);
+  if (before?.left === left) return before.run ? { run: before.run, at: before.at, again: true } : null;
+  const run = before !== undefined && left === before.left - 1 && before.left >= 1 ? `${kind}Roll${nn(before.left)}` : null;
+  seenLeft.set(seen, { left, run, at: now });
   if (seenLeft.size > 32) seenLeft.delete(seenLeft.keys().next().value!);
-  return before !== undefined && left === before - 1 && before >= 1 ? `${kind}Roll${nn(before)}` : null;
+  return run ? { run, at: now, again: false } : null;
 }
 
 /**
@@ -175,7 +178,8 @@ function TimerCanvas({ kind, left, ding, seen }: { kind: DoughPiece; left: numbe
     const g = cv.current?.getContext("2d");
     if (!g) return;
     const still = `${kind}${nn(left)}`;
-    const run = ding ? `${kind}Ding` : seen ? timerRun(seen, kind, left) : null;
+    const roll = !ding && seen ? timerRun(seen, kind, left) : null;
+    const run = ding ? `${kind}Ding` : roll?.run ?? null;
     const draw = (anim: string, i: number) => {
       const a = ZEBRA_TIMER.anims[anim];
       const f = a?.frames[i];
@@ -190,6 +194,9 @@ function TimerCanvas({ kind, left, ding, seen }: { kind: DoughPiece; left: numbe
     }
     const frames = ZEBRA_TIMER.anims[run]!.frames;
     let timer = 0;
+    // (A roll already playing, on a timer drawn afresh: from where it is now, its sound not again.)
+    let from = 0;
+    for (let t = roll?.again ? Date.now() - roll.at : 0; from < frames.length && t >= frames[from]!.ms; from++) t -= frames[from]!.ms;
     const step = (i: number) => {
       if (i >= frames.length) {
         // (A ding ends on the timer's last look: the rise takes the lump away.)
@@ -197,11 +204,11 @@ function TimerCanvas({ kind, left, ding, seen }: { kind: DoughPiece; left: numbe
         return;
       }
       draw(run, i);
-      if (frames[i]!.cue === "roll") play("zebraRoll");
+      if (frames[i]!.cue === "roll" && !(roll?.again && i === from)) play("zebraRoll");
       if (frames[i]!.cue === "ding") play("zebraDing");
       timer = window.setTimeout(() => step(i + 1), frames[i]!.ms);
     };
-    step(0);
+    step(from);
     return () => clearTimeout(timer);
   }, [kind, left, ding]);
   return <canvas ref={cv} class="dd-timer" width={ZEBRA_TIMER.w} height={ZEBRA_TIMER.h} data-kind={kind} data-left={left} aria-hidden="true" />;

@@ -149,10 +149,12 @@ describe("his oven timers (the review of Nov 11)", () => {
     const first = slots(view(102, lump(3)))[0]!.timer;
     const again = slots(view(102, lump(3)))[0]!.timer;
     expect(again).toEqual(first);
-    // (The roll is chosen once per minute, in the timer's effect.)
-    expect(timerRun("t:102", "p", 4)).toBeNull();
-    expect(timerRun("t:102", "p", 3)).toBe("pRoll04");
-    expect(timerRun("t:102", "p", 3)).toBeNull();
+    // (The roll is chosen once per minute, in the timer's effect; a timer drawn afresh at that minute plays the same roll from its
+    // start, as the screen changes from your move's to his turn's (#1026: it had restarted at the still, the roll cut).)
+    expect(timerRun("t:102", "p", 4, 1000)).toBeNull();
+    expect(timerRun("t:102", "p", 3, 2000)).toEqual({ run: "pRoll04", at: 2000, again: false });
+    expect(timerRun("t:102", "p", 3, 2100)).toEqual({ run: "pRoll04", at: 2000, again: true });
+    expect(timerRun("t:102", "p", 4, 2200)).toBeNull();
   });
 
   it("a minute off on every turn (Eric, Nov 27: \"8 and then to 7 to 6\"): yours as your move goes in, his as he moves; the rules' count (when it rises) is the view's, untouched", () => {
