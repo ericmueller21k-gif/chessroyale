@@ -82,6 +82,31 @@ describe("the burn on its tile", () => {
     expect(out.spared).toBe(true);
   });
 
+  it("spares his own piece pinned to his king: the gap would check him (the review of #1000, S2)", () => {
+    // His e7 knight on the tile, pinned to his e8 king by your e1 rook; him to move: burning it would check him through the gap.
+    const fen = "4k3/4n3/8/8/8/8/8/4R1K1 b - - 0 1";
+    expect(frostfireOutcome(fen, "e7")).toMatchObject({ piece: "n", side: "b", spared: true, fen });
+  });
+
+  it("never strikes your piece on your back rank with his pawn right behind it: the burn would hand him the promotion", () => {
+    // Your e1 queen, his e2 pawn behind it (burning e1 would let it promote there): the a3 knight is struck instead.
+    expect(chooseStrike("4k3/8/8/8/8/N7/4p3/K3Q3 w - - 0 1", "w", 1, 3)).toEqual({ square: "a3", piece: "n" });
+  });
+
+  it("no strike, and no event, when its burn would fall at the move cap (no burn comes then)", async () => {
+    // (The test switch strikes as crowd turn 2 begins, its burn on turn 3.)
+    const capped = (maxMoves: number) => new MatchRunner({ settings: kitSettings({ boss: "stranger", test: "frostfire", maxMoves }), rng: mulberry32(5), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
+    const open = capped(4);
+    await untilTurn(open, 2, opener);
+    expect(strangerOf(open)!.strike).toMatchObject({ turn: 2, burnAt: 3 });
+    const last = capped(3);
+    await untilTurn(last, 2, opener);
+    expect(last.boss!.crowdMoves + 1).toBe(2);
+    expect(strangerOf(last)?.strike ?? null).toBeNull();
+    expect(last.boss!.powers!.events.some((e) => e.kind === "frostfire")).toBe(false);
+    expect(bossRules(last.boss)!.powerTurn!(last.boss!)).toBe(false);
+  });
+
   it("the judge counts a piece left on the tile as gone, and one moved off it as saved", () => {
     const fen = "4k3/8/8/8/3N4/8/8/4K3 w - - 0 1";
     expect(burnLoss(fen, "e1e2", "d4", "w")).toBe(3);
