@@ -27,6 +27,7 @@ async function yourMove(page: Page) {
 
 /** Every frame from now on: his state, the crossing, the train, the dock's words, the cutscene's picture and his bar's animation. */
 async function record(page: Page) {
+  fetched.delete(page);
   await page.evaluate(() => {
     const w = window as any;
     w.__bd = [] as any[];
@@ -129,7 +130,19 @@ type Frame = {
   bar: string | null;
   moments: string[];
 };
-const recorded = (page: Page) => page.evaluate(() => (window as any).__bd as Frame[]);
+/**
+ * The frames so far: only the ones since the last call are copied out of the page, the rest kept here (the recording only grows). Copying
+ * all of it each time stalled the page's main thread longer as it grew (about 150 ms each poll a minute in, on this computer; over 400 on
+ * a busy CI runner, Nov 27), and a stall on his fall's hit put its reveal's first frame that much late.
+ */
+const fetched = new WeakMap<Page, Frame[]>();
+async function recorded(page: Page): Promise<Frame[]> {
+  const have = fetched.get(page) ?? [];
+  const more = await page.evaluate((from) => ((window as any).__bd as Frame[]).slice(from), have.length);
+  const all = [...have, ...more];
+  fetched.set(page, all);
+  return all;
+}
 
 async function battle(page: Page, power: string) {
   await asAdmin(page);
