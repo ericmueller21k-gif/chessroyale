@@ -1,4 +1,5 @@
 - Nov 20 ~17:45 UTC: ERIC refined: primary rule only for "add pieces" non-ult powers on shared tower floors (brief updated); Wrangler: ult off only on SHARED tower floors (solo floor keeps it) + in ALL modes at most once a game then greyed (sent to tower-fixes helper).
+- Nov 27 ~22:00 UTC: main 6e0f (#1025 holds) green + LIVE. Don Dough done -> #1026 (7bd80a0), stills sent; CI running. Town Ranked tables started session_01JuCWRu1jeTfB65vSUzZzq6 (xhigh, alone).
 - Nov 27 ~21:15 UTC: main eb98 (#1024 Turf) green + LIVE. #1025 holds 32/36/40 (Eric OK'd lowering; bubble over count OK) CI running. Don Dough helper running; then town-ranked-tables (xhigh alone).
 - Nov 27 ~20:50 UTC: #1024 Turf merged eb9893a (full suite green); main run watched. Open with Eric: bubble over the count (follow-up if he wants it clear); Double hop 48 -> ~44?
 - Nov 27 ~20:35 UTC: main 7811 (#1023 storm) green + LIVE. #1024 Turf: review's should-fix 1 (Double hop in the race) fixed by me (a894e97, test fails without), CI rerunning; should-fix 2 (bubble over the count on phone) asked Eric. Don Dough helper running.
