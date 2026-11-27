@@ -12,7 +12,7 @@ import { asAdmin, giveItems, tapInTown, test, townReady, wearItem } from "./help
 test.use({ actionTimeout: 15_000 });
 
 type Swamp = Record<string, { on: boolean; lift: number; anim: string | null } | null>;
-type Hooks = { __shopIntro?: () => { step: string; swamp?: Swamp } | null; __chandyLog?: { step: string; swamp: Swamp | null }[] };
+type Hooks = { __shopIntro?: () => { step: string; swamp?: Swamp } | null; __chandyLog?: { step: string; swamp: Swamp | null }[]; __covered?: boolean };
 const room = (p: Page) => p.locator("canvas.town-shop-canvas");
 
 async function chandyCard(page: Page) {
@@ -72,6 +72,11 @@ test("his rise: the post first, the platform lifting you both, the crates on it,
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
+    // (His storm covering the screen, noted as it's set: covered, it can be gone in well under a second when the battle loads fast, under
+    // a locator's once-a-second look by then (Birdie's wipe missed it so, Nov 27).)
+    new MutationObserver(() => {
+      if (document.querySelector('canvas.boss-storm[data-boss="chandy"][data-covered="1"]')) w.__covered = true;
+    }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-covered"] });
   });
   await page.goto("/town?sky=day&introPreview=1");
   await townReady(page);
@@ -79,7 +84,7 @@ test("his rise: the post first, the platform lifting you both, the crates on it,
   await card.getByRole("button", { name: "Challenge alone" }).click();
   await page.getByRole("dialog", { name: "Challenge Chandy?" }).getByRole("button", { name: "Fight" }).click();
   // (His wipe: the storm's canvas, his, covering the screen.)
-  await expect(page.locator('canvas.boss-storm[data-boss="chandy"][data-covered="1"]')).toBeAttached({ timeout: 90_000 });
+  await expect.poll(() => page.evaluate(() => (window as unknown as Hooks).__covered === true), { timeout: 90_000 }).toBe(true);
   const log = await page.evaluate(() => (window as unknown as Hooks).__chandyLog ?? []);
   const steps = log.map((l) => l.step).filter((s, i, a) => s !== a[i - 1]);
   expect(steps).toEqual(expect.arrayContaining(["post", "platform", "settle", "crates", "table", "entrance"]));
