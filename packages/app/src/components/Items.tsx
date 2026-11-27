@@ -1429,10 +1429,12 @@ export function ItemArt({
   const d = useRide(ride && def);
   const [ready, setReady] = useState(!later);
   const box = useRef<HTMLSpanElement>(null);
-  // (In view as it shows: drawn before the first paint. Otherwise a slice a frame after it, in order.)
+  // (In view as it shows: drawn before the first paint. Otherwise a slice a frame after it, in order. Where its frame is, not where it is:
+  // inside a frame with content-visibility, as the locker's, asking where it is lays the frame out to answer, 79 times a slowed phone's
+  // 3 ms on opening an admin's locker.)
   useLayoutEffect(() => {
     if (ready) return;
-    const r = box.current!.getBoundingClientRect();
+    const r = (box.current!.parentElement ?? box.current!).getBoundingClientRect();
     if (r.top < innerHeight && r.bottom > 0) setReady(true);
     else return drawLater(() => setReady(true));
   }, []);

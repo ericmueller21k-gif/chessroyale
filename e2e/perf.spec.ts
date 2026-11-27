@@ -779,12 +779,12 @@ test("Ginger's Super Freeze on a slow phone: his charge-up and blast, the ice bl
   expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
 });
 
-test("an admin's locker on a slow phone: one of every item, shiny, opens and fills within budget (Nov 27)", { tag: "@perf" }, async ({ page }) => {
+test("an admin's locker on a slow phone: one of every item, shiny, opened from home after its warm-up, opens and fills within budget (Nov 27)", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(2 * 60_000);
   await page.addInitScript(instrument);
-  // (An admin's locker, as the server makes it: one of every item, each shiny; core/admin-copies.ts. Before Nov 27, on this phone: 450 to
-  // 830 ms to the first paint, a 250 to 450 ms task, and 67 ms frames while it was open, every shine repainting.)
+  // (An admin's locker, as the server makes it: one of every item, each shiny; core/admin-copies.ts. Before Nov 27, this way on this
+  // phone: 320 to 540 ms to the first paint, a 200 to 300 ms task, and 80 to 350 ms frames while it was open, every shine repainting.)
   await page.route("**/api/me*", async (route) => {
     if (route.request().method() !== "GET") return route.continue();
     const res = await route.fetch();
@@ -792,17 +792,20 @@ test("an admin's locker on a slow phone: one of every item, shiny, opens and fil
     if (body?.locker) body.locker.items = ITEM_DEFS.map(adminCopy);
     await route.fulfill({ response: res, json: body });
   });
-  await page.goto("/shop?nolanding");
-  await page.getByRole("tab", { name: "Crates" }).waitFor();
+  await page.goto("/?nolanding");
+  const pawn = page.getByRole("button", { name: "Open your inventory" });
+  await pawn.waitFor();
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
-  await page.waitForTimeout(1000);
-  const open = await page.evaluate(
-    () =>
+  // (Home's warm-up draws them in its idle time: Crates.tsx, warmLocker.)
+  await page.waitForTimeout(8000);
+  const open = await pawn.evaluate(
+    (el) =>
       new Promise<{ paint: number; filled: number; longest: number }>((done) => {
         const P = (window as any).__perf;
         const t0 = performance.now();
-        [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find((b) => b.textContent?.trim() === "Locker")!.click();
+        // (Tapped from the page: a new account's walkthrough may cover home.)
+        (el as HTMLElement).click();
         let paint = 0;
         const wait = () => {
           const arts = [...document.querySelectorAll(".locker-grid .item-art svg")];
@@ -818,9 +821,9 @@ test("an admin's locker on a slow phone: one of every item, shiny, opens and fil
   await page.evaluate(() => ((window as any).__perf.frames = []));
   await page.waitForTimeout(2000);
   const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
-  console.log(`admin's locker (${ITEM_DEFS.length} items, slowed phone): first paint ${open.paint} ms, all drawn ${open.filled} ms, longest task ${open.longest} ms; open: ${f(s)}`);
-  expect(open.paint, "the first paint (ms)").toBeLessThan(450);
-  expect(open.longest, "the longest task (ms)").toBeLessThan(250);
+  console.log(`admin's locker from home (${ITEM_DEFS.length} items, slowed phone): first paint ${open.paint} ms, all drawn ${open.filled} ms, longest task ${open.longest} ms; open: ${f(s)}`);
+  expect(open.paint, "the first paint (ms)").toBeLessThan(400);
+  expect(open.longest, "the longest task (ms)").toBeLessThan(200);
   expect(open.filled, "every cell drawn (ms)").toBeLessThan(5000);
-  expect(s.p50, "median frame while open (ms)").toBeLessThan(50);
+  expect(s.p95, "95th percentile frame while open (ms)").toBeLessThan(70);
 });
