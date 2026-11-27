@@ -15,6 +15,7 @@ import type { DashView } from "./bosses/dash.ts";
 import type { ZebraView } from "./bosses/zebra.ts";
 import type { ChandyView } from "./bosses/chandy.ts";
 import type { BirdieView } from "./bosses/birdie.ts";
+import type { StrangerView } from "./bosses/stranger.ts";
 import type { Phase2Result } from "./bosses/recluse-phase2.ts";
 import type { MoveScore } from "./uci.ts";
 /**
@@ -549,6 +550,11 @@ export interface NetBossPowers {
    * the crowd move after which he fell (Armored Birdie from then).
    */
   birdie?: BirdieView | null;
+  /**
+   * The Stranger (missing for other bosses and from older servers; an older app ignores it): his Frostfire strike under way (its
+   * tile, the piece it struck, its last frozen crowd turn, the crowd move it burns after) and the last burn.
+   */
+  stranger?: StrangerView | null;
   /**
    * The circus tiger (missing for other bosses and from older servers; an older app ignores them): the balloon on his
    * nozzle (`balloon`: its shape as everyone sees it, a fake queen's "q"; its color; when it went on and when it's fully
