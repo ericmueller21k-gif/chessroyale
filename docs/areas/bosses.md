@@ -1038,8 +1038,10 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   line's words.
   His swords (Nov 27, docs/decisions/2026-11-27-stranger-swords.md): his move taking your piece that isn't a pawn is held for his
   **finisher** (`strangerBattle.finisher` via `bossMoveMoment`, as Chandy's lock; `finisher` event, `pick` → flame, ice, cut or frostfire):
-  his hop onto the board, the finisher on the piece, the piece off the board (`strangerBoard`), his hop back, then the move
-  (`components/Stranger.tsx`, `finishTimeline`); after his block first (`finisherLeadMs`). Your pawn: one of three slashes; his piece lost:
+  his hop onto the board, the finisher on the piece, his move on the board as it kills it (the event's `move`, slid at `goneAt`:
+  `strangerBoard`), his hop back, then the held move, the board already matching (`components/Stranger.tsx`, `finishTimeline`; home
+  `FINISHER_MARGIN_MS` before the hold ends). His block plays in his thinking, at least `FINISHER_BLOCK_MS` (`strangerTurnMs`). On a phone
+  his hop never rises above his corner (`hopHeight`). His Frostfire burn is Grex's art, quiet (`FireBurn`'s `quiet`). Your pawn: one of three slashes; his piece lost:
   his block; every third quiet move: his flourish (`kits.ts` `strangerAnim`, the kit's `animOf`). Shout: `gkHyuah`. Test link `&power=finisher[-kind]`.
 
 - **Chandy** (Nov 16; art docs/decisions/2026-11-16-chandy-art.md, rules 2026-11-16-chandy-rules.md): rules `bosses/chandy.ts`

@@ -235,7 +235,7 @@ export const STRANGER_FLOURISH_EVERY = 3;
 export function strangerAnim(beat: Pick<BeatResult, "anim" | "key">, s: Pick<BeatState, "fen" | "history" | "bases" | "crowdSide" | "lastMove">): string | undefined {
   const took = s.lastMove?.captured;
   if (beat.anim === "capture" || beat.anim === "check") return took === "p" ? STRANGER_SLASHES[hash(beat.key) % STRANGER_SLASHES.length] : took ? "idle" : undefined;
-  // (The same rule as his finisher's wait for it: hisLoss.)
+  // (The same rule as his thinking's minimum for it: hisLoss, strangerTurnMs.)
   if (beat.anim === "hurt") return hisLoss(s, s.crowdSide) >= 3 ? "block" : undefined;
   if (beat.anim === "move") return Math.ceil(s.history.length / 2) % STRANGER_FLOURISH_EVERY === 0 ? "flourishAll" : undefined;
   return undefined;
