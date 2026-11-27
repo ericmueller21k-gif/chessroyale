@@ -379,11 +379,11 @@ let P: BoxPlan;
 let BI: BoxInst;
 let BX: TownBox;
 let V: View;
-let offX = 0;
-let offY = 0;
-let CUT = 0;
+// (The box being planned's offsets and near cut: 0, 1 and 2. In a typed array, not module `let`s, Nov 27: a module variable holding a
+// fraction is a new boxed number each time it's set, three a box a frame, a few hundred boxes: much of walking's garbage.)
+const OFF = new Float64Array(3);
 /** A world point of the box being planned into the camera's frame (`cq`). */
-const atCam = (x: number, y: number) => toCam(V, x + offX, y + offY, cq);
+const atCam = (x: number, y: number) => toCam(V, x + OFF[0]!, y + OFF[1]!, cq);
 function grow(x: number, y: number): void {
   if (x < P.minX) P.minX = x;
   if (x > P.maxX) P.maxX = x;
@@ -403,7 +403,7 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   atCam(wp.x, wp.y);
   w.dx = (ax + cq.dx) / 2;
   w.dz = (az + cq.dz) / 2;
-  if (Math.max(az, cq.dz) < CUT) return;
+  if (Math.max(az, cq.dz) < OFF[2]!) return;
   // (A wall running past the camera, a row's beside you: only its part in front of the camera, cut where it passes the near plane.)
   let bx = cq.dx;
   let bz = cq.dz;
@@ -469,10 +469,10 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
   BI = b;
   BX = box;
   V = v;
-  CUT = cut;
+  OFF[2] = cut;
   // Every point from the camera, the nearest way round the wrap from the box's front line's middle.
-  offX = wrapFX(b.fx - camX) - b.fx;
-  offY = wrapFY(b.fy - camY) - b.fy;
+  OFF[0] = wrapFX(b.fx - camX) - b.fx;
+  OFF[1] = wrapFY(b.fy - camY) - b.fy;
   p.on = false;
   p.minX = p.minY = Infinity;
   p.maxX = p.maxY = -Infinity;
@@ -583,16 +583,24 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
  * top whose drawn pixels span a fifth of its body (first frame). Worked out once a picture.
  */
 const solidTops = new WeakMap<TownBox, number>();
+/** (Nov 27) Each front's first frame's drawn pixels (1 a pixel, row by row), shared by every box with that front. */
+const frontPixels = new WeakMap<object, Uint8Array>();
 export function solidTop(box: TownBox): number {
   let t = solidTops.get(box);
   if (t === undefined) {
     const ch = box.front;
-    const rows = frameKeys(ch, ch.anims.idle!.frames[0]!);
+    let px = frontPixels.get(ch);
+    if (!px) {
+      const rows = frameKeys(ch, ch.anims.idle!.frames[0]!);
+      px = new Uint8Array(ch.w * ch.h);
+      for (let y = 0; y < ch.h; y++) for (let x = 0; x < ch.w; x++) if (rows[y]?.[x]) px[y * ch.w + x] = 1;
+      frontPixels.set(ch, px);
+    }
     const need = Math.max(4, 0.2 * (box.body.x1 - box.body.x0));
     t = 0;
     for (let y = 0; y < ch.h; y++) {
       let n = 0;
-      for (let x = box.body.x0; x <= box.body.x1; x++) if (rows[y]?.[x]) n++;
+      for (let x = box.body.x0; x <= box.body.x1; x++) if (x >= 0 && x < ch.w && px[y * ch.w + x]) n++;
       if (n >= need) {
         t = ch.foot[1] - y;
         break;
@@ -617,7 +625,7 @@ export function wholeFits(fg: FaceGeom, fp: FacePlan): number {
   if (!m) return Infinity;
   const X = AF[0]! * fg.tx[2]! + AF[2]! * fg.ty[2]! + AF[4]!;
   const Y = AF[1]! * fg.tx[2]! + AF[3]! * fg.ty[2]! + AF[5]!;
-  return Math.hypot(X - fp.x[2]!, Y - fp.y[2]!);
+  return Math.sqrt((X - fp.x[2]!) ** 2 + (Y - fp.y[2]!) ** 2);
 }
 const AF = new Float64Array(6);
 

@@ -44,6 +44,7 @@
  */
 import { ChatText } from "../chat-emoji.tsx";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
+import type { VNode } from "preact";
 import { account, onAccountChange } from "../account.ts";
 import { mutes } from "../chat-mod.ts";
 import { openProfile } from "../profile-nav.ts";
@@ -104,6 +105,8 @@ export function TownChat({ tone: room, onSignIn, onGoTower }: { /** Inside a sho
   const [tone, setTone] = useState(townTone);
   const [, redraw] = useState(0);
   const log = useMemo(() => new ChatLog(() => redraw((n) => n + 1)), []);
+  /** Each line's element, made the first time it's drawn (a line never changes once said). */
+  const lineEls = useMemo(() => new WeakMap<ChatLine, VNode>(), []);
   // Scrolled up from the foot: the lines that came since are counted for the "↓ new" marker.
   const stick = useMemo(() => new Stick(), []);
   const [unseen, setUnseen] = useState(0);
@@ -432,10 +435,14 @@ export function TownChat({ tone: room, onSignIn, onGoTower }: { /** Inside a sho
       {/* (Focusable, so a keyboard gets to the box: Enter opens typing, as a tap does.) */}
       <div class="tc-log" ref={scroller} role="log" aria-label="Town chat" tabIndex={0} onScroll={scrolled} onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && openTyping()}>
         {lines.map((l) => {
+          // (Each line's markup made once, Nov 27: a line said draws only itself; the lines already there are the same elements, which
+          // Preact passes over. A party line's Join reads `onGoTower`: made fresh each time.)
+          const had = l.party ? undefined : lineEls.get(l);
+          if (had) return had;
           // A player's name is bold in a palette color: both shades are on the name (the box's tone picks one), `data-c` is its place in the palette.
           const c = l.kind === "player" ? nameColorIndex(l) : -1;
           const shade = NAME_COLORS[c];
-          return (
+          const el = (
             <div class={`tc-line tc-${l.kind}`} key={l.id} data-id={l.id}>
               <span class="tc-time">[{l.time}]</span> {l.name && <b class="tc-name" data-c={shade ? c : undefined} style={shade ? `--nd:${shade.day};--nn:${shade.night}` : undefined}>{l.name}</b>}
               {l.name && ": "}
@@ -445,6 +452,8 @@ export function TownChat({ tone: room, onSignIn, onGoTower }: { /** Inside a sho
               {l.party && <PartyGo go={onGoTower} />}
             </div>
           );
+          if (!l.party) lineEls.set(l, el);
+          return el;
         })}
       </div>
       {unseen > 0 && (

@@ -32,6 +32,7 @@ package, version, license and size).
 | The God King's, banner and menu sounds, `sounds/god-king/`, `banner/`, `menu/` | CC0 1.0 (Juhani Junkala, HaelDB, wintuh) and ours | each folder's `CREDITS.md` (CC0: no credit owed) |
 | The Colosseum's cheer, `sounds/colosseum/cheer.mp3` | CC BY 4.0 (Gregor Quendel's *Free Crowd Cheering Sounds*) with CC0 applause (Sandermotions) | `sounds/colosseum/CREDITS.md`; the notice in `/licenses/third-party.txt`; credited in Settings and the FAQ ("The Colosseum's crowd cheer: Free Crowd Cheering Sounds by Gregor Quendel (CC BY 4.0)") |
 | The Colosseum's ambience, `sounds/colosseum/ambient.mp3` | Royalty free, supplied by Eric (Oct 31, 2026: his call) | `sounds/colosseum/CREDITS.md` |
+| The Stranger's boss music, `music/stranger-loop.mp3` (ours), played through the FluidR3_GM sound bank | MIT (Frank Wen's FluidR3_GM) | `music/README.md`; the notice and license text in `/licenses/third-party.txt`; credited in the FAQ ("The Stranger's music") |
 | Icons, `icons/`; the landing page's demo video and still, `media/`; bot-match replays, `replays/` | ours (made for the game: the icons, a recording of the game, its own bot matches) | |
 | The pieces' and third-party licenses, `licenses/` | (the notices themselves) | |
 
