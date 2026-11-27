@@ -715,7 +715,7 @@ test("Chess Town on a slow phone: a second visit loads the first visit's kept pi
  * frame next to nothing more than an empty town on the same walk, and the page next to nothing outside it. Measured with the frame report
  * (`?report`: our parts a frame; the browser's long frames' other scripts: the presence and chat handling, never in our parts).
  */
-test("Chess Town busy on a slow phone: 55 other players walking and a chat line every 250 ms cost our frame little more than an empty town's, and the page little outside it (Nov 27)", { tag: "@perf" }, async ({ page }) => {
+test("Chess Town busy on a slow phone: 55 other players walking, six ranked games seated at the tables and a chat line every 250 ms cost our frame little more than an empty town's, and the page little outside it (Nov 27)", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(5 * 60_000);
   await busyTown(page, false);
@@ -747,7 +747,9 @@ async function busyTown(page: Page, wearing: boolean) {
     if (route.request().method() !== "POST") return route.continue();
     beat++;
     const others = busy ? Array.from({ length: 55 }, (_, i) => { const [c, r] = spots[(i * 7 + beat * 3) % spots.length]!; return { id: `busy-${i}`, name: `Walker ${i + 1}`, c, r, zzz: false, pawn: i % 2 ? "black" : "white", look: wear(i) }; }) : [];
-    await route.fulfill({ json: { others } });
+    // (Six ranked games at the park's tables, Nov 27: each pair seated on its stools with their tags, its board playing.)
+    const tables = busy ? Array.from({ length: 6 }, (_, t) => ({ code: `BUSY${t}`, table: t, seats: [0, 1].map((k) => ({ uid: `seat-${t}-${k}`, name: `Player ${t * 2 + k + 1}`, look: null, pawn: k ? "black" : "white" })) })) : [];
+    await route.fulfill({ json: { others, tables } });
   });
   await page.goto(`/town?sky=day&report=120&townroom=busy${Date.now().toString(36)}`);
   const canvas = page.locator("canvas.town-canvas");
@@ -775,6 +777,7 @@ async function busyTown(page: Page, wearing: boolean) {
   const empty = await walk();
   busy = true;
   await expect.poll(() => page.evaluate(() => (window as unknown as W).__townHere().filter((h) => !h.you && h.here).length), { timeout: 30_000, message: "the other players in the town" }).toBeGreaterThanOrEqual(50);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __townHere: () => { here: boolean; match: string | null; table: number | null }[] }).__townHere().filter((h) => h.here && h.match && h.table !== null).length), { timeout: 30_000, message: "the six games' players seated" }).toBe(12);
   await page.evaluate(() => {
     const w = window as unknown as W;
     let k = 0;
@@ -790,7 +793,7 @@ async function busyTown(page: Page, wearing: boolean) {
   const again = wearing ? await walk() : null;
   await page.evaluate(() => clearInterval((window as unknown as W).__chat));
   const fmt = (x: typeof empty) => `our parts ${x.ours.toFixed(1)} ms a frame of ${x.mean.toFixed(0)} (${x.frames} frames; ${x.parts}; ${x.uploads})${x.long ? `, the browser's long frames' other scripts ${Math.round(x.long.scripts)} ms (${x.long.by.map(([k, n]) => `${k} ${Math.round(n)}`).join(", ")})` : ""}`;
-  console.log(`Chess Town busy (slowed phone${wearing ? ", half wearing the tube or the cane" : ""}): empty ${fmt(empty)}; with 55 others and a chat line every 250 ms ${fmt(full)}${again ? `; again ${fmt(again)}` : ""}; ${beat - beats} server answers`);
+  console.log(`Chess Town busy (slowed phone${wearing ? ", half wearing the tube or the cane" : ""}): empty ${fmt(empty)}; with 55 others, six seated games and a chat line every 250 ms ${fmt(full)}${again ? `; again ${fmt(again)}` : ""}; ${beat - beats} server answers`);
   if (again) {
     // (Uploaded again for their own sake: none. After a spare page starts again they are, as everything on it is: the 55 players' tags at
     // five sizes nearly fill the 2 spare pages, and any wearers' pictures tip them over, on main too; logged above, not checked here.)
