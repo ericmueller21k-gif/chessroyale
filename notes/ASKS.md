@@ -15,7 +15,7 @@
 
 ## From the Nov 26 audit (notes/asks-audit-2026-11-26.md): never built / partly done
 - Nov 9-25 · 50 v 50 and Squads get their own ranks (RP from placement + engine score vs the lobby; ladder for all rank modes; a ranked leaver's seat filled by a bot at their level) · PR 1 of 5 #993 HELD: review (claude/mode-ranks-review) found a blocker (Squads strength averaged over bots moves a person's rating) + 3 should-fix (join-snapshot CAS loses matches; catch-up makes last place lose more; perMove over different moves, last place can gain: ask Eric); fix round next; PRs 2-5 after (sim; 50v50 recorded, full lane; Squads recorded, full lane; screens)
-- Nov 9-10 · Riders in the regular crates (5 non-boss riders, crate exclusives; the shopping cart) · PR #997 (5 Mythic rides in the Beta Crate, tier totals unchanged; full lane review running)
+- Nov 9-10 · Riders in the regular crates (5 non-boss riders, crate exclusives; the shopping cart) · PR #997 HELD for Eric: players earn Winter Crates, Beta only via the bonus roll (~1 in 18,200 openings gives a rider); Tommy Gun / Parrot 0.2% -> 0.057%. Review blocker fixed (add6239c). Ask: Winter too, or make Beta earnable?
 - Nov 10 · Auto chess: play against people (unranked, in match history) + a landing page (queue with a bot or search) · NEVER BUILT · ask Eric if still wanted (was parked "only on Eric's word")
 - Nov 12 · Rare items: a gold/diamond tier frame + tap to preview on a pawn (with the rider) · PR #995 (stills reviewed; CI)
 - Nov 13 · Hidden Boss in match history: his three forms, the beaten ones greyed · LIVE #990 b6206491 (main green)

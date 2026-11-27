@@ -2300,3 +2300,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 27 02:24: #994 MERGED 7c9ddf0f (chess halves 425/277 -> 246/251 s; unit 311 s is now the long pole). Main run superseded by later merges; watch ac75 (#991) watcher bj2ph0h8k.
 - Nov 27 02:33: Stranger rules done; merged main (tower.ts import conflict resolved), PR opened; review (xhigh) running. Needs Eric OK: banners.test.ts (guard file) gains his two moments. Unlock from tower_best >= 10 (a run that lost floor 10 but won 11 unlocks too). #998 fixes pushed (4e546b43), delta review running.
 - Nov 27 02:36: #993 mode ranks review: blocker + 3 should-fix; HELD, fix round queued (not started: 20 min to the 02:55 stop). Ask Eric: should a last place in 50v50 ever gain RP (equal perMove case)?
+- Nov 27 02:42: #997 review: blocker (profile ride count 36->41) fixed add6239c; nits 4 fixed; HELD for Eric: where the riders go (Beta is ~never earned) + Tommy Gun/Parrot rarer.
