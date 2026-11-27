@@ -132,7 +132,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     sooner (one player never meets the strict guard: Stockfish takes over at a strength of 2800).
     Stockfish's share of the moves follows the strength: none up to `bridgeShareFrom` (2500), then growing in a line to
     all of them (`bridgeStockfishShare`) just under `stockfishFrom` (2800); from 2800 Stockfish, as before. The guards
-    veto from the boss's own top-8 search (no extra search): Maia's next likely move, else Stockfish's best.
+    veto from the boss's own top-8 search (no extra search): Maia's next likely move, else Stockfish's best. A Battle Tower floor
+    draws its own way (`BossBrainCall.draw`: looser on floors 1 to 10, never a gift: [battle-tower.md](battle-tower.md), "In the runner").
   - **Within the powers:** Maia is asked for the allowed moves only (`searchmoves`), and nothing else is played; none of
     its moves allowed: today's Stockfish move. The King's strike, Boingo's funhouse move for the crowd, Hollow's extra
     move and Big Boy's bounce keep their own Stockfish picks; a reply its power's search scored (Wrangler's to the
