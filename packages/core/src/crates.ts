@@ -535,7 +535,7 @@ export const isShiny = (blemish: number) => purity(blemish) >= 90;
 
 /**
  * The purity roll: the chance of each band of purity (`low` to `high`, as shown, to one decimal place), even within
- * a band. Most items land between 30% and 70%; shiny (90%+) is 1 in 250, and 99%+ about 1 in 4,240; under 5% (blotched
+ * a band. Most items land between 30% and 70%; shiny (90%+) is 1 in 250, and 99%+ about 1 in 4,230; under 5% (blotched
  * nearly all over) is 1 in 100. The bands run from 100% down to 0% with no gaps, and the weights add up to 100.
  * Exactly 100% and exactly 0% (blotched all over: one color, a shade darker) each have a band of their own, both 1 in 5,000 (Eric, Nov 27:
  * "keep 0% at what it is now... make 100% closer to 1 in every 5000 too"; exactly 100% was about 1 in 275,000). Shiny stays 1 in 250
@@ -556,8 +556,9 @@ export const PURITY_BANDS: readonly { low: number; high: number; weight: number 
 ];
 
 /**
- * A purity band's chance as players read it (the crate page's chips, the FAQ's table): exact, never a long float. Rarer ones (exactly
- * 100% and 0%, 99-99.9%: under 0.1%) as "1 in N"; otherwise a percent to at most 3 decimals. (The review of #1007: "an odds disclosure must be exact".)
+ * A purity band's chance as players read it (the crate page's chips, the FAQ's table): short, never a long float. Rarer ones (exactly
+ * 100% and 0%, 99-99.9%: under 0.1%) as the nearest "1 in N" (today's are whole numbers, so exact); otherwise a percent to 3
+ * decimals. (The review of #1007: the chips printed 0.0036363636363636364%.)
  */
 export function purityOddsText(weight: number, total = 100): string {
   const p = (weight / total) * 100;
