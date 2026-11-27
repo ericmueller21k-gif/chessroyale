@@ -257,6 +257,19 @@ describe("mode ranks: Squads", () => {
     expect(run(1900)).toBeLessThan(run(1100));
   });
 
+  it("a leaver's result is their own place (the worst the squad could still finish), the squad's strength unchanged", () => {
+    const squads = [squad("me", 1, [["stay", 1500], ["gone", 1500]], [1500, 1500]), squad("o", 2, [["o1", 1500]], [1500, 1500, 1500]), squad("p", 5, [["p1", 1500]], [1500, 1500, 1500])];
+    squads[0] = { ...squads[0]!, people: [squads[0]!.people[0]!, { ...squads[0]!.people[1]!, place: 5 }] };
+    const ch = squadsRanks(squads, NOW);
+    expect(ch.get("stay")!.change.points!).toBeGreaterThan(0);
+    expect(ch.get("stay")!.next.wins).toBe(1);
+    expect(ch.get("gone")!.change.points!).toBeLessThan(0);
+    expect(ch.get("gone")!.next.wins).toBe(0);
+    expect(ch.get("o1")!.change.opponents).toBe(2);
+    expect(ch.get("o1")!.change.points!).toBeLessThan(0); // behind the leaver's squad, which finished 1st
+    expect(squadStrength(squads[0]!, NOW).rating).toBeCloseTo(1500, 9);
+  });
+
   it("no other real squad: no change", () => {
     expect(squadsRanks([squad("a", 1, [["a1", 1500]], [1500, 1500, 1500]), squad("b", 2, [], [1500, 1500, 1500, 1500])], NOW).size).toBe(0);
   });

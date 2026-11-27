@@ -235,8 +235,11 @@ export function crowdRanks(entrants: readonly CrowdEntrant[], now: number, m: Mo
 export interface SquadEntrant {
   id: string;
   place: number;
-  /** Its real players, each with their Squads record as read when they joined. */
-  people: readonly { id: string; record: ModeRecord }[];
+  /**
+   * Its real players, each with their Squads record as read when they joined. `place`: a leaver's own (the worst place the squad
+   * could still finish when they left: Squads' worstPlacement); everyone else's is the squad's.
+   */
+  people: readonly { id: string; record: ModeRecord; place?: number }[];
   /** Its bots' ratings (botRatingOf), counted in its strength only. */
   bots: readonly number[];
 }
@@ -264,11 +267,11 @@ export function squadsRanks(squads: readonly SquadEntrant[], now: number, m: Mod
   const strength = new Map(squads.map((q) => [q.id, squadStrength(q, now, s)]));
   const out = new Map<string, { next: ModeRecord; change: ModeChange }>();
   for (const mine of squads) {
-    const field = squads
-      .filter((o) => o.id !== mine.id && o.people.length > 0)
-      .map((o) => ({ rating: strength.get(o.id)!, score: mine.place < o.place ? 1 : mine.place > o.place ? 0 : 0.5 }));
+    const others = squads.filter((o) => o.id !== mine.id && o.people.length > 0);
     for (const p of mine.people) {
-      const done = modeMatch(p.record, field, mine.place === 1, now, "squads", { m, s, as: strength.get(mine.id)! });
+      const place = p.place ?? mine.place;
+      const field = others.map((o) => ({ rating: strength.get(o.id)!, score: place < o.place ? 1 : place > o.place ? 0 : 0.5 }));
+      const done = modeMatch(p.record, field, place === 1, now, "squads", { m, s, as: strength.get(mine.id)! });
       if (done) out.set(p.id, done);
     }
   }

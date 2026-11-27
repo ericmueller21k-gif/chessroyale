@@ -97,7 +97,8 @@ place part by up to 30% of each pair.)
 - **Seeding** (anti-smurf): 50 v 50 from the account's move-quality Rating (`users.rating`, clamped 800-2400), else the 1 v 1
   rating, else 1500; Squads from the 50 v 50 rating, else the 1 v 1 rating, else the Rating, else 1500. RD 350.
 - **Leaving** (Nov 9's rules, as 1 v 1): before move 1 a dodge (`dodgeRp`, a mark, no hidden-rating change); after it a leave (the
-  last place still open as the result, then `leaveRp` and a mark); nothing once you're cut or your squad is out. 50 v 50's away
+  last place still open as the result; in Squads, the worst place the squad could still finish, `worstPlacement`, while the
+  teammates keep the squad's; then `leaveRp` and a mark); nothing once you're cut or your squad is out. 50 v 50's away
   removal is a leave. The marks go in `ranked_conduct` with mode `crowd` or `squads`.
 - **A leaver's seat** (Nov 9): the bot that takes it plays at the leaver's own mode rating (`leaverBotSkill`: the temperature that
   plays like it, `botSkillForRating`), not today's fixed `botSkill` 4. In Squads this keeps the squad's strength as it was read, so
