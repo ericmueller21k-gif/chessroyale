@@ -7,3 +7,7 @@ earlier (STATUS: "only if it recurs"); it recurred. Download that run's `e2e-rep
 timing bound failed and why (a frame budget on a loaded runner? a timer measured from the wrong moment?), and fix the cause (the app's
 timing or the test's measurement, whichever is wrong). Never loosen a bound just to pass. Run the test 5x on desktop (one worker).
 `.pr-body.md` at most 40 lines, `.done`.
+
+**Also (main 055db17's run, Nov 27 ~11:05):** `e2e/birdie-home.spec.ts:98` (phone) "his challenge: his hello as he says his line at the
+middle table, the board's pop, his wipe": `expect(locator).toBeAttached()` failed, passed on retry (shard 15). Same boss, maybe the same
+cause (a moment's timing on a loaded runner). Fix both at their causes in this PR.
