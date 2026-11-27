@@ -306,10 +306,18 @@ export const holdsNow = (boss: Pick<BossView, "crowdMoves" | "result"> & { power
 export function TurfBar({ boss }: { boss: BossView }) {
   const t = boss.powers?.turf;
   const [open, setOpen] = useState<TurfHold | null>(null);
+  const tip = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return;
     const id = setTimeout(() => setOpen(null), 6000);
     return () => clearTimeout(id);
+  }, [open]);
+  // (Just under the bar, whatever its height: a phone's is tall, his figure in it.)
+  useLayoutEffect(() => {
+    const el = tip.current;
+    const bar = el?.closest(".boss-bar")?.getBoundingClientRect();
+    const from = (el?.offsetParent as HTMLElement | null)?.getBoundingClientRect();
+    if (el && bar && from) el.style.top = `${Math.round(bar.bottom - from.top + 8)}px`;
   }, [open]);
   if (!t) return null;
   const his = turfCount(t.owner, "b");
@@ -354,7 +362,7 @@ export function TurfBar({ boss }: { boss: BossView }) {
         </span>
       </span>
       {open && (
-        <span class="hp-hold-tip" role="note">
+        <span ref={tip} class="hp-hold-tip" role="note">
           {holdText(open, held > TURF_HOLDS.indexOf(open), his)}
         </span>
       )}

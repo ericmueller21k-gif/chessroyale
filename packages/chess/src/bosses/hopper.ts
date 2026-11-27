@@ -460,7 +460,8 @@ export const HOPPER: BossRules = {
       const test = b.settings.bossPowerTest;
       const moves = test === "leapfrog" ? LEAPFROG_TEST_MOVES[at.crowdSide] : test === "carrotpatch" ? CARROT_TEST_MOVES[at.crowdSide] : null;
       if (moves) b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...moves] }, moves.length, at.generation));
-      if (b.settings.towerFloor != null) return {};
+      // (Off on a tower floor, and on a floor of several bosses: only the tower deals them.)
+      if (b.settings.towerFloor != null || (b.settings.bossIds?.length ?? 0) > 1) return {};
       const turf = newTurf(b.boards.get(at.boardId)!.fen, at.crowdSide);
       return { turf: test === "turf" ? turfTest(turf, at.crowdSide) : turf };
     },

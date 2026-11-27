@@ -84,6 +84,7 @@ import { heldIn, marksStop, type LayerMarks, type PieceMark, type SquareMark } f
 import { lands } from "./boingo.ts";
 import { passTurn } from "./hollow.ts";
 import { castAnswer } from "./hopper.ts";
+import { gridOf, placementOf } from "./grid.ts";
 
 type ChandySettings = BossPowerSettings["chandy"];
 type SteerSettings = Pick<BossPowerSettings, "chandy" | "bouncePawnLogit">;
@@ -370,7 +371,14 @@ export function locksAfter(fen: string, move: string, locks: readonly ChandyLock
   try {
     after = applyMove(fen, move);
   } catch {
-    return locks.map((l) => ({ ...l }));
+    // (A step outside the rules that moves one piece, reaching him as a move on a shared floor (Chub & Chirp's hop and Pawn Bounce:
+    // a pawn over another, or back a square): that piece goes from its square to the other, as a move would take it. Review of #883.)
+    const g = gridOf(fen);
+    const piece = g.get(from(move));
+    if (!piece) return locks.map((l) => ({ ...l }));
+    g.delete(from(move));
+    g.set(to(move), piece);
+    after = [placementOf(g), ...fen.split(" ").slice(1)].join(" ");
   }
   const castle = pieceAt(fen, from(move))?.type === "k" && Math.abs(fileIx(from(move)) - fileIx(to(move))) === 2;
   const out: ChandyLock[] = [];
