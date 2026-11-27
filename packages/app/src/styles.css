@@ -28294,6 +28294,23 @@ body.mo-on .mm-scrim {
   }
 }
 
+/* A computer from 1100 px (Eric, Nov 27: "the bottom left of the board, sitting right in front of him", "a bit bigger"): the timers at his
+   feet (Zebra.tsx ZEBRA_UI.sideProp, drawn in .boss-side, which sits on the board's bottom-left corner), in front of him, at 2.5x
+   (95 x 55): the row's right edge 6 px short of the board, its bottom on his feet's line. The bar's room is left empty. */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .boss-side > .dd-timers {
+    --dd-w: 95px;
+    z-index: 1;
+    top: auto;
+    right: 6px;
+    bottom: var(--side-lift, 0px);
+  }
+  /* (An empty slot's outline gray, not the bar's faint white: it shows on the page in light and dark mode alike.) */
+  .boss-side > .dd-timers > .dd-slot.empty {
+    border-color: rgba(128, 128, 128, 0.55);
+  }
+}
+
 /* While it plays, his figure in its usual place is hidden: he kneels in the light. */
 body.cs-on .boss-char {
   visibility: hidden;

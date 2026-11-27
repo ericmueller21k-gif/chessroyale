@@ -4,7 +4,7 @@ import type { Stage } from "../characters/boss-beats.ts";
 import { SpriteAnim, frameImage } from "../components/BossEffect.tsx";
 import type { Character } from "../characters/sprite.ts";
 import { BossBarExtra, RageMeter } from "../components/BossPowers.tsx";
-import { BossFace, BossSide, bossStage } from "../components/BossCharacter.tsx";
+import { BossFace, BossSide, SIDES, bossStage } from "../components/BossCharacter.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { MOUSE_LAYOUT } from "../components/MatchMenu.tsx";
 import { VoiceBubble, bossVoice } from "../speech.tsx";
@@ -250,7 +250,7 @@ export function TowerBar({ boss, match, caster = null }: { boss: BossView; match
                   <BossNext boss={b} match={match} />
                   {/* (His prop where a lone bar has it. A computer's Babur pump stands beside his figure by the board: TowerSide; one pump on the page.) */}
                   <span class="boss-prop">
-                    <BossBarExtra boss={b} until={until} part={computer ? "cardProp" : "prop"} />
+                    <BossBarExtra boss={b} until={until} part={computer ? "cardProp" : "prop"} crowdMoved={match.phase.kind === "scoring"} />
                   </span>
                   {/* (His words, a phone's, where a lone bar has them while his part is open: the boss who says them, the one who cast a
                       moment, else the boss to move. Folded, they're drawn beside his window: tw-say, above.) */}
@@ -286,7 +286,7 @@ export function TowerSide({ boss, match, caster = null }: { boss: BossView; matc
             <VoiceBubble voice={bossVoice} class="bc-bubble tw-side-bubble" mine={(k) => speakerOf(side, k) === i} />
             <Figure boss={b} stage={bossStage(match.phase, b)} scale={scale} since={since} still={still} />
             {/* (His prop beside him, a computer's: Babur's pump by his feet, toward the window's edge, as by a lone boss's figure.) */}
-            {computer && <BossBarExtra boss={b} until={until} part="towerProp" />}
+            {computer && <BossBarExtra boss={b} until={until} part="towerProp" crowdMoved={match.phase.kind === "scoring"} />}
           </span>
         </span>
       ))}
@@ -294,7 +294,18 @@ export function TowerSide({ boss, match, caster = null }: { boss: BossView; matc
   );
 }
 
-/** The figures beside the board (a computer's): the floor's several stacked (TowerSide), else the boss's own (BossSide). */
+/**
+ * The figures beside the board (a computer's): the floor's several stacked (TowerSide), else the boss's own (BossSide), with his prop at
+ * his feet from 1100 px where his UI puts it there (BossUi.sideProp: Don Dough's oven timers; the bar's room left empty: Boss.tsx BossBar).
+ */
 export function SideFigures({ match, caster = null }: { match: GameView; caster?: string | null }) {
-  return match.boss && sideOf(match.boss) ? <TowerSide boss={match.boss} match={match} caster={caster} /> : <BossSide match={match} />;
+  const wide = useMedia(SIDES);
+  if (match.boss && sideOf(match.boss)) return <TowerSide boss={match.boss} match={match} caster={caster} />;
+  const b = match.boss;
+  const until = match.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0;
+  return (
+    <BossSide match={match}>
+      {wide && b && match.bossNote == null && <BossBarExtra boss={b} until={until} part="side" crowdMoved={match.phase.kind === "scoring"} />}
+    </BossSide>
+  );
 }

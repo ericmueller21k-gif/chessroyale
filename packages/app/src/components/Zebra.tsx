@@ -212,11 +212,12 @@ function TimerCanvas({ kind, left, ding, seen }: { kind: DoughPiece; left: numbe
  * minutes, rolling down each move; at 00:00 it rings as its dough rises (the rise's moment: after his move, from the screen's
  * moments; after yours, as he thinks, from his turn's own, zebraTurnMoments); an empty slot is a faint outline.
  */
-export function OvenTimers({ boss, moments }: { boss: BossView; moments: () => Moment[] }) {
+export function OvenTimers({ boss, moments, crowdMoved = false }: { boss: BossView; moments: () => Moment[]; crowdMoved?: boolean }) {
   const z = boss.powers?.zebra;
   if (!z) return null;
   const key = battleKey(boss);
   noteSlots(key, z);
+  const left = shownLeft(key, z.lumps, crowdMoved);
   // (The screen's moments are none while he thinks: a rise after your move is one of his turn's own.)
   const ms = [...moments(), ...zebraTurnMoments(boss)];
   const now = Date.now();
@@ -232,13 +233,33 @@ export function OvenTimers({ boss, moments }: { boss: BossView; moments: () => M
         if (ring && ring.shape) return <span key={`r${i}`} class="dd-slot" data-slot={i} data-ring="1"><TimerCanvas kind={ring.shape as DoughPiece} left={0} ding /></span>;
         if (!l) return <span key={`e${i}`} class="dd-slot empty" data-slot={i} />;
         return (
-          <span key={`l${l.n}`} class="dd-slot" data-slot={i} data-square={l.square} aria-label={`${PIECE_NAME[l.piece]} dough on ${l.square}: ${l.left} ${l.left === 1 ? "move" : "moves"} left`}>
-            <TimerCanvas kind={l.piece} left={l.left} seen={`${key}:${l.n}`} />
+          <span key={`l${l.n}`} class="dd-slot" data-slot={i} data-square={l.square} aria-label={`${PIECE_NAME[l.piece]} dough on ${l.square}: ${left(l)} ${left(l) === 1 ? "move" : "moves"} left`}>
+            <TimerCanvas kind={l.piece} left={left(l)} seen={`${key}:${l.n}`} />
           </span>
         );
       })}
     </span>
   );
+}
+
+/** Each lump's minutes as the view had them when the crowd's move went in (shownLeft), by battle and lump; cleared once it's counted. */
+const atMove = new Map<string, number>();
+
+/**
+ * The minutes each lump's timer shows (Eric, Nov 27: "8 and then to 7 to 6 on each turn"). The rules take a minute off for every move,
+ * the crowd's and his (packages/chess/src/bosses/zebra.ts, unchanged), but the crowd's comes off only once the judge has scored it,
+ * as his turn begins, a moment before his own: two drops on his turn. So while the crowd's move is in and being judged (`crowdMoved`)
+ * each timer shows a minute under what the view had as it went in, whether or not the view has counted it yet; then the view's own.
+ * Only what's shown: a lump still rises when the rules say. Notes the view's minutes as the move goes in; called as the timers draw.
+ */
+export function shownLeft(key: string, lumps: readonly DoughLump[], crowdMoved: boolean): (l: DoughLump) => number {
+  if (!crowdMoved) {
+    for (const l of lumps) atMove.delete(`${key}:${l.n}`);
+    return (l) => l.left;
+  }
+  for (const l of lumps) if (!atMove.has(`${key}:${l.n}`)) atMove.set(`${key}:${l.n}`, l.left);
+  while (atMove.size > 16) atMove.delete(atMove.keys().next().value!);
+  return (l) => Math.min(l.left, Math.max(0, atMove.get(`${key}:${l.n}`)! - 1));
 }
 
 /**
@@ -343,7 +364,9 @@ export const ZEBRA_UI = {
   // (Gold Plate comes at the start of his turn after the warning: after your move.)
   ultimate: { name: "Gold Plate", when: "After your move" },
   moments: MOMENTS,
-  // His oven timers, in the boss bar's free room right of his bars.
-  barProp: ({ boss, moments }) => <OvenTimers boss={boss} moments={moments} />,
+  // His oven timers, in the boss bar's free room right of his bars; on a computer from 1100 px, at his feet by the board's bottom-left
+  // corner (Eric, Nov 27).
+  barProp: ({ boss, moments, crowdMoved }) => <OvenTimers boss={boss} moments={moments} crowdMoved={crowdMoved} />,
+  sideProp: true,
   board: (p) => ZebraLayer(p),
 } satisfies BossUi;

@@ -32,7 +32,16 @@ test.beforeEach(async ({ page }) => {
 const room = (p: Page) => p.locator("canvas.town-shop-canvas");
 type Fig = { name: string; anim: string; frame: number; at: [number, number]; flip: boolean };
 type Out = { kept: string[]; carried: { item: string; at: [number, number]; a: number }[] };
-type Zebra = { part: string; figs: Fig[]; say: { who: string; text: string } | null; beat: string | null; chatter: { exchange: number; line: number } | null; you: [number, number]; out: Out | null; alpha: Record<string, number> };
+type Zebra = { part: string; figs: Fig[]; say: { who: string; text: string } | null; beat: string | null; chatter: { exchange: number; line: number } | null; you: [number, number]; out: Out | null; alpha: Record<string, number>; over: { z: number; rows: number; from: number } | null };
+/**
+ * Don seated behind his table (Eric, Nov 27: "his head gets covered up"): his top drawn again just after the table (its row, 7), so the
+ * table hides only his lap: his head and shoulders, at least 30 of the room's px of him (38 seated), over it.
+ */
+async function donOverTable(p: Page) {
+  const over = (await zebra(p))?.over ?? null;
+  expect(over?.z, "Don's top drawn after the table").toBe(7);
+  expect(over!.rows - over!.from, "Don's head and shoulders over the table").toBeGreaterThanOrEqual(30);
+}
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townGlide?: (to: string) => void;
@@ -208,6 +217,7 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   await expect(room(page)).toHaveAttribute("data-you", "4,9");
   const back = (await zebra(page))!;
   expect(back.figs.map((f) => f.name).sort()).toEqual(["crew-c", "crew-d", "crew-e", "don"]);
+  await donOverTable(page);
   // The chatter: a line in a bubble within a few seconds, the speaker on his talking (or arguing, scoffing) loop, the rest listening.
   await expect.poll(async () => (await zebra(page))?.say?.who ?? null, { message: "someone at the table talks", timeout: 8000 }).not.toBeNull();
   const z1 = (await zebra(page))!;
@@ -241,6 +251,8 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   expect(ups.length, "frames sampled").toBeGreaterThan(30);
   expect(Math.max(...ups.map((u) => u.ups)), "pieces standing in a frame").toBeLessThan(60);
   expect([...new Set(ups.flatMap((u) => u.ghosts))].filter((n) => !["bdoor", "bhem", "bhem-post"].includes(n)), "see-through over you").toEqual([]);
+  // (From the table's end too.)
+  await donOverTable(page);
   await shot(page, "back-table-end");
 
   // His card at the table's foot: his Challenge alone (Eric, Nov 11: "we don't need the talk button").

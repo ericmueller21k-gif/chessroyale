@@ -154,7 +154,12 @@ export interface BossUi {
    * of the bar's own size, positioned (`.boss-prop` is its containing block, nothing in it clips), nothing by default. A
    * test link's `?barslot=1` outlines it with a dashed line, so a screenshot shows the room.
    */
-  barProp?: (p: { boss: BossView; moments: () => Moment[] }) => ComponentChildren;
+  barProp?: (p: { boss: BossView; moments: () => Moment[]; crowdMoved?: boolean }) => ComponentChildren;
+  /**
+   * A computer's lone boss bar from 1100 px (his figure beside the board): its barProp is drawn at his feet by the board's bottom-left
+   * corner instead (BossSide's `.boss-side`; the bar's room left empty). Don Dough's oven timers (Eric, Nov 27).
+   */
+  sideProp?: boolean;
   /**
    * Its barProp is drawn in a Battle Tower floor's split bar too, in his own part (TowerBar; Babur's pump, Nov 20: his balloons
    * grow there as in his own bar). Left out: the split bar draws no prop for it.

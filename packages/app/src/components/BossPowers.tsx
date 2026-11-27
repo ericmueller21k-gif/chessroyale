@@ -58,7 +58,8 @@ export { PowerBanner, type Moment } from "./PowerParts.tsx";
 
 /** Every boss with powers on screen, by its BOSS_ROSTER id. */
 const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI, ZEBRA_UI, CHANDY_UI, BIRDIE_UI, STRANGER_UI] as BossUi[]).map((u) => [u.id, u]));
-const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
+/** A boss's own UI (its moments, bar pieces, props); null without one. */
+export const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
 /** The kinds of power moment a boss has (its file's), for the power tips' table test. */
 export const bossMomentKinds = (id: string): PowerEventKind[] => Object.keys(BOSS_UI.get(id)?.moments ?? {}) as PowerEventKind[];
 
@@ -185,13 +186,15 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
  * in the free room at the right (`prop`; none yet). Through the boss's turn on its screen it draws itself every frame (the
  * strip relights as his darkness lands): the header around it draws only now and then (useStillKey).
  */
-export function BossBarExtra({ boss, until = 0, part = "bar" }: { boss: BossView; until?: number; part?: "bar" | "ult" | "prop" | "towerProp" | "cardProp" }) {
+export function BossBarExtra({ boss, until = 0, part = "bar", crowdMoved = false }: { boss: BossView; until?: number; part?: "bar" | "ult" | "prop" | "towerProp" | "cardProp" | "side"; crowdMoved?: boolean }) {
   const ui = bossUi(boss);
+  // (`crowdMoved`: the crowd's move is in, being judged, and not yet in the view; a prop that counts moves can show it already. `side`:
+  // a lone boss's prop at his feet on a computer, BossUi.sideProp.)
   // (`towerProp`: a computer's tower floor of several, his prop by his figure where it's drawn there: BossUi.towerProp. `cardProp`: every
   // other bar prop, in his card of the split bar: TowerBar.)
-  const draw = part === "ult" ? ui?.ultBar : part === "prop" ? ui?.barProp : part === "towerProp" ? (ui?.towerProp ? ui.barProp : undefined) : part === "cardProp" ? (ui?.towerProp ? undefined : ui?.barProp) : ui?.bar;
+  const draw = part === "ult" ? ui?.ultBar : part === "prop" ? ui?.barProp : part === "side" ? (ui?.sideProp ? ui.barProp : undefined) : part === "towerProp" ? (ui?.towerProp ? ui.barProp : undefined) : part === "cardProp" ? (ui?.towerProp ? undefined : ui?.barProp) : ui?.bar;
   useFrameNow(!!draw && !!until);
-  return draw?.({ boss, moments: () => momentsOf(boss, until) }) ?? null;
+  return draw?.({ boss, moments: () => momentsOf(boss, until), crowdMoved }) ?? null;
 }
 
 // ---------------- The moments ----------------

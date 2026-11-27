@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { hapticOnce } from "../haptics.ts";
 import { KING_ATTACK, MOO_BEATS, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, legalMoves, pieceAt, shotSaves, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, BossBarExtra, CANDLE, battleDecor, casterOf, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BossBarExtra, bossUi, CANDLE, battleDecor, casterOf, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackPawnShown, yourTopple } from "../components/BigBoy.tsx";
 import { boardSawJolt, sawSwapBoard, sawyerMoments, splitFen, splitStill, swapStill } from "../components/Sawyer.tsx";
@@ -29,7 +29,7 @@ import { Board } from "../components/Board.tsx";
 import { seatKey } from "../board/yours.ts";
 import { useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
-import { UnderBoard } from "../components/QuickChat.tsx";
+import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { bossFramed, type BossView, type DodgeRun, type GameView, type LightsView, type RushView } from "../game.ts";
 import { LightsDock, LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
@@ -42,7 +42,7 @@ import { Hud } from "./Hud.tsx";
 import { SideFigures, TowerBoardLives } from "./TowerBar.tsx";
 import { moverOf, onSide, partOf, partsOf, sideOf } from "../boss-side.ts";
 import { BossDock, Dots } from "../components/BossDock.tsx";
-import { BossCharacter, BossFace, BossTag, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
+import { BossCharacter, BossFace, BossTag, SIDES, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, VoiceBubble, bossVoice } from "../speech.tsx";
@@ -120,6 +120,8 @@ export function BossBar({ boss, match, move }: { boss: BossView; match?: GameVie
   const until = match?.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0;
   // (Test link ?barslot=1: the prop's room outlined, so a screenshot shows it.)
   const slot = testParams().get("barslot") === "1";
+  // (A prop drawn at his feet beside the board on a computer, BossUi.sideProp: the bar's room left empty, keeping its size.)
+  const atFeet = useMedia(SIDES) && char && !!bossUi(boss)?.sideProp;
   return (
     // (A phone's name column starts this far right of its usual place, for a figure that reaches past it: kits.ts barName.)
     <div class={`boss-bar${char ? " has-char" : ""}${slot ? " barslot" : ""}`} style={{ "--bc-name": `${bossKit(boss.name)?.barName ?? 0}px` }} role="status" aria-label={`${boss.name}, threat ${boss.threat} of 5`}>
@@ -146,7 +148,7 @@ export function BossBar({ boss, match, move }: { boss: BossView; match?: GameVie
         {/* (The move number, a computer's: left of the status, where the title line said it, Nov 1.) */}
         {move && <span class="boss-move">{move}</span>}
         <BossNext boss={boss} match={match} />
-        <span class="boss-prop">{meters && <BossBarExtra boss={boss} until={until} part="prop" />}</span>
+        <span class="boss-prop">{meters && !atFeet && <BossBarExtra boss={boss} until={until} part="prop" crowdMoved={match?.phase.kind === "scoring"} />}</span>
         {/* (His words, a phone's: inside the bar, from the name column's left edge to its right padding, under the status, so never
             over it: one row when short, else two balanced rows. A computer's are by his figure beside the board.) */}
         {char && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" balanced />}

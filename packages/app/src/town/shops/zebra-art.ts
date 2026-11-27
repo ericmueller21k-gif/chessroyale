@@ -1133,6 +1133,8 @@ bside("bside-tally", (c) => {
 
 /** The table's top, in px over its foot: the board in a challenge goes here (a park table's is 27). */
 export const SHOP_ZEBRA_BACK_TABLE_TOP = 27; // (the crew rig's ZEBRA_TABLE_TOP: their pokes and the roll lying on it)
+/** The table's row (its foot, the front edge; it stands up there, RoomArt `upright`): Don's top half is drawn just after it (ShopRoom `overTable`). */
+export const SHOP_ZEBRA_BACK_TABLE_ROW = 7;
 const TB = { w: 3 * T + 8, h: 84 };
 /** Where the board lies on the table (its middle), in the table's pixels; the scattered pieces and cups keep clear of it. */
 export const SHOP_ZEBRA_BACK_BOARD_PX: Pt = [Math.floor(TB.w / 2), 48];
@@ -1342,7 +1344,7 @@ const BACK_FLOOR_COUNT = BACK.list.length;
   at("bdoor", 3, 10, false, { door: "front" });
   at("bhem-post", 12, 10, true, { flip: true });
   // The table (its 3 x 2 squares solid), the kingpin's chair at its head (west), the crew's three chairs along its north side.
-  at("table", 5, 7, true);
+  at("table", 5, SHOP_ZEBRA_BACK_TABLE_ROW, true);
   at("armchair", 4, 7, true);
   at("bench", 5, 5, true);
   at("lamp-green", 6, 7, false);
