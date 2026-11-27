@@ -216,6 +216,12 @@ const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: 
     on: { "a piece of yours warned for his train": (f) => ({ birdie: { next: 99, warn: { turn: 1, line: crowdPiece(f)[0]!, squares: lineSquares(crowdPiece(f)[0]!, "w"), square: crowdPiece(f), piece: "n" } } }) },
     off: () => ({ birdie: { next: 99, warn: null, ride: { at: 0, line: "a", squares: lineSquares("a", "w"), square: "a2", piece: "p" }, fell: { at: 0 } } }),
   },
+  // (The Stranger's Frostfire: a piece of yours frozen this turn, its square to burn the turn after next: a turn it limits and a board
+  // it changes outside a move, so the save sits it out. With no strike on, plain chess.)
+  stranger: {
+    on: { "a piece of yours frozen, its square to burn": (f) => ({ stranger: { next: 99, strike: { turn: 1, square: crowdPiece(f), piece: "n", frozenUntil: 1, burnAt: 3 }, burn: null } }) },
+    off: () => ({ stranger: { next: 99, strike: null, burn: null } }),
+  },
 };
 
 describe("the God King's Last Stand on a board a boss has changed: every boss", () => {
