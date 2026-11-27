@@ -583,16 +583,24 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
  * top whose drawn pixels span a fifth of its body (first frame). Worked out once a picture.
  */
 const solidTops = new WeakMap<TownBox, number>();
+/** (Nov 27) Each front's first frame's drawn pixels (1 a pixel, row by row), shared by every box with that front. */
+const frontPixels = new WeakMap<object, Uint8Array>();
 export function solidTop(box: TownBox): number {
   let t = solidTops.get(box);
   if (t === undefined) {
     const ch = box.front;
-    const rows = frameKeys(ch, ch.anims.idle!.frames[0]!);
+    let px = frontPixels.get(ch);
+    if (!px) {
+      const rows = frameKeys(ch, ch.anims.idle!.frames[0]!);
+      px = new Uint8Array(ch.w * ch.h);
+      for (let y = 0; y < ch.h; y++) for (let x = 0; x < ch.w; x++) if (rows[y]?.[x]) px[y * ch.w + x] = 1;
+      frontPixels.set(ch, px);
+    }
     const need = Math.max(4, 0.2 * (box.body.x1 - box.body.x0));
     t = 0;
     for (let y = 0; y < ch.h; y++) {
       let n = 0;
-      for (let x = box.body.x0; x <= box.body.x1; x++) if (rows[y]?.[x]) n++;
+      for (let x = box.body.x0; x <= box.body.x1; x++) if (x >= 0 && x < ch.w && px[y * ch.w + x]) n++;
       if (n >= need) {
         t = ch.foot[1] - y;
         break;
@@ -617,7 +625,7 @@ export function wholeFits(fg: FaceGeom, fp: FacePlan): number {
   if (!m) return Infinity;
   const X = AF[0]! * fg.tx[2]! + AF[2]! * fg.ty[2]! + AF[4]!;
   const Y = AF[1]! * fg.tx[2]! + AF[3]! * fg.ty[2]! + AF[5]!;
-  return Math.hypot(X - fp.x[2]!, Y - fp.y[2]!);
+  return Math.sqrt((X - fp.x[2]!) ** 2 + (Y - fp.y[2]!) ** 2);
 }
 const AF = new Float64Array(6);
 

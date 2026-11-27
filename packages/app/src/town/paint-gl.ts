@@ -1126,6 +1126,7 @@ class GLPainter implements Painter {
   private readonly fullV = new Float32Array(6 * VF);
 
   soft = (img: CanvasImageSource, x: number, y: number, w: number, h: number, k: number, haze: number, horizon: string): void => this.g.softImage(img, x, y, w, h, k, haze, horizon);
+  quads = (pts: Float64Array, order: Int32Array, from: number, to: number, only: Uint8Array | null): void => this.g.quads(pts, order, from, to, only);
 
   pixels(x: number, y: number, w: number, h: number): ImageData {
     const { gl, cv } = this;
@@ -1502,8 +1503,10 @@ class GLCtx {
     let c = this.colorCache.get(s);
     if (!c) {
       c = parseColor(s, { r: 0, g: 0, b: 0, a: 1 });
-      // (Colors made fresh each frame, such as a pulse's alpha, aren't kept: the cache stays small.)
-      if (this.colorCache.size > 600) this.colorCache.clear();
+      // (Colors made fresh each frame, such as a pulse's alpha, aren't kept: the cache stays small. Nov 27: 4,000, not 600: the ground's
+      // colors alone are 1,300 (65 haze steps, 5 grounds, light and dark, face and seam), so at 600 it emptied every few frames while
+      // walking and every color was parsed again.)
+      if (this.colorCache.size > 4000) this.colorCache.clear();
       this.colorCache.set(s, c);
     }
     out.r = c.r;
@@ -1535,26 +1538,47 @@ class GLCtx {
     }
     const st = this.st;
     this.P.room(st, (n - 2) * 3);
-    // Each vertex's color packed once (most polygons are one color: packed once for all).
+    // Each vertex's color packed once (most polygons are one color: packed once for all). (Written here, not through a call a vertex: a
+    // call carrying floats boxes each one, Nov 27: about 1 MB of garbage a frame, a minor GC every two seconds or so while walking.)
     const src = this.poly;
-    if (this.packed.length < n) this.packed = new Uint32Array(n * 2);
+    if (this.packed.length < n) this.packed = new Int32Array(n * 2);
     const pk = this.packed;
-    pk[0] = this.pack(0);
-    for (let k = 1; k < n; k++) {
-      const s = k * RF;
-      pk[k] = src[s + 4] === src[4] && src[s + 5] === src[5] && src[s + 6] === src[6] && src[s + 7] === src[7] ? pk[0]! : this.pack(k);
+    for (let k = 0; k < n; k++) {
+      const s = k * RF + 4;
+      if (k > 0 && src[s] === src[4] && src[s + 1] === src[5] && src[s + 2] === src[6] && src[s + 3] === src[7]) {
+        pk[k] = pk[0]!;
+        continue;
+      }
+      const r = Math.round(Math.min(1, Math.max(0, src[s]!)) * 255);
+      const g = Math.round(Math.min(1, Math.max(0, src[s + 1]!)) * 255);
+      const b = Math.round(Math.min(1, Math.max(0, src[s + 2]!)) * 255);
+      const a = Math.round(Math.min(1, Math.max(0, src[s + 3]!)) * 255);
+      pk[k] = (a << 24) | (b << 16) | (g << 8) | r;
     }
+    const { f, u } = st;
     let o = st.n * VF;
-    for (let t = 1; t < n - 1; t++) {
-      this.put(o, 0, flags, pk[0]!);
-      this.put(o + VF, t, flags, pk[t]!);
-      this.put(o + 2 * VF, t + 1, flags, pk[t + 1]!);
-      o += 3 * VF;
-    }
+    for (let t = 1; t < n - 1; t++)
+      for (let j = 0; j < 3; j++) {
+        const k = j === 0 ? 0 : t + j - 1;
+        const s = k * RF;
+        f[o] = src[s]!;
+        f[o + 1] = src[s + 1]!;
+        f[o + 2] = src[s + 2]!;
+        f[o + 3] = src[s + 3]!;
+        u[o + 4] = pk[k]!;
+        u[o + 5] = flags;
+        f[o + 6] = src[s + 8]!;
+        f[o + 7] = src[s + 9]!;
+        f[o + 8] = src[s + 10]!;
+        f[o + 9] = src[s + 11]!;
+        f[o + 10] = src[s + 12]!;
+        f[o + 11] = src[s + 13]!;
+        o += VF;
+      }
     st.n += (n - 2) * 3;
     st.modes |= 1 << (flags & 7);
   }
-  private packed = new Uint32Array(64);
+  private packed = new Int32Array(64);
 
   /** Whether the polygon lies wholly inside the clip's rectangle (nothing to cut). */
   private insideClip(n: number): boolean {
@@ -1566,36 +1590,6 @@ class GLCtx {
       if (x < c[0]! || x > c[2]! || y < c[1]! || y > c[3]!) return false;
     }
     return true;
-  }
-
-  /** Vertex `k`'s color (premultiplied, 0 to 1) as four bytes. */
-  private pack(k: number): number {
-    const src = this.poly;
-    const s = k * RF + 4;
-    const r = Math.round(Math.min(1, Math.max(0, src[s]!)) * 255);
-    const g = Math.round(Math.min(1, Math.max(0, src[s + 1]!)) * 255);
-    const b = Math.round(Math.min(1, Math.max(0, src[s + 2]!)) * 255);
-    const a = Math.round(Math.min(1, Math.max(0, src[s + 3]!)) * 255);
-    return ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
-  }
-
-  /** Vertex `k` of `poly` into the stream at float `o`, with its packed color. */
-  private put(o: number, k: number, flags: number, color: number): void {
-    const { f, u } = this.st;
-    const src = this.poly;
-    const s = k * RF;
-    f[o] = src[s]!;
-    f[o + 1] = src[s + 1]!;
-    f[o + 2] = src[s + 2]!;
-    f[o + 3] = src[s + 3]!;
-    u[o + 4] = color;
-    u[o + 5] = flags;
-    f[o + 6] = src[s + 8]!;
-    f[o + 7] = src[s + 9]!;
-    f[o + 8] = src[s + 10]!;
-    f[o + 9] = src[s + 11]!;
-    f[o + 10] = src[s + 12]!;
-    f[o + 11] = src[s + 13]!;
   }
 
   /** Clips `poly` (n vertices) to the clip's rectangle, every attribute along (Sutherland–Hodgman); the result back in `poly`. */
@@ -1649,6 +1643,108 @@ class GLCtx {
     P[o + 11] = p3;
     P[o + 12] = p4;
     P[o + 13] = p5;
+  }
+
+  /**
+   * (Nov 27) Quads in one solid fill, as a path of them filled would draw them: quad `order[i]` (its four corners at 8 floats from
+   * `pts[order[i] * 8]`, in the current transform's space), for i from `from` to `to - 1`, those with `only[order[i]]` set (null: all).
+   * Written straight into the stream: no path, no call a point (the ground's squares, render.ts fillRuns: a thousand quads a frame).
+   */
+  quads(pts: Float64Array, order: Int32Array, from: number, to: number, only: Uint8Array | null): void {
+    if (from >= to) return;
+    const fs = this.fillStyle;
+    const c = typeof fs === "string" ? this.color(fs, this.col) : this.color("#000000", this.col);
+    const a = this.globalAlpha;
+    if (a * c.a <= 0 || this.shadowOn()) {
+      // (Never so for the ground: the path's way, the same pixels.)
+      this.beginPath();
+      for (let i = from; i < to; i++) {
+        if (only && !only[order[i]!]) continue;
+        const o = order[i]! * 8;
+        this.moveTo(pts[o]!, pts[o + 1]!);
+        this.lineTo(pts[o + 2]!, pts[o + 3]!);
+        this.lineTo(pts[o + 4]!, pts[o + 5]!);
+        this.lineTo(pts[o + 6]!, pts[o + 7]!);
+        this.closePath();
+      }
+      return this.fill();
+    }
+    const flags = M_SOLID | (this.comp() << 7);
+    const col = (Math.round(Math.min(1, Math.max(0, c.a * a)) * 255) << 24) | (Math.round(Math.min(1, Math.max(0, c.b * c.a * a)) * 255) << 16) | (Math.round(Math.min(1, Math.max(0, c.g * c.a * a)) * 255) << 8) | Math.round(Math.min(1, Math.max(0, c.r * c.a * a)) * 255);
+    const m = this.m;
+    const m0 = m[0]!, m1 = m[1]!, m2 = m[2]!, m3 = m[3]!, m4 = m[4]!, m5 = m[5]!;
+    const st = this.st;
+    const cr = this.clipR;
+    const poly = this.poly;
+    for (let i = from; i < to; i++) {
+      const q = order[i]!;
+      if (only && !only[q]) continue;
+      const o = q * 8;
+      // (Clipped by a rectangle and crossing it: the polygon's way.)
+      if (this.clipOn) {
+        let inside = true;
+        for (let k = 0; k < 4; k++) {
+          const X = m0 * pts[o + 2 * k]! + m2 * pts[o + 2 * k + 1]! + m4;
+          const Y = m1 * pts[o + 2 * k]! + m3 * pts[o + 2 * k + 1]! + m5;
+          if (X < cr[0]! || X > cr[2]! || Y < cr[1]! || Y > cr[3]!) inside = false;
+        }
+        if (!inside) {
+          this.polyRoom(4);
+          for (let k = 0; k < 4; k++) {
+            const P = k * RF;
+            poly[P] = m0 * pts[o + 2 * k]! + m2 * pts[o + 2 * k + 1]! + m4;
+            poly[P + 1] = m1 * pts[o + 2 * k]! + m3 * pts[o + 2 * k + 1]! + m5;
+            poly[P + 2] = poly[P + 3] = 0;
+            poly[P + 4] = c.r * c.a * a;
+            poly[P + 5] = c.g * c.a * a;
+            poly[P + 6] = c.b * c.a * a;
+            poly[P + 7] = c.a * a;
+            poly[P + 8] = poly[P + 9] = poly[P + 10] = poly[P + 11] = poly[P + 12] = poly[P + 13] = 0;
+          }
+          this.emitPoly(4, flags);
+          continue;
+        }
+      }
+      this.P.room(st, 6);
+      const { f, u } = st;
+      let w = st.n * VF;
+      // (A fan from the first corner, as emitPoly's: 0 1 2, 0 2 3.)
+      for (let t = 0; t < 6; t++) {
+        const k = t === 0 || t === 3 ? 0 : t === 1 ? 1 : t === 2 || t === 4 ? 2 : 3;
+        const x = pts[o + 2 * k]!;
+        const y = pts[o + 2 * k + 1]!;
+        f[w] = m0 * x + m2 * y + m4;
+        f[w + 1] = m1 * x + m3 * y + m5;
+        f[w + 2] = f[w + 3] = 0;
+        u[w + 4] = col;
+        u[w + 5] = flags;
+        f[w + 6] = f[w + 7] = f[w + 8] = f[w + 9] = f[w + 10] = f[w + 11] = 0;
+        w += VF;
+      }
+      st.n += 6;
+    }
+    st.modes |= 1 << (flags & 7);
+  }
+
+  /** Points `p0` to `p0 + k - 1` of the path into `poly`, one solid color (as `v` does each, without a call a point). */
+  private solidPoly(p0: number, k: number, c: RGBA, a: number): void {
+    const P = this.poly;
+    const px = this.px;
+    const r = c.r * c.a * a;
+    const g = c.g * c.a * a;
+    const b = c.b * c.a * a;
+    const al = c.a * a;
+    for (let i = 0; i < k; i++) {
+      const o = i * RF;
+      P[o] = px[(p0 + i) * 2]!;
+      P[o + 1] = px[(p0 + i) * 2 + 1]!;
+      P[o + 2] = P[o + 3] = 0;
+      P[o + 4] = r;
+      P[o + 5] = g;
+      P[o + 6] = b;
+      P[o + 7] = al;
+      P[o + 8] = P[o + 9] = P[o + 10] = P[o + 11] = P[o + 12] = P[o + 13] = 0;
+    }
   }
 
   // ---- Fills.
@@ -1764,7 +1860,7 @@ class GLCtx {
       const k = p1 - p0;
       if (k < 3) continue;
       this.polyRoom(k);
-      for (let i = 0; i < k; i++) this.v(i, this.px[(p0 + i) * 2]!, this.px[(p0 + i) * 2 + 1]!, 0, 0, c, a);
+      this.solidPoly(p0, k, c, a);
       this.emitPoly(k, flags);
     }
   }
@@ -1922,6 +2018,10 @@ class GLCtx {
   private strokeStrip(hw: number, half: number, c: RGBA, a: number, flags: number, sigma: number, ox: number, oy: number): void {
     const P = this.px;
     const soft = (flags & 7) === M_SOFTLINE;
+    const cr = c.r * c.a * a;
+    const cg = c.g * c.a * a;
+    const cb = c.b * c.a * a;
+    const ca = c.a * a;
     for (let s = 0; s < this.nSub; s++) {
       const p0 = this.sub[s]!;
       let p1 = s + 1 < this.nSub ? this.sub[s + 1]! : this.np;
@@ -1944,7 +2044,7 @@ class GLCtx {
         if (ip >= 0) {
           const dx = P[(p0 + i) * 2]! - P[(p0 + ip) * 2]!;
           const dy = P[(p0 + i) * 2 + 1]! - P[(p0 + ip) * 2 + 1]!;
-          const l = Math.hypot(dx, dy) || 1;
+          const l = Math.sqrt(dx * dx + dy * dy) || 1;
           n1x = -dy / l;
           n1y = dx / l;
           nx += n1x;
@@ -1954,12 +2054,12 @@ class GLCtx {
         if (inx >= 0) {
           const dx = P[(p0 + inx) * 2]! - P[(p0 + i) * 2]!;
           const dy = P[(p0 + inx) * 2 + 1]! - P[(p0 + i) * 2 + 1]!;
-          const l = Math.hypot(dx, dy) || 1;
+          const l = Math.sqrt(dx * dx + dy * dy) || 1;
           if (!have) ((n1x = -dy / l), (n1y = dx / l));
           nx += -dy / l;
           ny += dx / l;
         }
-        const l = Math.hypot(nx, ny);
+        const l = Math.sqrt(nx * nx + ny * ny);
         if (l < 1e-6) {
           off[i * 2] = n1x;
           off[i * 2 + 1] = n1y;
@@ -1986,10 +2086,23 @@ class GLCtx {
         const box = off[B * 2]! * half;
         const boy = off[B * 2 + 1]! * half;
         const d = soft ? half : 0;
-        this.v(0, ax - aox, ay - aoy, -d, 0, c, a, hw, sigma);
-        this.v(1, bx - box, by - boy, -d, 0, c, a, hw, sigma);
-        this.v(2, bx + box, by + boy, d, 0, c, a, hw, sigma);
-        this.v(3, ax + aox, ay + aoy, d, 0, c, a, hw, sigma);
+        // (The four corners written here, not through `v`: Nov 27, a call carrying floats boxes each.)
+        const Q = this.poly;
+        for (let q = 0; q < 4; q++) {
+          const o = q * RF;
+          const sg = q < 2 ? -1 : 1;
+          Q[o] = q === 0 || q === 3 ? ax + sg * aox : bx + sg * box;
+          Q[o + 1] = q === 0 || q === 3 ? ay + sg * aoy : by + sg * boy;
+          Q[o + 2] = sg * d;
+          Q[o + 3] = 0;
+          Q[o + 4] = cr;
+          Q[o + 5] = cg;
+          Q[o + 6] = cb;
+          Q[o + 7] = ca;
+          Q[o + 8] = hw;
+          Q[o + 9] = sigma;
+          Q[o + 10] = Q[o + 11] = Q[o + 12] = Q[o + 13] = 0;
+        }
         this.emitPoly(4, flags);
       }
     }
