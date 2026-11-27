@@ -1,4 +1,6 @@
-"""Song AP (Eric, Nov 27): a gothic one, and the first hybrid: a loop of 2:40. A console's chips for the band (drums,
+"""Song AP: the Stranger's theme (Eric, Nov 27, of its third go: "you can change it to the stranger, because that's
+what the boss is, and ... send it to the director to be wired into the stranger as his boss music"). A gothic one,
+and the first hybrid: a loop of 2:40. A console's chips for the band (drums,
 bass, guitars, the lead, a fast pattern) and, on top, voices and instruments played from this file's notes through a
 sampled sound bank (sampled.py: FluidSynth and FluidR3_GM, MIT license): a voice, strings, a flute, an oboe, a
 violin, a bell. Every other song here is computed sample by sample; this one says so because it isn't.

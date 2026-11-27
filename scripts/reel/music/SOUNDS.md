@@ -877,7 +877,7 @@ together on top of it. So not to worry. We'll leave the hollow as is."
 - **Lesson:** twice, bars written to sit inside a finished song he likes came out as "thrown in" or not musical. A
   song he has passed is finished; a longer one is a new song to write whole, not an insert.
 
-## The gothic hybrid (Nov 27, song_ap.py): chips and sampled voices; third go sent (after 1:14 passed)
+## The Stranger's theme (Nov 27, song_ap.py, the gothic hybrid): chips and sampled voices; third go APPROVED, handed over
 
 Eric, with a write-up made with another assistant ("Full Song Deconstruction & IP-Free Master Blueprint": a timeline
 of a reference track, then a plan for one like it): "trying to work with Gemini to help me come up with a song, but
@@ -983,6 +983,21 @@ after 1 minute 14 sounds really good ... when I say balancing, it's really that 
     leaves a hole he hears as "it just died": fill it with what was playing just before.
   - **When he passes part of a song, leave that part sample for sample** (new drum hits take their noise from a
     generator of their own, so the old ones keep theirs) and say that it is unchanged.
+
+**Approved and handed over (Nov 27).** Eric, of the third go's full file (not the clip with the beat pushed
+further): "this Gothic hybrid v3, you can change it to the stranger, because that's what the boss is, and you can
+send it to the director to be wired into the stranger as his boss music."
+- The boss: `stranger` in packages/core's boss list ("The Stranger"; the Battle Tower's floors 10, 30 and 50).
+- `handoff.py`'s SONGS has `("stranger", "song_ap", 0, "The Stranger")`: one loop of 160.0 s, no intro piece (the
+  voice-alone opening comes round with the loop, as he passed it). Built stereo at 192 kbps into
+  `boss-music-stereo-192/` on the stills branch: -16.4 LUFS, peak -1.2 dBFS. Checked: the built file is the approved
+  master (correlation 1.00000), and the loop point is clean on the MP3 and the OGG.
+- Told the director: the files and their entry, and that the game's credits need a line for the sound bank
+  (FluidR3_GM, Frank Wen, MIT license), the first sampled sound in the game's music.
+- What passed, for the next songs: the balance of the third go (the drum loop and fast pattern 2 to 5 dB over the
+  held voices); one soft sampled voice over a chip band; a chip pattern racing under a slow tune; guitars through
+  the amp stage; real flute, oboe, strings and violin for a quiet bridge (he called everything after 1:14 "really
+  good").
 
 ## Sheet music: the town's first piano solo (Nov 26)
 

@@ -54,6 +54,7 @@ SONGS = [("grex", "song_m", 16, "Jefferson"), ("bigboy", "song_k", 0, "Big Boy")
          ("sawyer", "song_p", 32, "Sawyer"), ("timber", "song_q", 32, "Timber"), ("moo", "song_r", 16, "Moo & Moon"), ("clown", "song_s", 0, "Boingo the Clown"),
          ("gingerbread", "song_t", 0, "Ginger"), ("alfil", "song_u", 0, "Alfil"), ("dash", "song_y", 0, "Dash"), ("gardener", "song_z", 0, "Puddles"), ("pig", "song_ac", 0, "Wrangler"),
          ("tiger", "song_af", 0, "Babur"), ("chandy", "song_ag", 0, "Chandy"), ("hopper", "song_x", 0, "Chub & Chirp"), ("smudgy", "song_ao", 0, "Smudgy"), ("birdie", "song_aj", 0, "Birdie"),
+         ("stranger", "song_ap", 0, "The Stranger"),  # (needs FluidSynth and its bank: sampled.py)
          # (Not a boss: the battle tower's own music, a place's theme as the town's is. Its id is a guess until the tower has one.)
          ("tower", "song_an", 0, "The battle tower")]
 
