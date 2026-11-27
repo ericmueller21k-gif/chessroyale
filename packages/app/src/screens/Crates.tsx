@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import {
   BOSS_CRATES,
   CRATES,
+  LOCKER_ART,
   MYTHIC_CRATE,
   FISCHER,
   XP,
@@ -69,7 +70,8 @@ import {
 } from "@chessroyale/core";
 import { account, deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, pickBossCrate, setPawnColor, type OpenForce, type Opened } from "../account.ts";
 import { TokenArt } from "../components/TokenArt.tsx";
-import { Avatar, BetaCrateArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, MythicCrateArt, PresentArt, SupplyBoxArt, TranscendentArt, WinterCrateArt } from "../components/Items.tsx";
+import { Avatar, BetaCrateArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, MythicCrateArt, PresentArt, SupplyBoxArt, TranscendentArt, WinterCrateArt, warmItemArt } from "../components/Items.tsx";
+import { warmsAhead } from "../components/item-art-cache.ts";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { Confirm } from "../components/MatchMenu.tsx";
@@ -1363,6 +1365,31 @@ function RevealDetails({ item, again, quiet, onAgain, onClose, onWear }: { item:
 type LockerTab = ItemSlot | "all";
 const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "ride"];
 const tabName = (t: LockerTab) => (t === "all" ? "All" : SLOT_NAMES[t]);
+const topOf = (s: ItemStack) => s.items[0]!;
+
+/** A locker tab's stacks, in the locker's order: rarest first, then by color, the purest first. */
+function lockerStacks(items: readonly ItemInstance[], tab: LockerTab): ItemStack[] {
+  // (An item this app doesn't know, e.g. one added since it loaded, as an admin's copy of it: left out, not a crash.)
+  return stackItems(items)
+    .filter((s) => itemDef(topOf(s).def) && (tab === "all" || itemDef(topOf(s).def)?.slot === tab))
+    .sort((a, b) => tierIndex(topOf(b).def) - tierIndex(topOf(a).def) || colorIndex(topOf(b).color) - colorIndex(topOf(a).color) || topOf(a).blemish - topOf(b).blemish);
+}
+
+/**
+ * Home's warm-up (Eric, Nov 27: "how about it silently loads when you boot into the website on the main menu?"): the drawings of what
+ * you own, in the locker's order, made ahead in home's idle time a few at a time, so the Locker opens with them ready. Only while home
+ * shows (no match, no Chess Town over it) and the tab is in view; it stops for good when that ends (home starts it again). Answers a stop.
+ */
+export function warmLocker(items: readonly ItemInstance[] | undefined): () => void {
+  if (!items?.length || !warmsAhead()) return () => undefined;
+  const onHome = () => document.visibilityState === "visible" && !!document.querySelector("#app .fd-home") && !document.querySelector("canvas.town-canvas");
+  let stop = () => undefined as void;
+  const wait = setTimeout(() => (stop = warmItemArt(lockerStacks(items, "all").map(topOf), onHome)), LOCKER_ART.warmAfterMs);
+  return () => {
+    clearTimeout(wait);
+    stop();
+  };
+}
 
 /**
  * What you own, and the one place to wear it. Crate items, rarest first, with copies of an item in the same color
@@ -1382,13 +1409,10 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const shop = profile?.shop;
   const pawn = myPawnColor();
   if (!locker) return <p class="muted">Your locker needs your account.</p>;
-  const top = (s: ItemStack) => s.items[0]!;
+  const top = topOf;
   // (The Outfit slot is secret, Eric, Nov 10: its tab shows only once you own an outfit; his exception to "nothing hidden".)
   const outfits = ownsOutfit(locker.items);
-  // (An item this app doesn't know, e.g. one added since it loaded, as an admin's copy of it: left out, not a crash.)
-  const stacks = stackItems(locker.items)
-    .filter((s) => itemDef(top(s).def) && (tab === "all" || itemDef(top(s).def)?.slot === tab))
-    .sort((a, b) => tierIndex(top(b).def) - tierIndex(top(a).def) || colorIndex(top(b).color) - colorIndex(top(a).color) || top(a).blemish - top(b).blemish);
+  const stacks = lockerStacks(locker.items, tab);
   // What you got in the shop: God King effects (under All; the God King tab is gone, Eric, Nov 7).
   const fromShop = GOD_KING_SHOP ? SHOP_ITEMS.filter((i) => wornFromLocker(i) && shop?.owned.includes(i.id)) : [];
   const shopTab = tab === "all" && GOD_KING_SHOP;
@@ -1456,7 +1480,9 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                         }
                   }
                 >
-                  <ItemArt def={it.def} finish={it} />
+                  <span class="locker-art">
+                    <ItemArt def={it.def} finish={it} kept later />
+                  </span>
                   <strong>{itemName(it)}</strong>
                   {hc ? (
                     <>

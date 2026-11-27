@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "preac
 import { WelcomeNotice } from "../components/WelcomeNotice.tsx";
 import { CROWD_PARTY_MAX, BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, canPick, menuBosses, unlockBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
+import { warmLocker } from "./Crates.tsx";
 import { bossAloneElo, chosenDifficulty, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
 import { BossDifficulty } from "../components/BossDifficulty.tsx";
@@ -664,6 +665,9 @@ export function HomeScreen({
   bossParty?: { client: PartyClient | null; error: string | null; onInvite: () => Promise<boolean>; onLeave: () => void };
 }) {
   const { profile } = useAccount();
+  // The locker's drawings made ahead in home's idle time (Eric, Nov 27), so the Locker opens with them ready (Crates.tsx, warmLocker).
+  const lockerItems = profile?.locker?.items;
+  useEffect(() => warmLocker(lockerItems), [lockerItems]);
   const live = useLive();
   // A part resting (a kill switch, status.ts): its way in is disabled, with its line.
   useServerStatus();

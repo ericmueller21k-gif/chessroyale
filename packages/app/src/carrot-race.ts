@@ -34,10 +34,10 @@ const worth = (prize: readonly string[]) => prize.reduce((t, x) => t + VALUE[x]!
  * His ladder's line for a count of carrots (Eric's sheet: "0: nothing · 1: a pawn or two · 2: up to a knight or bishop ·
  * 3: up to a queen and a rook · 4: two queens · 5: he wins"), from the odds: one prize, its name; one kind of piece in
  * several counts, "a pawn or two"; else "up to" the best prize (those tied for best: "a knight or bishop"). The count
- * that wins the battle: "they win".
+ * that wins the battle: "Chub & Chirp wins" (Eric, Nov 27: was "they win").
  */
 export function ladderWords(tier: number, s: Odds = BOSS_POWERS): string {
-  if (tier >= s.carrotCount) return "they win";
+  if (tier >= s.carrotCount) return "Chub & Chirp wins";
   const row = s.carrotOdds[Math.min(tier, s.carrotOdds.length - 1)]!.map((x) => x.prize);
   const keys = [...new Set(row.map(prizeKey))];
   if (keys.length === 1) return prizeWords(row[0]!);
@@ -56,7 +56,7 @@ export function ladderWords(tier: number, s: Odds = BOSS_POWERS): string {
 
 /** Each count's prizes and their odds, in words, for the FAQ: "a pawn 60%, two pawns 40%"; "two queens, every time". */
 export function oddsWords(tier: number, s: Odds = BOSS_POWERS): string {
-  if (tier >= s.carrotCount) return "they win the battle on the spot";
+  if (tier >= s.carrotCount) return "Chub & Chirp wins the battle on the spot";
   const row = s.carrotOdds[Math.min(tier, s.carrotOdds.length - 1)]!;
   if (row.length === 1) return row[0]!.prize.length ? `${prizeWords(row[0]!.prize)}, every time` : "nothing: every card on the reel is blank";
   return row.map((x) => `${prizeWords(x.prize)} ${Math.round(x.p * 100)}%`).join(", ");

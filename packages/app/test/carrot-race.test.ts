@@ -11,7 +11,7 @@ const odds = BOSS_POWERS.carrotOdds;
 
 describe("the ladder and the odds in words", () => {
   it("says the sheet's ladder, from the settings", () => {
-    expect([0, 1, 2, 3, 4, 5].map((t) => ladderWords(t))).toEqual(["nothing", "up to a pawn", "up to a knight or bishop", "up to a queen", "a queen", "they win"]);
+    expect([0, 1, 2, 3, 4, 5].map((t) => ladderWords(t))).toEqual(["nothing", "up to a pawn", "up to a knight or bishop", "up to a queen", "a queen", "Chub & Chirp wins"]);
   });
 
   it("names each prize, and each count's odds", () => {

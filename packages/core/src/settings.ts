@@ -6475,3 +6475,23 @@ export const RESIDENTS = {
 export const ITEM_FRAMES: Readonly<Record<string, "gold" | "diamond">> = { legendary: "gold", mythic: "diamond" };
 /** The tile class for an item tier's frame (" frame-gold", " frame-diamond", or "" for none). */
 export const frameClass = (tier: string) => (ITEM_FRAMES[tier] ? ` frame-${ITEM_FRAMES[tier]}` : "");
+
+/**
+ * The locker's item drawings (Eric, Nov 27: "clicking locker … lags for a sec"; docs/decisions/2026-11-27-locker-speed.md). Each item's
+ * drawing is made once a session and kept (memory only); the locker draws the cells in view before its first paint and fills the rest in
+ * a slice a frame after it; home warms the drawings of what you own in its idle time, so the locker opens with them ready.
+ */
+export const LOCKER_ART = {
+  /** Drawings kept at most (an admin owns about 80 items; each one is about 10 kB of text). */
+  keep: 400,
+  /** Drawings made in one slice at most (the locker's: one a frame; home's warm-up: one an idle moment): a phone, a computer. A warm-up
+   *  slice stops early with under `sliceLeftMs` of idle time left. */
+  slicePhone: 2,
+  sliceComputer: 6,
+  sliceLeftMs: 4,
+  /** Home's warm-up starts this long after home first shows (ms), and waits at most this long for an idle moment each slice (ms). */
+  warmAfterMs: 1500,
+  idleWaitMs: 1000,
+  /** No warm-up on a device that says it has this little memory (GB, `navigator.deviceMemory`) or less, or asks to save data. */
+  warmMinMemoryGb: 2,
+} as const;
