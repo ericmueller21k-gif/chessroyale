@@ -275,6 +275,51 @@ describe("the Matchmaker's 1 v 1 queue", () => {
     expect(D.made.size).toBe(0);
   });
 
+  it("a search begun at a town's table (Nov 27): the game is made with the town's flag, and the town is told the pair, the longer search first, before either hears the code", async () => {
+    const events: string[] = [];
+    const D = duels();
+    const created: Record<string, unknown>[] = [];
+    const ns = {
+      idFromName: (n: string) => n,
+      get: (code: string) => ({
+        ...(D.ns as { get: (c: string) => object }).get(code),
+        async create(c: string, players: { w: DuelPlayerView; b: DuelPlayerView }, opts: Record<string, unknown>) {
+          created.push(opts);
+          events.push("created");
+          return (D.ns as { get: (c: string) => { create: (...a: unknown[]) => Promise<boolean> } }).get(code).create(c, players, opts);
+        },
+      }),
+    };
+    const live = {
+      idFromName: (n: string) => n,
+      get: () => ({
+        async players() {
+          return 2;
+        },
+        async townMatch(code: string, order: { uid: string; pawn: string }[]) {
+          events.push(`town ${order.map((s) => `${s.uid}:${s.pawn}`).join(",")}`);
+          return true;
+        },
+      }),
+    };
+    const store = new Map<string, unknown>();
+    const ctx = { storage: { get: async (k: string) => store.get(k), put: async (k: string, v: unknown) => void store.set(k, v) }, blockConcurrencyWhile: <T>(fn: () => Promise<T>) => fn() };
+    const mm = new TestMatchmaker(ctx as unknown as DurableObjectState, { DUELS: ns, LIVE: live } as never);
+    const first = await mm.duelNext(null, { ...info("ann", 1500), town: true, pawn: "black" });
+    const bob = await mm.duelNext(null, info("bob", 1500));
+    events.push("code");
+    expect("code" in bob && bob.code).toBeTruthy();
+    expect(created[0]).toMatchObject({ town: true });
+    expect(events).toEqual(["created", "town ann:black,bob:white", "code"]);
+    expect("code" in (await mm.duelNext(ticketOf(first)))).toBe(true);
+    // (Neither from a table: no flag, the town never asked.)
+    const D2 = duels();
+    const mm2 = matchmaker(D2.ns);
+    await mm2.duelNext(null, info("cy", 1500));
+    await mm2.duelNext(null, info("di", 1500));
+    expect(D2.made.size).toBe(1);
+  });
+
   it("each player's ask answered with the game's code tells the game, once (ranked's leave rules: a no-show is a dodge only then)", async () => {
     const D = duels();
     const mm = matchmaker(D.ns);

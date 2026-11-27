@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { CAPACITY, CROWD_PARTY_MAX, DEFAULT_SETTINGS, MATCHMAKING, firstGetsWhite, pawnColorOf, type SeatColor } from "@chessroyale/core";
+import { CAPACITY, CROWD_PARTY_MAX, DEFAULT_SETTINGS, MATCHMAKING, TOWN_TABLES, firstGetsWhite, pawnColorOf, type SeatColor } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
@@ -399,14 +399,17 @@ export class Matchmaker extends DurableObject<Env> {
       countCall("mm.createFailed");
       return false;
     }
-    this.placeAll(tickets, code);
     // Ranked at the park's tables (Eric, Nov 27): the town seats the pair at a table, the first's (the one who searched longer) if they
-    // still sit there (live-hub.ts townMatch, town-tables.ts found). Not waited for: the game is theirs already.
+    // still sit there (live-hub.ts townMatch, town-tables.ts found). Before they hear the code: once they do, their towns close and say
+    // they've left, and a table is seated only where the town still has one of them sitting. At most TOWN_TABLES.seatWaitMs: the game is
+    // theirs whatever the town says.
     if (town && this.env.LIVE) {
       const seat = (t: Ticket): TableSeat => ({ uid: view(t).uid, name: view(t).name, look: view(t).look ?? null, pawn: pawnColorOf(t.info?.pawn as string | undefined) });
       const [first, second] = [...tickets].sort((x, y) => x.at - y.at);
-      this.ctx.waitUntil(liveHub(this.env).townMatch(code, [seat(first!), seat(second!)]).catch(() => false));
+      const told = liveHub(this.env).townMatch(code, [seat(first!), seat(second!)]).catch(() => false);
+      await Promise.race([told, new Promise((ok) => setTimeout(ok, TOWN_TABLES.seatWaitMs))]);
     }
+    this.placeAll(tickets, code);
     return true;
   }
 

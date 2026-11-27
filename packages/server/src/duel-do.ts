@@ -261,9 +261,11 @@ export class DuelGame extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 });
     if (!this.record || (await this.closeIfDue())) return new Response("No such game", { status: 404 });
-    // Watching (the town's spectator view, Nov 27): anyone with the code, at most TOWN_TABLES.watchersMax at once; it hears the game as
-    // both players do and nothing it sends reaches the game (webSocketMessage answers only its hello).
+    // Watching (the town's spectator view, Nov 27): a game found from a town's table only (its players sat down in front of everyone),
+    // anyone with the code, at most TOWN_TABLES.watchersMax at once; it hears the game as both players do and nothing it sends reaches the
+    // game (webSocketMessage answers only its hello).
     if (new URL(request.url).searchParams.get("watch") === "1") {
+      if (!this.record.town) return new Response(JSON.stringify({ message: "This game can't be watched." }), { status: 403 });
       if (this.watchers().length >= TOWN_TABLES.watchersMax) return new Response(JSON.stringify({ message: "Too many are watching this game." }), { status: 429 });
       const pair = new WebSocketPair();
       this.ctx.acceptWebSocket(pair[1]);
