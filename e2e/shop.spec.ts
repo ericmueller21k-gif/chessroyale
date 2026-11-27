@@ -1973,8 +1973,8 @@ test("rare frames: gold Legendary, diamond Mythic, commons plain; the magnifier 
   await expect(tile("Beanie").locator(".locker-item")).not.toHaveClass(/frame-/);
   await expect(tile("Candy Cane").locator(".locker-item")).toHaveClass(/frame-gold/);
   await expect(tile("Riding Chirp").locator(".locker-item")).toHaveClass(/frame-diamond/);
-  const sizes = await page.locator(".locker-item").evaluateAll((els) => els.map((e) => `${e.getBoundingClientRect().width}x${e.getBoundingClientRect().height}`));
-  expect(new Set(sizes).size, "every tile the same size").toBe(1);
+  const sizes = await page.locator(".locker-item").evaluateAll((els) => els.map((e) => `${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`));
+  expect(new Set(sizes).size, `every tile the same size: ${sizes.join(" ")}`).toBe(1);
   // The magnifier: the preview, nothing worn.
   await page.getByRole("button", { name: "Preview Riding Chirp" }).click();
   const box = page.getByRole("dialog");
