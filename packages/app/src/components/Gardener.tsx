@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { GARDEN_ART, WATER_BEATS, growthAt, withPiece, withoutPiece, type GardenView } from "@chessroyale/chess";
+import { GARDEN_ART, WATER_BEATS, growthArt, growthAt, withPiece, withoutPiece, type GardenView } from "@chessroyale/chess";
 import { BOSS_POWERS, type WaterGrowth } from "@chessroyale/core";
 import { SWEEP_MS } from "../characters/effects/gardener.ts";
 import { pickLine } from "../characters/boss-beats.ts";
@@ -29,7 +29,7 @@ import { SoundAt, onSquare, type BoardLayerProps, type BossUi, type Moment, type
  * - **The watering** (`water`, as the crowd's turn after it begins; his whole turn): his cast at the board's corner; at its `spray` cue the
  *   `waterSweep` crosses the board and each outcome's square sprouts as the front reaches it; then each outcome in the moment's `growth`
  *   order, WATER_BEATS apart: a killer plant `kill` (the piece off at `snap`, as a captured piece goes), a grown piece `bud` / `budQueen`
- *   (the piece on at `pop`, with a pop-in), a plain plant `grow` then `green`, nothing `wilt`. The board under the moment is the position
+ *   (`budQueen` a seed's queen, the jackpot; a regrown one a `bud`: growthArt; the piece on at `pop`, with a pop-in), a plain plant `grow` then `green`, nothing `wilt`. The board under the moment is the position
  *   before it until each outcome's cue (`gardenerFen`). Then his reaction: `cheer`, `bigCheer` or `shrug`.
  * - **The plain plants** stay drawn on their squares from `garden.plants` while they block: `green` at `left` 3, `toFall` then `fall` at 2,
  *   `toDrop` then `drop` at 1, `gone` as one leaves the list. A reload shows each in its state without a watering played again (a
@@ -146,8 +146,9 @@ function waterItems(m: Moment, now: number, orientation: Orientation): BoardItem
     const sproutAt = m.at + WATER_BEATS.sprayAt + frontMs(g.square, orientation);
     const at = m.at + growthAt(i);
     if (now >= at) {
-      // (The queen's pop has a chime of its own: SoundAt below. A plain plant ends on its green and stays so.)
-      const how = g.kind === "killer" ? { anim: "kill" } : g.kind === "q" ? { anim: "budQueen", quiet: true } : g.kind === "plant" ? { anim: "grow", then: "green" } : g.kind === "nothing" ? { anim: "wilt" } : { anim: "bud" };
+      // (The jackpot queen's pop has a chime of its own: SoundAt below; a regrown queen is a plain bud. A plain plant ends on its green and stays so.)
+      const art = growthArt(g);
+      const how = art === "budQueen" ? { anim: art, quiet: true } : art === "grow" ? { anim: art, then: "green" } : { anim: art };
       out.push({ square: g.square, name: "gardenPlant", since: at, ...how });
     } else if (now >= sproutAt) out.push({ square: g.square, name: "gardenPlant", anim: "sprout", since: sproutAt, quiet: true });
   });
@@ -407,7 +408,7 @@ function waterMoment({ boss, moment, now, cast, kit }: MomentProps) {
   return (
     <div class="power-moment pm-water">
       {cast("spray", WATER_BEATS.sprayAt)}
-      {growth.map((x, i) => (x.kind === "q" ? <SoundAt key={`chime-${i}`} id={`${moment.key}:${boss.startMove}:chime:${i}`} at={moment.at + growthAt(i) + GARDEN_ART.budPop} now={now} sound="gardenerChime" /> : null))}
+      {growth.map((x, i) => (growthArt(x) === "budQueen" ? <SoundAt key={`chime-${i}`} id={`${moment.key}:${boss.startMove}:chime:${i}`} at={moment.at + growthAt(i) + GARDEN_ART.budPop} now={now} sound="gardenerChime" /> : null))}
       {eaten >= 0 && now >= moment.at + growthAt(eaten) + EATEN_AT() && <Say voice={bossVoice} text={line} sayKey={`${boss.id}:${boss.startMove}:${moment.key}:eaten`} priority={NORMAL} />}
     </div>
   );
