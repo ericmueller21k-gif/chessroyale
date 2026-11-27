@@ -1,6 +1,8 @@
 // The Stranger's art (Nov 27; docs/decisions/2026-11-27-stranger-art.md), drawn ahead of his rules: his figure (and its locked look), his
 // kit (ART_KITS until his rules put him in the roster), his square's fire and ice, and his sounds. The same checks characters.test.ts and
 // boss-character.test.ts make of every boss, plus his own: swords on his back at rest, drawn before every move, the tips meeting.
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ART_KITS, BOSS_KITS } from "../src/characters/kits.ts";
 import { EFFECTS } from "../src/characters/power-art.ts";
@@ -13,7 +15,6 @@ import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import type { Beat } from "../src/characters/boss-beats.ts";
 
 const whole = (ch: Character, edges = true) => {
-  for (const [name, part] of Object.entries(ch.parts)) for (const row of part.grid) for (const k of row) if (k !== ".") expect(ch.palette, `${name}: "${k}"`).toHaveProperty(k);
   for (const [name, anim] of Object.entries(ch.anims))
     anim.frames.forEach((f, i) => {
       for (const look of [undefined, ...Object.keys(ch.looks ?? {})]) expect(renderFrame(ch, f, { look }).data.length).toBe(ch.w * ch.h * 4);
@@ -22,6 +23,9 @@ const whole = (ch: Character, edges = true) => {
       const edge = [...keys[0]!, ...keys[ch.h - 1]!, ...keys.map((r) => r[0]), ...keys.map((r) => r[ch.w - 1])];
       expect(edge.filter(Boolean), `${ch.id} ${name} frame ${i + 1}`).toEqual([]);
     });
+  // (After the frames: his parts are painted the first time a frame shows them.)
+  expect(Object.keys(ch.parts).length).toBeGreaterThan(0);
+  for (const [name, part] of Object.entries(ch.parts)) for (const row of part.grid) for (const k of row) if (k !== ".") expect(ch.palette, `${name}: "${k}"`).toHaveProperty(k);
 };
 
 describe("the Stranger's art", () => {
@@ -70,6 +74,26 @@ describe("the Stranger's art", () => {
     const P = STRANGER_PORTRAIT;
     expect(P.x >= 0 && P.y >= 0 && P.x + P.w <= STRANGER.w && P.y + P.h <= STRANGER.h).toBe(true);
     for (const lines of Object.values(STRANGER_LINES)) for (const line of lines ?? []) expect(line.length, line).toBeLessThan(48);
+  });
+
+  it("none of his lines is another speaker's (his voice's sound is keyed by a line's words: a shared line changed theirs)", () => {
+    const mine = Object.values(STRANGER_LINES).flatMap((l) => [...(l ?? [])]);
+    const src = join(import.meta.dirname, "../src");
+    const files = (readdirSync(src, { recursive: true }) as string[]).filter((f) => /\.tsx?$/.test(f) && !f.endsWith("stranger-lines.ts"));
+    expect(files.length).toBeGreaterThan(100);
+    for (const f of files) {
+      const text = readFileSync(join(src, f), "utf8");
+      for (const line of mine) for (const q of ['"', "'", "`"]) expect(text.includes(q + line + q), `"${line}" in ${f}`).toBe(false);
+    }
+  });
+
+  it("his ready blades stay clear of the ground (the ground's cut is for his planted swords only)", () => {
+    for (const name of ["draw", "slash", "cast", "ready"])
+      for (const f of STRANGER.anims[name]!.frames) {
+        const keys = frameKeys(STRANGER, f);
+        // (A blade reaching the ground's row would be cut there: none in the row above it.)
+        expect(keys.slice(STRANGER_FOOT[1] - 1).flat().filter((k) => k && "pPqQysSvVW".includes(k)), name).toEqual([]);
+      }
   });
 
   it("his sounds are his own, every one used, quieter than a piece's move, and the same every time", () => {

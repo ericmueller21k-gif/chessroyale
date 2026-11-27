@@ -1,7 +1,7 @@
 /**
  * The Stranger's board art (docs/decisions/2026-11-27-stranger-art.md): his twin-tip cast landing on a square, fire and ice at once.
- * One square is SQUARE (32) art px, as every boss's board art. Drawn, not wired: his rules job puts it in power-art.ts EFFECTS (a
- * start, a loop, an end that ends on an empty frame) and plays it on the shared board-effects canvas.
+ * One square is SQUARE (32) art px, as every boss's board art. Its entry is in power-art.ts EFFECTS (`strangerSquare`: a start, its
+ * stages, an end that ends on an empty frame); his rules job plays it on the shared board-effects canvas.
  *
  * - `strike`: two bolts spiral in from the square's corners, ember and ice, meet at its middle in a flash, and an ice block grows
  *   over the piece (a cue `freeze`); it ends on `frozen`'s first frame.

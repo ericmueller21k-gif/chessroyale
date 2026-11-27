@@ -12,7 +12,7 @@ import type { Beat } from "./boss-beats.ts";
 export const STRANGER_LINES: Partial<Record<Beat, readonly string[]>> = {
   entrance: ["Kneel, or draw.", "A crown is only borrowed. I came to collect."],
   move: ["Hm.", "As expected.", "Go on."],
-  capture: ["Cut down.", "One less.", "Too slow."],
+  capture: ["Cut down.", "One less.", "You hesitated."],
   hurt: ["A scratch.", "Interesting."],
   strike: ["Fall."],
   thinking: ["Fire, or ice…", "Patience is a blade too."],

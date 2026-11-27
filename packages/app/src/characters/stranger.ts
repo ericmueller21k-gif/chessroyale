@@ -4,7 +4,8 @@
  * place come in their own job (docs/decisions/2026-11-27-stranger-art.md).
  *
  * An original JRPG swordsman, drawn facing front, light from the top left, in a 128 x 128 frame, his feet at [64, 122], about 100 px
- * from his boots to his crown's tips: long white hair parted over his brow and draped down both sides of him to his waist; pale skin, a
+ * from his boots to his crown's tips: long white hair parted over his brow, its front locks framing his face, the whole of it falling
+ * long and wide behind him past both shoulders to his knees, drawn strand by single-pixel strand (Eric, Nov 27); pale skin, a
  * narrow face, one ember eye and one ice eye; a long midnight-indigo trench coat of his own cut (a standing collar, gold trim, open
  * from the belt down over dark trousers, its crimson lining showing as its tails swing: the trench-coat idea of the Hidden Boss's final
  * form, cut and colored anew, no pauldrons); dark gloves and boots; and his crown, a grander Fire & Ice crown than the player's item:
@@ -112,14 +113,15 @@ const N4: readonly Pt[] = [
 
 /**
  * Lays `src` over `dst`. Its own outline goes only where it meets what's under it (the figure's outer outline is the renderer's ring),
- * so every piece keeps a 1-pixel dark edge against the next, as every part of ours does.
+ * so every piece keeps a 1-pixel dark edge against the next, as every part of ours does; none against the keys in `joins` (a lock of
+ * hair over the hair it's part of).
  */
-function lay(dst: Cv, src: Cv, ring = true): void {
+function lay(dst: Cv, src: Cv, ring = true, joins = ""): void {
   if (ring)
     for (let y = 0; y < src.length; y++)
       for (let x = 0; x < src[0]!.length; x++) {
         if (src[y]![x] !== ".") continue;
-        if (get(dst, x, y) === "." || get(dst, x, y) === "k") continue;
+        if (get(dst, x, y) === "." || get(dst, x, y) === "k" || joins.includes(get(dst, x, y))) continue;
         if (N4.some(([dx, dy]) => get(src, x + dx, y + dy) !== ".")) dst[y]![x] = "k";
       }
   for (let y = 0; y < src.length; y++) for (let x = 0; x < src[0]!.length; x++) if (src[y]![x] !== ".") dst[y]![x] = src[y]![x]!;
@@ -273,30 +275,67 @@ function paintSword(c: Cv, kind: "fire" | "ice", at: Pt, deg: number, phase = 0)
 const BACK_F = { at: [44, 39] as Pt, deg: 140 };
 const BACK_I = { at: [84, 39] as Pt, deg: -140 };
 
+// His hair is drawn strand by strand: single-pixel strands side by side, light and shadow alternating (Eric, Nov 27: "the strands really
+// need to be like thinly drawn pixel next to each other more, not these like chunks"), a few white highlight pixels in its sheen.
+const HAIR = "HhjJ";
+const HAIR_KEYS = "HhjJW";
+/** Each strand's shade against its neighbors': light and shadow by turns, never two alike side by side. */
+const STRAND_TONE = [0.22, -0.18, 0.1, -0.3, 0.26, -0.08, 0.16, -0.24, 0.04, -0.14];
+const strandTone = (n: number) => STRAND_TONE[((n % STRAND_TONE.length) + STRAND_TONE.length) % STRAND_TONE.length]!;
+/** A strand's highlight: a white pixel where a light strand crosses the sheen. */
+const sheen = (n: number) => strandTone(n) > 0.15;
+/** Linear between the points `pts` ([y, value], by y). */
+const along = (pts: readonly Pt[], y: number) => {
+  if (y <= pts[0]![0]) return pts[0]![1];
+  for (let i = 1; i < pts.length; i++) {
+    const [y1, v1] = pts[i]!;
+    const [y0, v0] = pts[i - 1]!;
+    if (y <= y1) return v0 + ((y - y0) / (y1 - y0)) * (v1 - v0);
+  }
+  return pts.at(-1)![1];
+};
+
+/** The fall's half width by height (frame px, standing): narrow at his crown, past his shoulders by his chest, widest at its ends. */
+const FALL_HW: readonly Pt[] = [
+  [20, 9],
+  [30, 15],
+  [44, 19],
+  [54, 25],
+  [70, 32],
+  [90, 37],
+  [106, 38],
+];
+/** The strands across the fall: about one a pixel where it's widest. */
+const FALL_STRANDS = 68;
+
+/**
+ * The long fall behind him: from the crown of his head down behind his shoulders and his back, fanning out past both shoulders to his
+ * knees (seen to his left and right behind the coat), strand by strand, its tips in pointed locks, swaying at their ends.
+ */
 function paintBackHair(c: Cv, oy: number, sway: number): void {
-  // The long fall behind him: from the crown of his head down to his waist, wider toward its ends, its tips swaying.
-  const s = sway * 1.5;
-  fillPoly(
-    c,
-    [
-      [54, 26 + oy],
-      [74, 26 + oy],
-      [78, 46 + oy],
-      [81 + s, 74 + oy],
-      [80 + s, 90 + oy],
-      [76 + s, 86 + oy],
-      [64, 78 + oy],
-      [52 + s, 86 + oy],
-      [48 + s, 90 + oy],
-      [47 + s, 74 + oy],
-      [50, 46 + oy],
-    ],
-    (x, y) => {
-      const strand = (x + Math.floor(y / 11)) % 4;
-      const l = 0.45 - (x - MID) * 0.012 + (strand === 0 ? -0.3 : strand === 2 ? 0.14 : 0);
-      return ramp("Hhj", l);
-    },
-  );
+  const tipOf = (n: number) => {
+    // (Pointed locks of 7 strands, the middle one longest; shorter toward the fall's outer edges.)
+    // (Each lock its own length, for a wild, uneven end.)
+    const s = (n + 0.5) / FALL_STRANDS - 0.5;
+    const g = n % 7;
+    const lockLen = [0, 5, 2, 7, 1, 4, 6, 3, 5, 0][Math.floor(n / 7) % 10]!;
+    return 108 - 22 * s * s - Math.abs(g - 3) * 1.8 - ((n * 5) % 3) - lockLen;
+  };
+  for (let y = 20; y < 108; y++) {
+    const hw = along(FALL_HW, y);
+    const drift = sway * 1.5 * Math.max(0, (y - 50) / 50);
+    for (let x = Math.floor(MID - hw - 3); x <= Math.ceil(MID + hw + 3); x++) {
+      // (Each strand a gentle wave down its length.)
+      const wave = 0.5 * Math.sin(y * 0.16 + (x - MID) * 0.05);
+      const s = (x + 0.5 - MID - drift - wave) / hw;
+      if (Math.abs(s) > 1) continue;
+      const n = Math.floor(((s + 1) / 2) * FALL_STRANDS);
+      if (y > tipOf(n)) continue;
+      // (Lit from the top left; darker toward its ends, behind him.)
+      const l = 0.46 - s * 0.18 - Math.max(0, y - 64) * 0.004 + strandTone(n);
+      put(c, x, y + oy, (y === 66 || y === 67) && sheen(n) && s < 0 ? "J" : ramp(HAIR, l));
+    }
+  }
 }
 
 function paintLegs(c: Cv, oy: number, kneel: number): void {
@@ -539,7 +578,6 @@ function paintHead(c: Cv, pose: StrangerPose, ox: number, oy: number, sway: numb
     if (mouth === "smirk") put(hd, 67 + ox, my - 1, "m");
   }
   // The hair over his head: a dome from brow to crown, its bangs in long points over his brow, between his eyes and past them.
-  const s = sway;
   fillPoly(
     hd,
     [
@@ -560,35 +598,56 @@ function paintHead(c: Cv, pose: StrangerPose, ox: number, oy: number, sway: numb
       [54 + ox, 39 + oy],
     ],
     (x, y) => {
-      // (Strands sweeping from the crown's middle down to the bangs' points.)
-      const strand = Math.round((x - 64 - ox) * (1 - (y - 21 - oy) / 30) + 64) % 4;
-      return ramp("hjJW", 0.74 - (x - 54 - ox) * 0.024 - (y - 21 - oy) * 0.008 + (strand === 0 ? -0.26 : 0));
+      // (Single strands sweeping from his crown's middle out and down to the bangs' points, a white pixel where a light one meets the
+      // sheen just under the crown.)
+      const n = Math.floor(Math.atan2(x + 0.5 - 64 - ox, y + 0.5 - 15 - oy) * 22);
+      const l = 0.78 - (x - 54 - ox) * 0.02 - (y - 21 - oy) * 0.012 + strandTone(n);
+      return y - oy === 27 && sheen(n) && x - ox < 70 ? "W" : ramp(HAIR, l);
     },
   );
   lay(c, hd);
-  // The side locks: from his temples down in front of his shoulders to his chest, swaying at their tips.
-  const lock = (x0: number, lean: number, lit: boolean) => {
+  // The front locks: from his temples down past his cheeks over his collar, the front of the same fall (no line between them), each a
+  // band of strands, their tips in points at his collarbone. Inside the swords' hilts on his back.
+  const lock = (side: -1 | 1) => {
     const lk = cvs();
-    fillPoly(
-      lk,
-      [
-        [x0 - 1.5 + ox, 30 + oy],
-        [x0 + 2.5 + ox, 30 + oy],
-        [x0 + 2.5 + lean * 0.4 + ox, 52 + oy],
-        [x0 + 2 + lean + s * 1.5, 72 + oy],
-        [x0 + 0.5 + lean + s * 1.5, 78 + oy],
-        [x0 - 1.5 + lean + s * 1.5, 70 + oy],
-        [x0 - 1.5 + lean * 0.4 + ox, 52 + oy],
-      ],
-      (x, y) => {
-        const strand = (x + Math.floor(y / 13)) % 3;
-        return ramp(lit ? "hjJW" : "Hhj", 0.62 - (x - x0 - ox) * 0.1 + (strand === 0 ? -0.3 : strand === 2 ? 0.1 : 0));
-      },
-    );
-    lay(c, lk);
+    // (Inner edge by the face, outer edge out toward his shoulder: our left lock's, mirrored for the other.)
+    const inner: readonly Pt[] = [
+      [27, 57],
+      [34, 56],
+      [40, 55.5],
+      [47, 57],
+      [54, 56.5],
+      [62, 55],
+    ];
+    const outer: readonly Pt[] = [
+      [27, 52],
+      [40, 51],
+      [46, 50.5],
+      [54, 47],
+      [62, 45],
+    ];
+    const N = 7;
+    const tips = [61, 64, 62, 66, 63, 60, 62];
+    for (let y = 27; y <= 66; y++) {
+      const a = along(outer, y);
+      const b = along(inner, y);
+      const d = sway * 1.2 * Math.max(0, (y - 44) / 20);
+      for (let x = Math.floor(a) - 1; x <= Math.ceil(b) + 1; x++) {
+        const t = (x + 0.5 - a - d) / (b - a);
+        if (t < 0 || t >= 1) continue;
+        const n = Math.floor(t * N);
+        if (y > tips[side < 0 ? n : N - 1 - n]!) continue;
+        const X = side < 0 ? x : 2 * MID - 1 - x;
+        // (Our left lock lit, the other in his shade; each strand's own tone.)
+        const l = (side < 0 ? 0.66 : 0.4) - Math.max(0, y - 44) * 0.006 + strandTone(n + (side < 0 ? 0 : 3)) * 1.2;
+        put(lk, X + ox, y + oy, side < 0 && y === 38 && sheen(n) ? "W" : ramp(HAIR, l));
+      }
+    }
+    // (No outline where it falls in front of the hair behind it: one fall.)
+    lay(c, lk, true, HAIR_KEYS);
   };
-  lock(53, -1, true);
-  lock(75, 1, false);
+  lock(-1);
+  lock(1);
   // The crown.
   paintCrown(c, cx, 22 + oy);
 }
@@ -665,14 +724,14 @@ function paintFigure(c: Cv, p: StrangerPose, phase: number): void {
   const oy = (p.bob ?? 0) + Math.round(10 * (p.kneel ?? 0));
   const sway = p.sway ?? 0;
   const [hx, hy] = p.head ?? [0, 0];
-  // Swords on his back first (behind everything), then his hair's long fall.
+  // His hair's long fall first (behind everything), then the swords crossed on his back, their hilts over it.
+  const hair = cvs();
+  paintBackHair(hair, oy + hy, sway);
+  lay(c, hair);
   const back = cvs();
   if (p.swordF === "back") paintSword(back, "fire", [BACK_F.at[0], BACK_F.at[1] + oy], BACK_F.deg, phase);
   if (p.swordI === "back") paintSword(back, "ice", [BACK_I.at[0], BACK_I.at[1] + oy], BACK_I.deg, phase);
   lay(c, back);
-  const hair = cvs();
-  paintBackHair(hair, oy + hy, sway);
-  lay(c, hair);
   const legs = cvs();
   paintLegs(legs, oy, p.kneel ?? 0);
   lay(c, legs);
@@ -703,32 +762,46 @@ function figurePart(p: StrangerPose, phase: number): { name: string; at: Pt } | 
 
 /**
  * His aura: a soft ring 2 to 4 px off his outline (fire on our left of his middle, ice on our right), its outer edge flickering by the
- * phase, and a few embers and frost motes rising. See-through, no outline: one part per figure and phase.
+ * phase. See-through, no outline: one part per figure, phase and level (1 his idle's, 2 flared), grown from the figure's own part (the
+ * figure is painted once, never again for its aura).
  */
-function auraPart(p: StrangerPose, phase: number, strength = 1): { name: string; at: Pt } | null {
+function auraPart(p: StrangerPose, phase: number, level: 1 | 2): { name: string; at: Pt } | null {
+  const fig = figurePart(p, phase);
+  if (!fig) return null;
   return part(
-    `aura:${poseKey(p, phase)}:${strength}`,
+    `aura:${poseKey(p, phase)}:${level}`,
     (c) => {
-      const fig = cvs();
-      paintFigure(fig, p, phase);
-      const solid = (x: number, y: number) => get(fig, x, y) !== ".";
-      // Distance to his figure, up to 4 px (a few passes of growth).
-      const dist: number[][] = fig.map((r) => r.map((k) => (k === "." ? 99 : 0)));
-      for (let pass = 1; pass <= 4; pass++)
-        for (let y = 0; y < STRANGER_H; y++)
-          for (let x = 0; x < STRANGER_W; x++)
-            if (dist[y]![x] === 99 && N4.some(([dx, dy]) => dist[y + dy]?.[x + dx] === pass - 1)) dist[y]![x] = pass;
-      for (let y = 0; y < STRANGER_H; y++)
-        for (let x = 0; x < STRANGER_W; x++) {
-          const d = dist[y]![x]!;
-          if (d === 0 || d === 99 || y > GROUND - 1) continue;
-          if (solid(x, y)) continue;
-          // (Its reach flickers: 2 to 4 px by a wave along his outline, moving with the phase.)
-          const reach = 2 + strength * (1 + Math.round(1 + Math.sin(y * 0.45 + phase * 1.7 + (x < MID ? 0 : 2)))) * 0.5;
-          if (d > Math.min(4, reach + 0.5)) continue;
-          const fire = x < MID;
-          put(c, x, y, d <= 1 ? (fire ? "7" : "9") : fire ? "6" : "8");
-        }
+      const grid = STRANGER_PARTS[fig.name]!.grid;
+      const [fx, fy] = fig.at;
+      // Distance to his figure, up to 4 px, in a box 5 px round it (one pass outward per pixel of distance).
+      const x0 = fx - 5;
+      const y0 = fy - 5;
+      const w = grid[0]!.length + 10;
+      const h = grid.length + 10;
+      const dist = new Uint8Array(w * h).fill(99);
+      let edge: number[] = [];
+      grid.forEach((row, y) => {
+        for (let x = 0; x < row.length; x++) if (row[x] !== ".") (dist[(y + 5) * w + x + 5] = 0), edge.push((y + 5) * w + x + 5);
+      });
+      for (let d = 1; d <= 4; d++) {
+        const next: number[] = [];
+        for (const i of edge)
+          for (const j of [i - 1, i + 1, i - w, i + w])
+            if (j >= 0 && j < dist.length && dist[j] === 99 && Math.abs((j % w) - (i % w)) <= 1) (dist[j] = d), next.push(j);
+        edge = next;
+      }
+      for (let i = 0; i < dist.length; i++) {
+        const d = dist[i]!;
+        if (d === 0 || d === 99) continue;
+        const x = x0 + (i % w);
+        const y = y0 + Math.floor(i / w);
+        if (y > GROUND - 1) continue;
+        // (Its reach flickers: 2 to 4 px by a wave along his outline, moving with the phase.)
+        const reach = 2 + level * (1 + Math.round(1 + Math.sin(y * 0.45 + phase * 1.7 + (x < MID ? 0 : 2)))) * 0.5;
+        if (d > Math.min(4, reach + 0.5)) continue;
+        const fire = x < MID;
+        put(c, x, y, d <= 1 ? (fire ? "7" : "9") : fire ? "6" : "8");
+      }
     },
     false,
   );
@@ -754,8 +827,8 @@ export interface FrameOpts {
   specks?: readonly Speck[];
   /** Extra layers over him (a slash's arc, the cast's light). */
   over?: readonly Layer[];
-  /** The aura's strength (0 none, 1 his idle's, 2 flared). */
-  aura?: number;
+  /** His aura: 0 none, 1 his idle's, 2 flared. */
+  aura?: 0 | 1 | 2;
   pal?: Readonly<Record<string, string>>;
 }
 
@@ -765,11 +838,11 @@ export function strangerFrame(p: StrangerPose, phase: number, o: FrameOpts): Fra
   const sh = shadowPart();
   if (sh) layers.push({ part: sh.name, x: sh.at[0], y: sh.at[1] });
   const aura = o.aura ?? 1;
-  if (aura > 0) {
+  if (aura !== 0) {
     const a = auraPart(p, phase % 4, aura);
     if (a) layers.push({ part: a.name, x: a.at[0], y: a.at[1] });
   }
-  const f = figurePart(p, phase % 4);
+  const f = figurePart(p, phase % 4); // (cached: the aura made it first)
   if (f) layers.push({ part: f.name, x: f.at[0], y: f.at[1] });
   layers.push(...(o.over ?? []));
   return { layers, ms: o.ms, ...(o.cue ? { cue: o.cue } : {}), ...(o.shake ? { shake: o.shake } : {}), ...(o.specks ? { specks: o.specks } : {}), ...(o.pal ? { pal: o.pal } : {}) };
@@ -801,12 +874,13 @@ export const POSES = {
     eyes: "narrow",
     mouth: "smirk",
   },
+  // (Their tips clear of the ground: the ground's cut is for his planted swords alone.)
   ready: {
     ...REST,
-    armF: [[43, 70], [41, 83]],
-    armI: [[85, 70], [87, 83]],
-    swordF: held([41, 83], -168),
-    swordI: held([87, 83], 168),
+    armF: [[43, 67], [41, 79]],
+    armI: [[85, 67], [87, 79]],
+    swordF: held([41, 79], -168),
+    swordI: held([87, 79], 168),
     mouth: "smirk",
   },
   // The double slash: both raised high and back, then down across in an X (his arms crossed), then the follow-through.
@@ -948,12 +1022,12 @@ const F = (pose: PoseName | StrangerPose, phase: number, o: FrameOpts): Frame =>
 const breathe = (p: StrangerPose, i: number): StrangerPose => ({ ...p, bob: i >= 2 ? 1 : 0, sway: [0, 0.5, 0, -0.5][i % 4]! });
 
 const idle = (): Anim => ({ loop: true, frames: [0, 1, 2, 3].map((i) => F(breathe(POSES.rest, i), i, { ms: 320 })) });
-const readyLoop = (): Anim => ({ loop: true, frames: [0, 1, 2, 3].map((i) => F(breathe(POSES.ready, i), i, { ms: 300, aura: 1.5 })) });
+const readyLoop = (): Anim => ({ loop: true, frames: [0, 1, 2, 3].map((i) => F(breathe(POSES.ready, i), i, { ms: 300, aura: 2 })) });
 const drawFrames = (): Frame[] => [
   F("reach", 0, { ms: 140 }),
-  F("pull", 1, { ms: 110, cue: "draw", aura: 1.5 }),
+  F("pull", 1, { ms: 110, cue: "draw", aura: 2 }),
   F("flourish", 2, { ms: 130, aura: 2 }),
-  F("ready", 3, { ms: 180, aura: 1.5 }),
+  F("ready", 3, { ms: 180, aura: 2 }),
 ];
 const sheatheFrames = (): Frame[] => [
   F("pull", 0, { ms: 150 }),
@@ -964,17 +1038,17 @@ const slashFrames = (): Frame[] => [
   F("windup", 0, { ms: 220, aura: 2 }),
   F("cross", 1, { ms: 70, cue: "slash", aura: 2, over: [...over(arcPart("fire", 0)), ...over(arcPart("ice", 0))], shake: [1, 0] }),
   F("through", 2, { ms: 110, aura: 2, over: [...over(arcPart("fire", 1)), ...over(arcPart("ice", 1))] }),
-  F("through", 3, { ms: 120, aura: 1.5, over: [...over(arcPart("fire", 2)), ...over(arcPart("ice", 2))] }),
-  F("ready", 0, { ms: 220, aura: 1.5 }),
+  F("through", 3, { ms: 120, aura: 2, over: [...over(arcPart("fire", 2)), ...over(arcPart("ice", 2))] }),
+  F("ready", 0, { ms: 220, aura: 2 }),
 ];
 const castFrames = (): Frame[] => [
-  F("aimTips", 0, { ms: 200, aura: 1.5 }),
+  F("aimTips", 0, { ms: 200, aura: 2 }),
   F("aimTips", 1, { ms: 120, cue: "tips", aura: 2, over: over(orbPart(0)) }),
   F("aimTips", 2, { ms: 120, aura: 2, over: over(orbPart(1)) }),
   F("aimTips", 3, { ms: 140, aura: 2, over: over(orbPart(2)) }),
   F("aimTips", 0, { ms: 160, cue: "cast", aura: 2, over: over(orbPart(3)), shake: [0, 1] }),
-  F("aimTips", 1, { ms: 120, aura: 1.5, over: over(orbPart(1)) }),
-  F("ready", 2, { ms: 200, aura: 1.5 }),
+  F("aimTips", 1, { ms: 120, aura: 2, over: over(orbPart(1)) }),
+  F("ready", 2, { ms: 200, aura: 2 }),
 ];
 
 export const STRANGER_ANIMS: Record<string, Anim> = {
@@ -983,10 +1057,10 @@ export const STRANGER_ANIMS: Record<string, Anim> = {
   think: lazyAnim(() => ({ loop: true, frames: [0, 1, 2, 3].map((i) => F({ ...breathe(POSES.rest, i), eyes: "narrow" }, i, { ms: 360 })) })),
   // Smug: his idle with a smirk.
   smug: lazyAnim(() => ({ loop: true, frames: [0, 1, 2, 3].map((i) => F({ ...breathe(POSES.rest, i), mouth: "smirk" }, i, { ms: 320 })) })),
-  // His entrance and a move: a nod, his aura flaring.
+  // His entrance: a nod with his hum, his aura flaring.
   nod: lazyAnim(() => ({
     loop: false,
-    frames: [F({ ...POSES.rest, head: [0, 1], eyes: "narrow" }, 0, { ms: 200, cue: "hum", aura: 2 }), F({ ...POSES.rest, mouth: "smirk" }, 1, { ms: 320, aura: 1.5 }), F(POSES.rest, 2, { ms: 200 })],
+    frames: [F({ ...POSES.rest, head: [0, 1], eyes: "narrow" }, 0, { ms: 200, cue: "hum", aura: 2 }), F({ ...POSES.rest, mouth: "smirk" }, 1, { ms: 320, aura: 2 }), F(POSES.rest, 2, { ms: 200 })],
   })),
   draw: lazyAnim(() => ({ loop: false, frames: drawFrames() })),
   sheathe: lazyAnim(() => ({ loop: false, frames: sheatheFrames() })),
@@ -1007,13 +1081,13 @@ export const STRANGER_ANIMS: Record<string, Anim> = {
   })),
   rattled: lazyAnim(() => ({
     loop: true,
-    frames: [0, 1, 2, 3].map((i) => F({ ...POSES.rattled, head: [i % 2 ? 0 : -1, 0], bob: i >= 2 ? 1 : 0 }, i, { ms: 240, aura: 0.5 })),
+    frames: [0, 1, 2, 3].map((i) => F({ ...POSES.rattled, head: [i % 2 ? 0 : -1, 0], bob: i >= 2 ? 1 : 0 }, i, { ms: 240, aura: 1 })),
   })),
   defeat: lazyAnim(() => ({
     loop: false,
     frames: [
-      F("flinch", 0, { ms: 160, cue: "fall", aura: 0.5 }),
-      F({ ...POSES.kneel, kneel: 0.5, eyes: "shut", head: [0, 1], swordF: "back", swordI: "back", armF: ARMS.hangF, armI: ARMS.hangI }, 1, { ms: 160, aura: 0.5 }),
+      F("flinch", 0, { ms: 160, cue: "fall", aura: 1 }),
+      F({ ...POSES.kneel, kneel: 0.5, eyes: "shut", head: [0, 1], swordF: "back", swordI: "back", armF: ARMS.hangF, armI: ARMS.hangI }, 1, { ms: 160, aura: 1 }),
       F(POSES.kneel, 2, { ms: 300, cue: "kneel", aura: 0, shake: [0, 1] }),
       F(POSES.kneel, 3, { ms: 400, aura: 0 }),
     ],
@@ -1050,7 +1124,7 @@ export const STRANGER_PORTRAIT = { x: 43, y: 9, w: 42, h: 42 };
 
 /**
  * His cues and their sounds (stranger-sounds.ts, sound.ts names): `draw` both swords out, `sheathe` home, `slash` the double slash,
- * `tips` the tips touching, `cast` the cast's release, `hit`, `fall` (a sword's clatter), `kneel`, `hum` (his entrance's nod).
+ * `tips` the tips touching, `cast` the cast's release, `hit`, `fall` (a sword's clatter), `kneel`, `hum` (his entrance's nod, only there).
  */
 export const STRANGER_SOUNDS: Record<string, SoundName> = {
   draw: "strangerDraw",

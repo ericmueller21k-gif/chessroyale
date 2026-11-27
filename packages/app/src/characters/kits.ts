@@ -1272,7 +1272,8 @@ export const ART_KITS: Readonly<Record<string, BossKit>> = {
     anims: {
       entrance: "nod",
       thinking: "think",
-      move: "nod",
+      // (A move, a square struck: he stays at rest, no hum; his entrance alone nods with it.)
+      move: "idle",
       capture: "strike",
       hurt: "hit",
       check: "strike",
@@ -1282,10 +1283,10 @@ export const ART_KITS: Readonly<Record<string, BossKit>> = {
       victory: "victory",
       strike: "strike",
       power: "castFull",
-      powerHit: "nod",
+      powerHit: "idle",
       ultimateWarn: "draw",
       ultimate: "strike",
-      ultimateHit: "nod",
+      ultimateHit: "idle",
     },
     loops: { thinking: "think", defeat: "defeatLoop" },
     sounds: STRANGER_SOUNDS,
