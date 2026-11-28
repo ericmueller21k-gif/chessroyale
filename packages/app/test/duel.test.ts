@@ -147,6 +147,27 @@ describe("the 1 v 1 queue and game in the app", () => {
     d.onMessage({ t: "welcome", you: "w", game: view(["e2e4"]), v: 1 });
     expect(sent).toHaveLength(2);
   });
+  it("the vote closes by the clock: past its close, the \"Timer\" line shows from the picks before the server's word (a late alarm once skipped it, Nov 28)", async () => {
+    const { NetDuel } = await import("../src/duel.ts");
+    const d = new NetDuel("ABCDE") as unknown as NetDuelInside & { snapshot(): { phase: string; control: string | null; clock: unknown } };
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    const vote = {
+      code: "ABCDE", phase: "vote", players: { w: { uid: "a", name: "Ann", look: null, rank: rankView(null) }, b: { uid: "b", name: "Bo", look: null, rank: rankView(null) } },
+      versusAt: 0, voteAt: 990_000, voteEndsAt: 1_001_000, picks: { w: "rapid", b: "bullet" }, control: null, clock: null, startsAt: null,
+      fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", moves: [], sans: [],
+      clocks: { w: 0, b: 0 }, turnAt: 0, running: false, firstMoveBy: null, drawOffer: null, canOffer: { w: false, b: false }, connected: { w: true, b: true }, end: null,
+    };
+    d.onMessage({ t: "welcome", you: "w", game: vote, v: 1 });
+    expect(d.snapshot()).toMatchObject({ phase: "vote", control: null, clock: null });
+    // Its close passes and the server says nothing yet: Rapid and Bullet meet on Blitz.
+    vi.setSystemTime(1_001_000);
+    expect(d.snapshot()).toMatchObject({ phase: "overlay", control: "blitz", clock: { baseSeconds: 180, incrementSeconds: 2 } });
+    // The server's play, late: the game.
+    d.onMessage({ t: "game", game: { ...vote, phase: "play", control: "blitz", clock: { baseSeconds: 180, incrementSeconds: 2 }, startsAt: 1_002_500 } });
+    expect(d.snapshot().phase).toBe("play");
+    vi.useRealTimers();
+  });
   it("the chat's messages go as they are (Nov 25: a typed line went without its text, an empty line the server refused unseen)", async () => {
     const { NetDuel } = await import("../src/duel.ts");
     const sent: unknown[] = [];
