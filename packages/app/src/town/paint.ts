@@ -72,14 +72,14 @@ export interface PaintLayer {
 export type Backend = "2d" | "webgl";
 
 /**
- * The WebGL atlas's layout (paint-gl.ts), which the kept pictures' pages are packed to (keep-pictures.ts, Nov 25): pages `page` px
- * square, each picture with `pad` clear pixels round it; one bigger than `big` either way has a texture (and a kept page) of its own.
+ * The WebGL atlas's layout (paint-gl.ts), which the baked town's files are packed to (keep-pictures.ts `packPictures`, Nov 25): pages
+ * `page` px square, each picture with `pad` clear pixels round it; one bigger than `big` either way has a texture (and a page) of its own.
  */
 export const ATLAS = { page: 2048, pad: 2, big: 1024 } as const;
 
 /**
  * A whole page of pictures, packed as the atlas packs (`ATLAS`): one of the build's baked files (baked.ts: a group's page, as wide and
- * tall as its pictures reach) or a later visit's kept page (keep-pictures.ts). Its decoded pixels, its size, and each picture on it
+ * tall as its pictures reach). Its decoded pixels, its size, and each picture on it
  * (the canvas standing in for it, drawn by as any other, and its top left on the page; two may share a place).
  */
 export interface AtlasPage {
@@ -121,13 +121,19 @@ export interface Painter {
   /** (With `keep`) Uploads what it was handed, a slice of up to `budgetMs` at a time; says how much is done (0 to 1). */
   kept?(budgetMs: number): number;
   /**
-   * (With `keep`, the loading screen, before `kept`; Nov 25) Whole pages (the build's baked files, or a later visit's kept pages),
-   * uploaded whole by `kept`, each placed on the atlas's layers: each picture on them kept as `keep` keeps one, where its page put it,
-   * never uploaded alone. `fill` puts a picture's pixels on its canvas (empty until then) should it need uploading again (a lost
-   * context, `changed`). Says whether it took them: false (too many for the atlas, or `kept` has started), and none is placed: hand each
-   * picture to `keep` then (baked.ts `adoptOrKeep`; a later visit's kept ones are, as each is put in place).
+   * (With `keep`, the loading screen, before `kept`; Nov 25) Whole pages (the build's baked files), uploaded whole by `kept`, each
+   * placed on the atlas's layers: each picture on them kept as `keep` keeps one, where its page put it, never uploaded alone. `fill`
+   * puts a picture's pixels on its canvas (empty until then) should it be uploaded alone (false: they can't be read just now, and it
+   * isn't uploaded). Says whether it took them: false (too many for the atlas, or `kept` has started), and none is placed: hand each
+   * picture to `keep` then (baked.ts `adoptOrKeep`). After a lost context the pages are handed over again (their decoded copies are
+   * let go once uploaded: baked.ts `release`, `reopen`).
    */
-  adopt?(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): boolean;
+  adopt?(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => boolean): boolean;
+  /**
+   * (WebGL) What the GPU holds for `src` now, as a canvas would give its pixels: a baked picture's, its decoded page let go, for a 2D
+   * context that asks (a tap's hit test, a chip's face). Null: nothing of it is there just now (a lost context).
+   */
+  read?(src: object): ImageData | null;
   /**
    * (WebGL, the loading screen's warm-up, Nov 28) Waits until the GPU has done everything sent so far (one pixel read back): a frame drawn
    * under the loading card pays its textures' and shaders' first use there, not in the first frames you see.

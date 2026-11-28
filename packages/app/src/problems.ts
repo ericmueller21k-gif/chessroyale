@@ -1,4 +1,4 @@
-import { OPS, TOWN_BAKED_FALLBACK, TOWN_GL_FALLBACK, type TownBakedFallback, type TownGlFallback } from "@chessroyale/core";
+import { OPS, TOWN_BAKED_FALLBACK, TOWN_GL_FALLBACK, TOWN_LOAD_LATE, type TownBakedFallback, type TownGlFallback, type TownLoadLate } from "@chessroyale/core";
 import { account } from "./account.ts";
 
 /**
@@ -102,15 +102,26 @@ export function reportTownFallback(why: TownGlFallback) {
   captureError(TOWN_GL_FALLBACK.kind, why);
 }
 
-let painted = false;
+let unloaded = false;
 /**
- * The town didn't use the build's baked pictures and painted its own instead (Town.tsx `loadTown`, town/baked.ts; Nov 28): reported
- * once a page with the first reason (TOWN_BAKED_FALLBACK), as the WebGL fallback is. Nothing shows: the town opens, only later.
+ * The town's pictures didn't load (Town.tsx `loadTown`, town/baked.ts; Nov 28): reported once a page with the first reason
+ * (TOWN_BAKED_FALLBACK), as the WebGL fallback is. The loading card says so, with Retry.
  */
 export function reportBakedFallback(why: TownBakedFallback) {
-  if (painted) return;
-  painted = true;
+  if (unloaded) return;
+  unloaded = true;
   captureError(TOWN_BAKED_FALLBACK.kind, why);
+}
+
+const late = new Set<TownLoadLate>();
+/**
+ * The town showed before the labels' fonts, the pawns' crate items or the rides were in: nothing of them had arrived for the stall
+ * limit (Town.tsx `loadTown`; Nov 28). Reported once a page for each (TOWN_LOAD_LATE). Nothing shows: they appear when they land.
+ */
+export function reportTownLate(what: TownLoadLate) {
+  if (late.has(what)) return;
+  late.add(what);
+  captureError(TOWN_LOAD_LATE.kind, what);
 }
 
 /** A worker's error event (Stockfish's, Maia's, the sound worker's): reported as `worker:<name>`. */

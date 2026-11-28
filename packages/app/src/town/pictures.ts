@@ -6,7 +6,8 @@
  * - the build (scripts/bake-town.ts) paints the same list in Node and writes it as picture files with a manifest.
  * Until this, the list was the body of render.ts's `plan`: nothing outside a running town could say what the town draws.
  *
- * Not here: what a device must make for itself (names, tags, bubbles, outfits, rides, the tables' boards), and the sky.
+ * Not here: what a device must make for itself (names, tags, bubbles, outfits, rides, the tables' boards), and the sky. The sidekicks'
+ * frames are the build's too (`townSheets`, `sidekickFrame`): cut from their sheets, not painted, so they aren't `Want`s.
  */
 import type { Character } from "../characters/sprite.ts";
 import { GINGERBREAD } from "../characters/gingerbread.ts";
@@ -281,16 +282,19 @@ export function townWants(art: TownArt, count: (ch: Character) => number = (ch) 
   return out;
 }
 
+/** A sheet's animations, in its rows' order (scripts/bake-sidekicks.ts). */
+export const SHEET_ANIMS = ["idle", "walk", "sit", "wave"] as const;
+/** A sidekick's sheet's name in SIDEKICK_SHEETS: its picture file's too (sidekicks/<name>.png), and what its baked frames are named by. */
+export const sheetName = (sheet: SidekickSheet): string => Object.keys(SIDEKICK_SHEETS).find((k) => (SIDEKICK_SHEETS as Record<string, SidekickSheet>)[k] === sheet)!;
+/** A sidekick's frame's picture's name: its sheet's name, the animation, the frame. Its group, a file of its own: `sidekick:<sheet>`. */
+export const sidekickFrame = (sheet: string, anim: (typeof SHEET_ANIMS)[number], k: number): string => `sidekick:${sheet}:${anim}#${k}`;
+
 /**
- * The sidekicks' sheets this town shows, each once, by its name in SIDEKICK_SHEETS: its picture file's name too (sidekicks/<name>.png,
- * made by scripts/bake-sidekicks.ts). Each is a group of its own, a file as it is.
+ * The sidekicks' sheets this town shows, each once, by its name in SIDEKICK_SHEETS (made by scripts/bake-sidekicks.ts). The build
+ * bakes each frame of each as a picture of its own (Nov 28, phase 1c: `sidekickFrame`; scripts/bake-town.ts), a group a sidekick.
  */
 export function townSheets(): string[] {
   const out = new Set<string>();
-  for (const b of TOWN_BOTS) {
-    if (!isSprite(b.look)) continue;
-    const sheet = b.look.sprite;
-    out.add(Object.keys(SIDEKICK_SHEETS).find((k) => (SIDEKICK_SHEETS as Record<string, SidekickSheet>)[k] === sheet)!);
-  }
+  for (const b of TOWN_BOTS) if (isSprite(b.look)) out.add(sheetName(b.look.sprite));
   return [...out];
 }

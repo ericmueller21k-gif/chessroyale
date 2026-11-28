@@ -13,7 +13,7 @@ import { BAKED_NAME, TOWN_PICTURES_DIR, manifestFrom, type TownKind, type TownMa
 declare const __TOWN_PICTURES__: string | undefined;
 declare const __TOWN_PAGES__: Partial<Record<TownKind, readonly string[]>> | undefined;
 /**
- * This build's baked town's manifest's name (null: none baked for it; tests). In the dev server, `order.json`: the bake's file that
+ * This build's baked town's manifest's name (null: none baked for it: tests; the town can't load then). In the dev server, `order.json`: the bake's file that
  * names its manifest, read fresh each time the town loads (the dev server bakes when the town first asks, and again after the art
  * changes: vite.config.ts `townPictures`).
  */
@@ -74,7 +74,7 @@ let manifest: TownManifest | null = null;
  * server's is read fresh each time the town loads: the one its latest bake's order.json names.
  */
 export async function bakedManifest(o: FileAsk = {}): Promise<TownManifest | null> {
-  if (!TOWN_MANIFEST || !TOWN_PICTURES.baked) return null;
+  if (!TOWN_MANIFEST) return null;
   if (manifest) return manifest;
   try {
     const dev = TOWN_MANIFEST === NAMED_BY;
@@ -117,7 +117,7 @@ function workerAnswers(signal: AbortSignal): Promise<void> {
  */
 export function fetchTownAhead(kind: TownKind): () => void {
   // (Nor in the dev server, where asking would bake the town for every page that rests on home.)
-  const all = TOWN_MANIFEST && TOWN_MANIFEST !== NAMED_BY && TOWN_PICTURES.baked ? [TOWN_MANIFEST, ...(TOWN_PAGES[kind] ?? [])].filter((n) => BAKED_NAME.test(n)) : [];
+  const all = TOWN_MANIFEST && TOWN_MANIFEST !== NAMED_BY ? [TOWN_MANIFEST, ...(TOWN_PAGES[kind] ?? [])].filter((n) => BAKED_NAME.test(n)) : [];
   const line = typeof navigator === "undefined" ? undefined : (navigator as { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (all.every((n) => fetched.has(n)) || line?.saveData === true || (TOWN_PICTURES.homeFetchNotOn as readonly string[]).includes(line?.effectiveType ?? "")) return () => {};
   const stop = new AbortController();

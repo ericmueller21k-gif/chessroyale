@@ -4757,62 +4757,51 @@ export const ALERTS = {
 } as const;
 
 /**
- * Chess Town's pictures kept between visits (Nov 23, Eric: "the drawn pictures between visits ... it seems like just smart"; the app's
- * town/keep-pictures.ts): the first visit on a build paints every picture on the loading screen, as before, then keeps them on the device
- * (IndexedDB, as PNG pages); a later visit on the same build and layout loads them instead of painting. Anything odd paints as before.
- * `on`: the switch. `maxMB`: the most it keeps (more, and nothing is kept). (Its pages' size is the WebGL atlas's, Nov 25: the app's town/paint.ts `ATLAS`.) `waitMs`: how long the loading
- * screen waits for the kept pictures to be read and decoded before it paints instead. They're kept under the first visit's loading
- * card, after its box tops (Nov 28: kept after the first frame, it was a hitch about 2 s in): composed a page at a time, encoded in a
- * worker. `sliceMs`: the default slice a frame for a save outside the loading screen.
- * docs/decisions/2026-11-23-town-keep-pictures.md.
- *
- * Since Nov 28 (the town's structure, phase 1b) the build paints the pictures and the town loads them as files (the app's
- * town/baked.ts): `baked` is that switch; off, or with a file missing, the town paints on the device as above. `homeFetchAfterMs`: home
- * fetches the town's files, one at a time at low priority, once it has shown this long (so the service worker has them before the first
- * visit to the town). docs/decisions/2026-11-28-town-load-baked.md.
- * `homeFetchNotOn`: the connections home doesn't fetch ahead on (the browser's `effectiveType`; nor on one that asks to save data).
- * `stallMs`: the loading screen's limit with nothing arriving (no byte of the manifest or of any file, the page showing): then it stops
- * waiting and the device paints, as with a file missing. Never a cap on a load that's still moving.
- * docs/decisions/2026-11-28-town-load-baked-fixes.md.
+ * Chess Town's pictures (the app's town/baked.ts). The build paints every picture the town draws that is the same for every player and
+ * the town loads them as files (Nov 28, the town's structure, phase 1: docs/decisions/2026-11-28-town-load-baked.md). Since phase 1c
+ * nothing is painted or kept on the device (until then a first visit painted them, on the phone's other cores too, and kept them in
+ * IndexedDB: Nov 23): docs/decisions/2026-11-28-town-no-device-painting.md.
+ * `homeFetchAfterMs`: home fetches the town's files, one at a time at low priority, once it has shown this long (so the service worker
+ * has them before the first visit to the town). `homeFetchNotOn`: the connections home doesn't fetch ahead on (the browser's
+ * `effectiveType`; nor on one that asks to save data).
+ * `stallMs`: the loading screen's limit with nothing arriving (no byte of the manifest or of any file; no font, crate item or ride come
+ * in; the page showing). Never a cap on a load that's still moving (Eric, Nov 27-28: load first, then show).
+ * `retryMs`: a file that didn't come, didn't decode or isn't its size is asked for again after each of these waits (twice); still
+ * failing, the loading card says "The town didn't load. Please retry." with Retry (never a half town).
  */
 export const TOWN_PICTURES = {
-  on: true,
-  maxMB: 24,
-  waitMs: 4000,
-  sliceMs: 3,
-  baked: true,
   homeFetchAfterMs: 4000,
   homeFetchNotOn: ["slow-2g", "2g", "3g"],
   stallMs: 15000,
+  retryMs: [500, 1500],
 } as const;
 
 /**
- * The baked town not used (Nov 28, the review of phase 1b: the app's town/baked.ts): the town painted its pictures on the device instead,
- * and the page says so once, through the error reporting (the app's problems.ts, `reportBakedFallback`), as this kind with its reason as
- * the message. `manifest`: the manifest wasn't read (no answer, or not a manifest). `file`: a file didn't come. `decode`: one didn't
- * decode (or the browser can't). `size`: one isn't the size the manifest gives. `list`: a picture this town draws isn't in it.
- * `stall`: nothing arrived for `TOWN_PICTURES.stallMs`. (The town closing mid-load, `?paintall` and a build with no baked town aren't
- * fallbacks: none reported.)
+ * The town's pictures not loaded (Nov 28; the app's town/baked.ts): the loading card says "The town didn't load. Please retry." with
+ * Retry, and the page says why once, through the error reporting (the app's problems.ts, `reportBakedFallback`), as this kind with its
+ * reason as the message. (Until phase 1c the device painted its own pictures then; the kind's name is from that.) `manifest`: the
+ * manifest wasn't read (no answer, or not a manifest). `file`: a file didn't come. `decode`: one didn't decode (or the browser can't).
+ * `size`: one isn't the size the manifest gives. Each after its retries (`TOWN_PICTURES.retryMs`). `list`: a picture this town draws
+ * isn't in the manifest. `stall`: nothing arrived for `TOWN_PICTURES.stallMs`. `gpu`: the painter couldn't take them (a job failed, or
+ * the files didn't fit its atlas again after a lost context). (The town closing mid-load isn't one: nothing reported.)
  */
 export const TOWN_BAKED_FALLBACK = {
   kind: "town-baked-fallback",
-  reasons: ["manifest", "file", "decode", "size", "list", "stall"],
+  reasons: ["manifest", "file", "decode", "size", "list", "stall", "gpu"],
 } as const;
 export type TownBakedFallback = (typeof TOWN_BAKED_FALLBACK.reasons)[number];
 
 /**
- * Chess Town's first visit paints on more cores (Nov 23, Eric: "It sounds like we can use more cores"; the app's town/paint-pool.ts).
- * The loading screen's pictures are pure pixel math (each frame's palette keys read into RGBA, each roof face baked), so it runs in a
- * few workers while the main thread puts the pixels on canvases and paints what's left itself. `max` workers at most (the device's cores
- * less one, and at least one); each is handed `batch` pictures at a time, `ahead` batches queued so it never waits. `on: false` paints
- * on the main thread only, as before. docs/decisions/2026-11-23-town-paint-workers.md.
+ * The town shown before something of its loading screen was in (Nov 28, phase 1c): the labels' fonts, the pawns' crate items or the
+ * rides didn't come, and nothing of them arrived for `TOWN_PICTURES.stallMs` (the only way out since the 3 s cap went: Eric's "load
+ * first, then show"). The town shows without, they show when they land, and the page says so once (`reportTownLate`), as this kind with
+ * what was late as the message.
  */
-export const TOWN_PAINT_WORKERS = {
-  on: true,
-  max: 3,
-  batch: 4,
-  ahead: 6,
+export const TOWN_LOAD_LATE = {
+  kind: "town-load-late",
+  reasons: ["fonts", "items", "rides"],
 } as const;
+export type TownLoadLate = (typeof TOWN_LOAD_LATE.reasons)[number];
 
 /**
  * The street town's WebGL failures (Oct 30; Nov 13: never today's town; the app's town/gl-fail.ts; docs/areas/ops.md, "Health"):

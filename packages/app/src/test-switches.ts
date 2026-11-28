@@ -92,29 +92,15 @@ const TIMING_ASKED = (() => {
 /**
  * `?crowd=N`, `?fps` and `?report` (`?report=S`: its run S seconds long, Nov 26: frame-report.ts reportMs) as the page opened (the town reads them once, so a later replaceState that drops the query can't lose them).
  * (`?street=off`, the old town after the street town's WebGL failed, is gone since Nov 13: gl-fail.ts.) `?back=2d` (Nov 11, anyone's, as `?report`): rooms draw their back the 2D way, as before
- * shops/back-gl.ts, so a phone's `?report` can compare the two. `?paintall` (Nov 23, anyone's): the town paints every picture as a first
- * visit does, neither loading the kept ones nor keeping its own (town/keep-pictures.ts), so a phone can compare the two.
+ * shops/back-gl.ts, so a phone's `?report` can compare the two. (`?paintall`, `?paintworkers` and `?paintslow`, the town painting its
+ * pictures on the device, are gone since Nov 28: the build bakes them, town/baked.ts.)
  */
 export const TOWN_ASKED = (() => {
   try {
     const q = new URLSearchParams(globalThis.location?.search ?? "");
-    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), report: q.has("report"), reportS: q.get("report"), back2d: q.get("back") === "2d", paintAll: q.has("paintall") };
+    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), report: q.has("report"), reportS: q.get("report"), back2d: q.get("back") === "2d" };
   } catch {
-    return { crowd: 0, fps: false, report: false, reportS: null as string | null, back2d: false, paintAll: false };
-  }
-})();
-/**
- * `?paintworkers=N` (Nov 23, anyone's, as `?paintall`): a first visit to Chess Town paints with N workers (0: on the main thread only, as
- * before; town/paint-pool.ts), so a phone can compare. `?paintslow=K` (tests only: it counts where the switches do, Town.tsx): each
- * worker's picture takes K times as long, as on a core K times slower (CDP's CPU slowing reaches the page's own thread, not its workers).
- */
-export const TOWN_PAINT_ASKED = (() => {
-  try {
-    const q = new URLSearchParams(globalThis.location?.search ?? "");
-    const n = q.get("paintworkers");
-    return { workers: n !== null && /^\d+$/.test(n) ? Math.min(8, Number(n)) : null, slow: Math.max(1, Math.min(16, Number(q.get("paintslow")) || 1)) };
-  } catch {
-    return { workers: null as number | null, slow: 1 };
+    return { crowd: 0, fps: false, report: false, reportS: null as string | null, back2d: false };
   }
 })();
 let gameOnDevice = true;

@@ -13,7 +13,9 @@
  *   street's row; the park; the Colosseum; the props), as the WebGL atlas packs (town/paint.ts ATLAS), a file a page. A group's
  *   pictures only one town draws (an admins-first home; the fronts that fill its lot in a player's town) are files of their own
  *   (`.admin`, `.player`), so no device fetches what it never draws. Pictures with the same pixels are stored once.
- * - each sidekick's sheet, as it is (scripts/bake-sidekicks.ts made it), under its contents' name.
+ * - the sidekicks' frames (phase 1c): each sheet (packages/app/src/town/sidekicks/<name>.png, made by scripts/bake-sidekicks.ts) cut
+ *   into its frames, each a picture of its own with the atlas's clear pixels round it (`sidekick:<name>:<animation>#<frame>`), a
+ *   file a sidekick. As a sheet a frame has 0 to 2 clear pixels at its edge, so a smoothed draw would read its neighbor.
  * - manifest.<hash>.json (`TownManifest`, town/manifest.ts): each file, each picture's place, the roofs' and glows' pieces, the
  *   animations' frame times, the boxes' tops. Named by its contents too (phase 1b): the build hands the app its name
  *   (`__TOWN_PICTURES__`), so an app the service worker kept reads its own town, never a newer one's.
@@ -31,7 +33,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import type * as Bake from "../packages/app/src/town/bake.ts";
 import { TOWNS, TOWN_PICTURES_DIR, type TownFile, type TownKind, type TownManifest } from "../packages/app/src/town/manifest.ts";
-import { png } from "./png.ts";
+import { SIDEKICK_SHEETS, type SidekickSheet } from "../packages/app/src/town/sidekick-sheets.ts";
+import { png, unpng } from "./png.ts";
 
 export { TOWNS, TOWN_PICTURES_DIR, type TownFile, type TownKind, type TownManifest };
 
@@ -98,6 +101,8 @@ export async function bakeTown(out: string = join(APP, "public", TOWN_PICTURES_D
   const tmp = mkdtempSync(join(tmpdir(), "town-bake-"));
   let towns: Bake.TownBake[];
   let pack: typeof Bake.packPictures;
+  let frameName: typeof Bake.sidekickFrame;
+  let anims: typeof Bake.SHEET_ANIMS;
   let pad = 0;
   let tLoad = 0;
   let inputs: string[];
@@ -108,6 +113,8 @@ export async function bakeTown(out: string = join(APP, "public", TOWN_PICTURES_D
     tLoad = performance.now() - t0;
     pack = mods[0]!.packPictures;
     pad = mods[0]!.ATLAS.pad;
+    frameName = mods[0]!.sidekickFrame;
+    anims = mods[0]!.SHEET_ANIMS;
     towns = mods.map((m) => m.bakeList());
   } finally {
     rmSync(tmp, { recursive: true, force: true });
@@ -130,6 +137,36 @@ export async function bakeTown(out: string = join(APP, "public", TOWN_PICTURES_D
       else if (had.hash !== hash) throw new Error(`town bake: "${name}" is one picture in a ${[...had.towns][0]}'s town and another in an ${TOWNS[ti]}'s`);
       else had.towns.add(TOWNS[ti]!);
     }
+  });
+  // The sidekicks' frames (phase 1c): each sheet this town shows, cut into its frames (rows its animations, a frame a column).
+  const cutSheets = new Map<string, Map<string, Pic>>();
+  const framesOf = (id: string) => {
+    let frames = cutSheets.get(id);
+    if (frames) return frames;
+    cutSheets.set(id, (frames = new Map()));
+    const sheet = (SIDEKICK_SHEETS as Record<string, SidekickSheet>)[id];
+    if (!sheet) throw new Error(`town bake: no sidekick sheet named "${id}"`);
+    const img = unpng(readFileSync(join(APP, "src/town/sidekicks", `${id}.png`)));
+    const cols = Math.max(...anims.map((a) => sheet.ms[a].length));
+    if (img.w !== cols * sheet.w || img.h !== anims.length * sheet.h) throw new Error(`town bake: sidekicks/${id}.png isn't its sheet's size (npx tsx scripts/bake-sidekicks.ts)`);
+    anims.forEach((a, row) =>
+      sheet.ms[a].forEach((_, col) => {
+        const data = new Uint8ClampedArray(sheet.w * sheet.h * 4);
+        for (let y = 0; y < sheet.h; y++) data.set(img.data.subarray(((row * sheet.h + y) * img.w + col * sheet.w) * 4, ((row * sheet.h + y) * img.w + (col + 1) * sheet.w) * 4), y * sheet.w * 4);
+        const px = { w: sheet.w, h: sheet.h, data };
+        frames!.set(frameName(id, a, col), { group: `sidekick:${id}`, px, hash: hashOf(`${px.w}x${px.h}:`, px.data), towns: new Set() });
+      }),
+    );
+    return frames;
+  };
+  const sidekicks: Record<TownKind, number> = { player: 0, admin: 0 };
+  TOWNS.forEach((t, ti) => {
+    for (const id of towns[ti]!.sheets)
+      for (const [name, p] of framesOf(id)) {
+        p.towns.add(t);
+        byName.set(name, p);
+        sidekicks[t]++;
+      }
   });
   const merge = <K extends "roofs" | "glows" | "anims" | "tops">(k: K): Bake.TownBake[K] => {
     const all: Record<string, unknown> = {};
@@ -197,27 +234,12 @@ export async function bakeTown(out: string = join(APP, "public", TOWN_PICTURES_D
       pngs.push(body);
     });
   }
-  // The sidekicks' sheets, each as it is.
-  const sheets: Record<string, number> = {};
-  TOWNS.forEach((t, ti) => {
-    for (const id of towns[ti]!.sheets) {
-      if (id in sheets) {
-        files[sheets[id]!]!.towns.push(t);
-        continue;
-      }
-      const body = readFileSync(join(APP, "src/town/sidekicks", `${id}.png`));
-      sheets[id] = files.length;
-      rows.push({ file: files.length, pictures: 1, pixels: body.readUInt32BE(16) * body.readUInt32BE(20) });
-      files.push({ name: `sidekick-${id}.${hashOf(body).slice(0, 12)}.png`, group: `sidekick:${id}`, towns: [t], w: body.readUInt32BE(16), h: body.readUInt32BE(20), bytes: body.length });
-      pngs.push(body);
-    }
-  });
   const pictures: TownManifest["pictures"] = {};
   for (const [name, p] of byName) {
     const s = stored.get(p.hash)!;
     pictures[name] = [s.at[0], s.at[1], s.at[2], p.px.w, p.px.h];
   }
-  const manifest: TownManifest = { v: 1, files, pictures, roofs: merge("roofs"), glows: merge("glows"), anims: merge("anims"), tops: merge("tops"), sheets };
+  const manifest: TownManifest = { v: 2, files, pictures, roofs: merge("roofs"), glows: merge("glows"), anims: merge("anims"), tops: merge("tops") };
   const manifestText = JSON.stringify(manifest);
   const manifestName = `manifest.${hashOf(manifestText).slice(0, 12)}.json`;
   const index = new Map(Object.keys(pictures).map((n, i) => [n, i]));
@@ -241,7 +263,7 @@ export async function bakeTown(out: string = join(APP, "public", TOWN_PICTURES_D
     bytes: bytesOf(() => true),
     files: files.length,
     towns: Object.fromEntries(
-      TOWNS.map((t, ti) => [t, { names: towns[ti]!.pictures.size, files: files.filter((f) => f.towns.includes(t)).length, pixels: pixelsOf((f) => f.towns.includes(t)), bytes: bytesOf((f) => f.towns.includes(t)) }]),
+      TOWNS.map((t, ti) => [t, { names: towns[ti]!.pictures.size + sidekicks[t], files: files.filter((f) => f.towns.includes(t)).length, pixels: pixelsOf((f) => f.towns.includes(t)), bytes: bytesOf((f) => f.towns.includes(t)) }]),
     ) as BakeResult["totals"]["towns"],
   };
   return { manifest, manifestName, inputs, order, rows, totals, ms: { load: tLoad, paint: tPaint, pack: tPack, write: tWrite, total: performance.now() - t0 } };

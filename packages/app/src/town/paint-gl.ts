@@ -588,9 +588,13 @@ class GLPainter implements Painter {
     this.pages = [];
     // (Made again as it's needed: one from before a lost context is dead, and a page started again wasn't cleared through it.)
     this.readFb = null;
-    // (Kept pages not uploaded yet, after a lost context: their pictures are filled and uploaded one by one as they show, `upload`.)
+    // (After a lost context: nothing is on the GPU. Whole pages are handed over again (`adopt`: the town fetches them again, as their
+    // decoded copies were let go once uploaded), and every picture kept one by one waits for `kept` again: uploaded under the loading
+    // card once more, not one by one as each first shows.)
     this.adoptQ = [];
     this.adoptAt = 0;
+    this.keepQ = this.live.filter((e) => e.kept);
+    this.keepAt = -1;
     this.dummy = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.dummy);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -713,8 +717,10 @@ class GLPainter implements Painter {
    * done (0 to 1).
    */
   kept(budgetMs: number): number {
-    const q = this.keepQ;
     if (this.lost) return 1;
+    // (Not what the atlas holds as it is: a page's pictures, handed over again whole after a lost context.)
+    if (this.keepAt < 0) this.keepQ = this.keepQ.filter((e) => !(e.tex && e.gen === this.gen && !e.dirty));
+    const q = this.keepQ;
     if (this.keepAt < 0) {
       q.sort((a, b) => hOf(b) - hOf(a) || wOf(b) - wOf(a));
       // (On the kept pages there already, where they have room: under an adopted page's files.)
@@ -725,7 +731,7 @@ class GLPainter implements Painter {
       this.keepAt = 0;
     }
     const t0 = performance.now();
-    // (A later visit's kept pages first, each whole, `adopt`.)
+    // (The whole pages first, each in one upload, `adopt`.)
     while (this.adoptAt < this.adoptQ.length) {
       this.pageUp(this.adoptQ[this.adoptAt++]!);
       if (performance.now() - t0 > budgetMs) return this.adoptAt / (this.adoptQ.length + q.length);
@@ -753,19 +759,19 @@ class GLPainter implements Painter {
   /** (`adopt`) The kept pages waiting for `kept` to upload them whole, and how far it has come through them. */
   private adoptQ: { tex: Tex; img: TexImageSource; x: number; y: number; w: number; h: number }[] = [];
   private adoptAt = 0;
-  /** (`adopt`) Puts a kept picture's pixels on its canvas. */
-  private fill: ((src: HTMLCanvasElement) => void) | null = null;
+  /** (`adopt`) Puts a page's picture's pixels on its canvas (false: they can't be read just now). */
+  private fill: ((src: HTMLCanvasElement) => boolean) | null = null;
 
   /**
    * Whole pages of pictures, packed as the atlas packs (`ATLAS`: each picture with its clear pixels round it): the build's baked files
-   * (baked.ts, Nov 28: a group's page each, as wide and tall as its pictures reach) or a later visit's kept pages (keep-pictures.ts, Nov
-   * 25). Each is uploaded whole by `kept`, onto a layer of the atlas beside and under the others (`placePages`; one big picture's, into
-   * its own texture), and each picture on it kept where its page put it, as `keep` would keep it. Until Nov 25, 7.0 s to a slowed
-   * phone's first frame, 3.3 s of it cutting 1,912 pictures out of these pages and 0.55 s uploading each.
-   * (Called once, before `kept` starts. Pages that wouldn't all fit, or one not of the atlas's layout: false, and every picture is left
-   * to `keep`, filled as it's uploaded.)
+   * (baked.ts, Nov 28: a group's page each, as wide and tall as its pictures reach). Each is uploaded whole by `kept`, onto a layer of
+   * the atlas beside and under the others (`placePages`; one big picture's, into its own texture), and each picture on it kept where
+   * its page put it, as `keep` would keep it. Until Nov 25, 7.0 s to a slowed phone's first frame, 3.3 s of it cutting 1,912 pictures
+   * out of these pages and 0.55 s uploading each.
+   * (Called before `kept` starts, and again after a lost context, the pages fetched again. Pages that wouldn't all fit, or one not of
+   * the atlas's layout: false, and every picture is left to `keep`, filled as it's uploaded.)
    */
-  adopt(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): boolean {
+  adopt(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => boolean): boolean {
     this.fill = fill;
     const own = (pg: AtlasPage) => pg.pics.length >= 1 && (pg.width > BIG || pg.height > BIG) && pg.pics.every((p) => p.x === 0 && p.y === 0 && p.src.width === pg.width && p.src.height === pg.height);
     const shared = pages.filter((pg) => !own(pg));
@@ -845,10 +851,15 @@ class GLPainter implements Painter {
   private upload(e: Entry, src: CanvasImageSource): void {
     const { gl } = this;
     const s = src as HTMLCanvasElement;
-    // (A kept page's picture uploaded alone (a lost context, a page `adopt` couldn't take): its pixels on its canvas first.)
+    // (A page's picture uploaded alone (a page `adopt` couldn't take): its pixels on its canvas first. They can't be read just now
+    // (its page let go, and nothing of it on the GPU after a lost context): not uploaded, so not drawn, until they can: never blank.)
     if (e.stand) {
+      if (this.fill && !this.fill(s)) {
+        e.tex = null;
+        e.page = null;
+        return;
+      }
       e.stand = false;
-      this.fill?.(s);
     }
     const w = s.width;
     const h = s.height;
@@ -1196,6 +1207,33 @@ class GLPainter implements Painter {
         d[o + 3] = a;
         for (let c = 0; c < 3; c++) d[o + c] = a === 0 ? 0 : a === 255 ? buf[s + i + c]! : Math.min(255, Math.round((buf[s + i + c]! * 255) / a));
       }
+    }
+    return out;
+  }
+
+  /**
+   * (paint.ts `read`) What the textures hold for `src` now, as a canvas would give its pixels (not premultiplied): a picture whose
+   * decoded page was let go once uploaded (baked.ts `release`), asked for by a 2D context. Null: nothing of it is on the GPU just now.
+   */
+  read(src: object): ImageData | null {
+    const { gl } = this;
+    const e = this.reg.get(src);
+    if (this.lost || !e?.tex?.t || e.gen !== this.gen || !e.w || !e.h) return null;
+    const out = new ImageData(e.w, e.h);
+    const d = out.data;
+    // (Its rows as uploaded, top first. The framebuffer is bound again by whatever draws next: `flush`, `frame`.)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, (this.readFb ??= gl.createFramebuffer()));
+    if (e.tex.layer >= 0) gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, this.atlas, 0, e.tex.layer);
+    else gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, e.tex.t, 0);
+    gl.readPixels(e.x, e.y, e.w, e.h, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(d.buffer));
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // (Its colors out of its alpha again: a canvas multiplies them back in exactly, so what a 2D context then holds is the texels.)
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i + 3]!;
+      if (a === 0 || a === 255) continue;
+      d[i] = Math.min(255, Math.round((d[i]! * 255) / a));
+      d[i + 1] = Math.min(255, Math.round((d[i + 1]! * 255) / a));
+      d[i + 2] = Math.min(255, Math.round((d[i + 2]! * 255) / a));
     }
     return out;
   }

@@ -1,25 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { adoptOrKeep, loadBaked, type Baked, type BakedNet, type NetAsk } from "../src/town/baked.ts";
-import { Pictures, type Page, type PageIO } from "../src/town/keep-pictures.ts";
+import { adoptOrKeep, loadBaked, settledOrStalled, type Baked, type BakedNet, type NetAsk } from "../src/town/baked.ts";
+import { Pictures, packPictures, type Page, type PageIO, type PicSource } from "../src/town/keep-pictures.ts";
 import { BAKED_NAME, filesOf, manifestFrom, type TownManifest } from "../src/town/manifest.ts";
 import { countPages, placePages } from "../src/town/paint-gl.ts";
 import { ATLAS, type AtlasPage } from "../src/town/paint.ts";
 
 /**
- * The town loads the build's baked pictures (Nov 28, the town's structure, phase 1b: town/baked.ts, town/manifest.ts,
- * docs/decisions/2026-11-28-town-load-baked.md): the manifest read and checked, this town's files fetched and decoded, each picture a
- * canvas standing in for it by name, the files placed whole on the atlas's layers; and anything odd gives nothing at all, so the town
- * paints on the device as before. (That the loaded town is the painted one, picture for picture: e2e/town-street.spec.ts.)
+ * The town loads the build's baked pictures (Nov 28, the town's structure, phase 1: town/baked.ts, town/manifest.ts,
+ * docs/decisions/2026-11-28-town-load-baked.md, 2026-11-28-town-no-device-painting.md): the manifest read and checked, this town's
+ * files fetched and decoded, each picture a canvas standing in for it by name, the files placed whole on the atlas's layers, then let
+ * go and fetched again after a lost context; a file that fails asked for again, twice; and anything still odd gives nothing at all
+ * and says why (the loading card then says the town didn't load: the device paints nothing since phase 1c).
  */
 const H = "0123456789ab";
-/** A small town: a home both towns draw, a row only a player's draws, an admin's home, and a sidekick's sheet. */
+/** A small town: a home both towns draw, a row only a player's draws, an admin's home, and a sidekick's frames. */
 const manifest = (): TownManifest => ({
-  v: 1,
+  v: 2,
   files: [
     { name: `home-a.${H}.png`, group: "home:a", towns: ["player", "admin"], w: 200, h: 100, bytes: 3000 },
     { name: `row-x-n.player.${H}.png`, group: "row:x:N", towns: ["player"], w: 300, h: 50, bytes: 1000 },
     { name: `home-b.admin.${H}.png`, group: "home:b", towns: ["admin"], w: 120, h: 80, bytes: 500 },
-    { name: `sidekick-moo.${H}.png`, group: "sidekick:moo", towns: ["player", "admin"], w: 640, h: 256, bytes: 700 },
+    { name: `sidekick-moo.admin.${H}.png`, group: "sidekick:moo", towns: ["admin"], w: 136, h: 68, bytes: 700 },
   ],
   pictures: {
     "a#0": [0, 2, 2, 40, 30],
@@ -29,38 +30,60 @@ const manifest = (): TownManifest => ({
     "glow:a": [0, 120, 2, 20, 20],
     "x#0": [1, 2, 2, 100, 40],
     "b#0": [2, 2, 2, 50, 50],
+    "sidekick:moo:idle#0": [3, 2, 2, 64, 64],
+    "sidekick:moo:idle#1": [3, 70, 2, 64, 64],
   },
   roofs: { "roof:a:flat": [[0, 0, 0, 30, 30, 0.5, 1.5, 0, 30, 0, 10, 10, 0, 0], [0, 0, 30, 20, 20, -1, 2]] },
   glows: { "glow:a": [0, 0, 5, 6, 21.5, 5, 0], "glow:none": [] },
   anims: { a: [100, 200], x: [1000], b: [1000] },
   tops: { "box-a": 41.5 },
-  sheets: { moo: 3 },
 });
 
 const closed: string[] = [];
-/** Files as blobs naming themselves; decoding gives a page of the manifest's size (or `size`, or fails); a stand-in names its rect. */
-const io = (m: TownManifest, o: { fail?: string; width?: number } = {}): PageIO => ({
-  decode: async (b) => {
-    const name = await b.text();
-    if (name === o.fail) throw new Error("decode");
-    const f = m.files.find((x) => x.name === name)!;
-    return { width: o.width ?? f.w, height: f.h, name, close: () => void closed.push(name) } as Page;
-  },
-  standIn: (page, x, y, w, h) => ({ of: `${(page as Page & { name: string }).name}@${x},${y}`, width: w, height: h, cuts: 0 }) as unknown as HTMLCanvasElement,
-  fill: (c) => void ((c as unknown as { cuts: number }).cuts = 1),
-});
-const net = (m: TownManifest | null, o: { missing?: string } = {}): BakedNet & { asked: string[] } => {
-  const asked: string[] = [];
+type Stand = { width: number; height: number; cuts: string[]; source: () => PicSource | null };
+/** What a stand-in was last filled from: its page and place there, "gpu" for pixels read back; none: nowhere to read it. */
+const cutsOf = (c: unknown) => (c as Stand).cuts;
+/**
+ * Files as blobs naming themselves; decoding gives a page of the manifest's size (or `width`; or fails, `fail` times at most if
+ * `failTimes` is given); a stand-in keeps what gives its pixels, and `fill` notes where they came from.
+ */
+const io = (m: TownManifest, o: { fail?: string; failTimes?: number; width?: number } = {}): PageIO & { decodes: string[] } => {
+  const decodes: string[] = [];
   return {
-    asked,
-    manifest: async () => m,
-    file: async (name) => {
-      asked.push(name);
-      if (name === o.missing) throw new Error(`${name}: 404`);
-      return new Blob([name]);
+    decodes,
+    decode: async (b) => {
+      const name = await b.text();
+      decodes.push(name);
+      if (name === o.fail && (o.failTimes === undefined || decodes.filter((d) => d === name).length <= o.failTimes)) throw new Error("decode");
+      const f = m.files.find((x) => x.name === name)!;
+      let open = true;
+      return { width: o.width ?? f.w, height: f.h, name, close: () => void (open && ((open = false), closed.push(name))) } as Page;
+    },
+    standIn: (w, h, source) => ({ width: w, height: h, cuts: [], source }) as unknown as HTMLCanvasElement,
+    fill: (c) => {
+      const from = (c as unknown as Stand).source();
+      if (!from) return false;
+      cutsOf(c).push("page" in from ? `${(from.page as Page & { name: string }).name}@${from.x},${from.y}` : "gpu");
+      return true;
     },
   };
 };
+const net = (m: TownManifest | null, o: { missing?: string; missingTimes?: number; manifestFails?: number } = {}): BakedNet & { asked: string[]; manifests: number } => {
+  const asked: string[] = [];
+  const n = {
+    asked,
+    manifests: 0,
+    manifest: async () => (++n.manifests <= (o.manifestFails ?? 0) ? null : m),
+    file: async (name: string) => {
+      asked.push(name);
+      if (name === o.missing && (o.missingTimes === undefined || asked.filter((a) => a === name).length <= o.missingTimes)) throw new Error(`${name}: 404`);
+      return new Blob([name]);
+    },
+  };
+  return n;
+};
+/** (No wait between tries: the tests' clock.) */
+const NOW = { retryMs: [0, 0] };
 
 describe("the baked town's manifest (town/manifest.ts)", () => {
   it("reads the build's manifest as it is, and names files as the bake names them", () => {
@@ -74,7 +97,8 @@ describe("the baked town's manifest (town/manifest.ts)", () => {
     const broken: [string, (m: TownManifest) => unknown][] = [
       ["a page", () => "<!doctype html>"],
       ["nothing", () => null],
-      ["another version", (m) => ({ ...m, v: 2 })],
+      ["another version", (m) => ({ ...m, v: 3 })],
+      ["phase 1b's version (the sidekicks' sheets listed apart)", (m) => ({ ...m, v: 1, sheets: {} })],
       ["a part missing", (m) => ({ ...m, tops: undefined })],
       ["a name out of the folder", (m) => ({ ...m, files: [{ ...m.files[0]!, name: `../../api/x.${H}.png` }, ...m.files.slice(1)] })],
       ["a file of no size", (m) => ({ ...m, files: [{ ...m.files[0]!, w: 0 }, ...m.files.slice(1)] })],
@@ -85,13 +109,12 @@ describe("the baked town's manifest (town/manifest.ts)", () => {
       ["a glow's pieces not in sevens", (m) => ({ ...m, glows: { g: [0, 0, 5] } })],
       ["an animation of no frames", (m) => ({ ...m, anims: { a: [] } })],
       ["a top that's no number", (m) => ({ ...m, tops: { b: "1" } })],
-      ["a sheet on no file", (m) => ({ ...m, sheets: { moo: 7 } })],
     ];
     for (const [what, make] of broken) expect(manifestFrom(JSON.parse(JSON.stringify(make(manifest())) ?? "null")), what).toBeNull();
   });
-  it("a town's files: the pages it draws from, never the other town's own, nor the sidekicks' sheets", () => {
+  it("a town's files: the pages it draws from, its sidekicks' frames among them (phase 1c), never the other town's own", () => {
     expect(filesOf(manifest(), "player")).toEqual([0, 1]);
-    expect(filesOf(manifest(), "admin")).toEqual([0, 2]);
+    expect(filesOf(manifest(), "admin")).toEqual([0, 2, 3]);
   });
 });
 
@@ -106,12 +129,12 @@ describe("loading the baked town (town/baked.ts)", () => {
     expect(shares.length).toBe(2);
     expect([0.25, 0.75]).toContain(shares[0]);
     expect(shares[1]).toBe(1);
-    expect({ files: b.files, bytes: b.bytes }).toEqual({ files: 2, bytes: 4000 });
-    // (A player's town has no picture of an admin's home, nor one the manifest doesn't name.)
-    expect([b.has("a#0"), b.has("x#0"), b.has("b#0"), b.has("nope")]).toEqual([true, true, false, false]);
+    expect({ files: b.files, bytes: b.bytes, open: b.open }).toEqual({ files: 2, bytes: 4000, open: true });
+    // (A player's town has no picture of an admin's home or sidekick, nor one the manifest doesn't name.)
+    expect([b.has("a#0"), b.has("x#0"), b.has("b#0"), b.has("sidekick:moo:idle#0"), b.has("nope")]).toEqual([true, true, false, false, false]);
     expect(() => b.pic("b#0")).toThrow(/no picture/);
-    const a0 = b.pic("a#0") as unknown as { of: string; width: number; height: number };
-    expect(a0).toMatchObject({ of: `${m.files[0]!.name}@2,2`, width: 40, height: 30 });
+    const a0 = b.pic("a#0");
+    expect(a0).toMatchObject({ width: 40, height: 30 });
     // (A new canvas each time it's asked for, as the device kept a canvas a painting; two names of the same pixels share a place.)
     const again = b.pic("a#0");
     const a1 = b.pic("a#1");
@@ -121,28 +144,64 @@ describe("loading the baked town (town/baked.ts)", () => {
     expect(pages.map((p) => [p.width, p.height, p.pics.length])).toEqual([[200, 100, 3], [300, 50, 1]]);
     expect(pages[0]!.pics).toEqual([{ src: a0, x: 2, y: 2 }, { src: again, x: 2, y: 2 }, { src: a1, x: 2, y: 2 }]);
     expect(pages[1]!.pics).toEqual([{ src: x0, x: 2, y: 2 }]);
-    b.fill(x0);
-    expect((x0 as unknown as { cuts: number }).cuts).toBe(1);
+    // (Its pixels, asked for: cut from its file's page, at its place there.)
+    expect(b.fill(x0)).toBe(true);
+    expect(cutsOf(x0)).toEqual([`${m.files[1]!.name}@2,2`]);
     closed.length = 0;
     b.close();
     expect(closed.sort()).toEqual([m.files[0]!.name, m.files[1]!.name]);
+    expect(b.open).toBe(false);
   });
-  it("an admin's town fetches its own files", async () => {
+  it("an admin's town fetches its own files, its sidekick's frames among them", async () => {
     const m = manifest();
     const n = net(m);
     const b = (await loadBaked("admin", n, io(m))) as Baked;
-    expect(n.asked.sort()).toEqual([m.files[0]!.name, m.files[2]!.name].sort());
-    expect([b.has("b#0"), b.has("x#0")]).toEqual([true, false]);
+    expect(n.asked.sort()).toEqual([m.files[0]!.name, m.files[2]!.name, m.files[3]!.name].sort());
+    expect([b.has("b#0"), b.has("x#0"), b.has("sidekick:moo:idle#1")]).toEqual([true, false, true]);
   });
-  it("all or nothing, and it says why (the review of phase 1b, S3): no manifest, a file missing, one that doesn't decode or isn't its size, or a browser that can't decode gives none of it, the decoded files let go", async () => {
+  it("a file that fails is asked for again, twice (phase 1c: nothing is painted on the device, so a hiccup mustn't cost the town): the manifest, a file that didn't come, one that didn't decode; the third try in, the town loads", async () => {
     const m = manifest();
-    expect(await loadBaked("player", net(null), io(m))).toBe("manifest");
-    expect(await loadBaked("player", { manifest: () => Promise.reject(new Error("offline")), file: async () => new Blob([]) }, io(m))).toBe("manifest");
+    const n = net(m, { missing: m.files[1]!.name, missingTimes: 2, manifestFails: 2 });
+    const d = io(m, { fail: m.files[0]!.name, failTimes: 2 });
+    const b = (await loadBaked("player", n, d, NOW)) as Baked;
+    expect(typeof b, "loaded").toBe("object");
+    expect(n.manifests, "the manifest asked for three times").toBe(3);
+    expect(n.asked.filter((a) => a === m.files[1]!.name).length, "the missing file asked for three times").toBe(3);
+    // (One that didn't decode is fetched again, then decoded again.)
+    expect(n.asked.filter((a) => a === m.files[0]!.name).length).toBe(3);
+    expect(d.decodes.filter((x) => x === m.files[0]!.name).length).toBe(3);
+    expect(b.pages().length).toBe(2);
+    // (The waits between tries are the setting's: 500 ms, then 1,500.)
+    vi.useFakeTimers();
+    try {
+      const slow = net(m, { missing: m.files[1]!.name, missingTimes: 2 });
+      let done = false;
+      void loadBaked("player", slow, io(m), { retryMs: [500, 1500] }).then(() => (done = true));
+      const tries = () => slow.asked.filter((a) => a === m.files[1]!.name).length;
+      await vi.advanceTimersByTimeAsync(400);
+      expect(tries()).toBe(1);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(tries()).toBe(2);
+      await vi.advanceTimersByTimeAsync(1300);
+      expect([tries(), done]).toEqual([2, false]);
+      await vi.advanceTimersByTimeAsync(200);
+      expect([tries(), done]).toEqual([3, true]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("all or nothing, and it says why (the review of phase 1b, S3): no manifest, a file missing, one that doesn't decode or isn't its size, each after three tries, or a browser that can't decode gives none of it, the decoded files let go", async () => {
+    const m = manifest();
+    const none = net(null);
+    expect(await loadBaked("player", none, io(m), NOW)).toBe("manifest");
+    expect(none.manifests, "three tries").toBe(3);
+    expect(await loadBaked("player", { manifest: () => Promise.reject(new Error("offline")), file: async () => new Blob([]) }, io(m), NOW)).toBe("manifest");
     expect(await loadBaked("player", net(m), null)).toBe("decode");
+    const gone = net(m, { missing: m.files[1]!.name });
     const cases: [string, () => ReturnType<typeof loadBaked>][] = [
-      ["file", () => loadBaked("player", net(m, { missing: m.files[1]!.name }), io(m))],
-      ["decode", () => loadBaked("player", net(m), io(m, { fail: m.files[1]!.name }))],
-      ["size", () => loadBaked("player", net(m), io(m, { width: 199 }))],
+      ["file", () => loadBaked("player", gone, io(m), NOW)],
+      ["decode", () => loadBaked("player", net(m), io(m, { fail: m.files[1]!.name }), NOW)],
+      ["size", () => loadBaked("player", net(m), io(m, { width: 199 }), NOW)],
     ];
     for (const [why, make] of cases) {
       closed.length = 0;
@@ -151,6 +210,7 @@ describe("loading the baked town (town/baked.ts)", () => {
       // (What did decode is closed: no page left in memory.)
       expect(closed).toContain(m.files[0]!.name);
     }
+    expect(gone.asked.filter((a) => a === m.files[1]!.name).length, "the missing file: three tries").toBe(3);
   });
   /** A network whose second file (the row) hangs until `land` is called; `asks`: what each fetch was handed. */
   const hung = (m: TownManifest) => {
@@ -201,7 +261,7 @@ describe("loading the baked town (town/baked.ts)", () => {
       vi.unstubAllGlobals();
     }
   });
-  it("the town closing mid-load (S1): the fetches are stopped, a file landing after isn't decoded, what had decoded is let go, and it's no fallback (null); closed before it starts, nothing is asked", async () => {
+  it("the town closing mid-load (S1): the fetches are stopped, a file landing after isn't decoded, what had decoded is let go, and it's no failure (null); closed before it starts, nothing is asked", async () => {
     const m = manifest();
     const h = hung(m);
     const shut = new AbortController();
@@ -219,6 +279,48 @@ describe("loading the baked town (town/baked.ts)", () => {
     expect(await loadBaked("player", n, io(m), { closed: shut.signal })).toBeNull();
     expect(n.asked).toEqual([]);
   });
+  it("memory (phase 1c, the review of 1b, S6): once uploaded the decoded files are let go, and a picture's pixels then come from the GPU; after a lost context the files are fetched again for the painter, the same pictures on them; a file that won't come again says why", async () => {
+    const m = manifest();
+    const n = net(m);
+    const b = (await loadBaked("player", n, io(m))) as Baked;
+    const a0 = b.pic("a#0");
+    const x0 = b.pic("x#0");
+    const early = b.pic("glow:a");
+    // (Read while its file is in memory: cut from it, once, and its canvas keeps them.)
+    b.fill(early);
+    closed.length = 0;
+    let gpu: boolean = true;
+    const read: unknown[] = [];
+    b.release((c) => (read.push(c), gpu ? ({ width: c.width, height: c.height } as ImageData) : null));
+    expect(b.open).toBe(false);
+    expect(closed.sort(), "every decoded file let go").toEqual([m.files[0]!.name, m.files[1]!.name]);
+    // (Asked for now: what the GPU holds for it.)
+    expect(b.fill(a0)).toBe(true);
+    expect([cutsOf(a0), read]).toEqual([["gpu"], [a0]]);
+    // (The context lost: nothing to read just now; it says so, and is asked again later.)
+    gpu = false;
+    expect(b.fill(x0)).toBe(false);
+    expect(cutsOf(x0)).toEqual([]);
+    // (Fetched again: the same files, decoded again, the same pictures standing on them, the ones made since too.)
+    n.asked.length = 0;
+    const shares: number[] = [];
+    const late = b.pic("roof:a:flat/0");
+    expect(await b.reopen(n, { onShare: (s) => shares.push(s) })).toBe("ok");
+    expect([b.open, n.asked.sort(), shares.at(-1)]).toEqual([true, [m.files[0]!.name, m.files[1]!.name], 1]);
+    const pages = b.pages();
+    expect(pages.map((p) => [p.width, p.height])).toEqual([[200, 100], [300, 50]]);
+    expect(pages[0]!.pics.map((p) => p.src)).toEqual([a0, early, late]);
+    expect(b.fill(x0)).toBe(true);
+    expect(cutsOf(x0)).toEqual([`${m.files[1]!.name}@2,2`]);
+    // (Let go again once uploaded; a file that fails then, three times: why, and nothing left open.)
+    b.release(() => null);
+    expect(await b.reopen(net(m, { missing: m.files[0]!.name }), NOW)).toBe("file");
+    expect(b.open).toBe(false);
+    // (The town closing meanwhile: stopped, nothing to say.)
+    const shut = new AbortController();
+    shut.abort();
+    expect(await b.reopen(n, { closed: shut.signal })).toBeNull();
+  });
   it("pages the painter can't take whole (no room on the atlas): each picture is handed to its keep, so none is left to upload on its first draw", () => {
     const pages = [
       { img: {}, width: 10, height: 10, pics: [{ src: "a", x: 0, y: 0 }, { src: "b", x: 5, y: 0 }] },
@@ -226,19 +328,72 @@ describe("loading the baked town (town/baked.ts)", () => {
     ] as unknown as AtlasPage[];
     const kept: unknown[] = [];
     const keep = (c: unknown) => void kept.push(c);
-    expect(adoptOrKeep({ adopt: () => true, keep }, pages, () => {})).toBe(true);
+    expect(adoptOrKeep({ adopt: () => true, keep }, pages, () => true)).toBe(true);
     expect(kept).toEqual([]);
-    expect(adoptOrKeep({ adopt: () => false, keep }, pages, () => {})).toBe(false);
+    expect(adoptOrKeep({ adopt: () => false, keep }, pages, () => true)).toBe(false);
     expect(kept).toEqual(["a", "b", "c"]);
   });
 });
 
+describe("the loading screen's waits with no time cap (baked.ts settledOrStalled; Eric, Nov 27-28: load first, then show)", () => {
+  it("waits until every font, crate item or ride is in or has failed, however long; only nothing arriving for the stall limit ends it early, and time with the page hidden doesn't count", async () => {
+    vi.useFakeTimers();
+    try {
+      const gate = () => {
+        let go!: () => void;
+        let no!: (e: Error) => void;
+        const p = new Promise<void>((a, b) => ((go = a), (no = b)));
+        return { p, go, no };
+      };
+      expect(await settledOrStalled([], 3000)).toBe(true);
+      // (Three things, each 1.5 s after the last: 4.5 s in all, past the old 3 s cap, and never 3 s with nothing arriving.)
+      const [a, b, c] = [gate(), gate(), gate()];
+      let done: boolean | "waiting" = "waiting";
+      void settledOrStalled([a.p, b.p, c.p], 3000).then((v) => (done = v));
+      await vi.advanceTimersByTimeAsync(1500);
+      a.go();
+      await vi.advanceTimersByTimeAsync(1500);
+      // (One that failed has settled too: its wait is over.)
+      b.no(new Error("its drawing didn't come"));
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(done).toBe("waiting");
+      c.go();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(done).toBe(true);
+      expect(vi.getTimerCount(), "its watch stopped").toBe(0);
+      // (Nothing arriving: hidden time doesn't count; 3 s showing does. False: the town shows without, and says so.)
+      const d = gate();
+      done = "waiting";
+      void settledOrStalled([d.p], 3000).then((v) => (done = v));
+      vi.stubGlobal("document", { visibilityState: "hidden" });
+      await vi.advanceTimersByTimeAsync(20_000);
+      vi.stubGlobal("document", { visibilityState: "visible" });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(done).toBe("waiting");
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(done).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      // (The town closing ends the wait at once.)
+      const shut = new AbortController();
+      done = "waiting";
+      void settledOrStalled([gate().p], 3000, shut.signal).then((v) => (done = v));
+      shut.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(done).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("the baked pictures in the loading screen's list (keep-pictures.ts Pictures)", () => {
-  it("a baked picture is listed, never handed to the painter's keep (its file is adopted whole); a roof's pieces come from the manifest, each sheet one canvas a roof", async () => {
+  it("a baked picture is listed once, never handed to the painter's keep (its file is adopted whole); a roof's pieces come from the manifest, each sheet one canvas a roof", async () => {
     const m = manifest();
     const b = (await loadBaked("player", net(m), io(m))) as Baked;
     const kept: unknown[] = [];
-    const P = new Pictures((c) => kept.push(c), null, b);
+    const P = new Pictures((c) => kept.push(c), b);
     const a0 = b.pic("a#0");
     P.add(a0);
     P.add(a0);
@@ -247,15 +402,44 @@ describe("the baked pictures in the loading screen's list (keep-pictures.ts Pict
     expect(roof.faces.map((f) => [f.whole, ...f.tris].map((p) => [p.sx, p.sy, p.w, p.h, p.ox, p.oy]))).toEqual([[[0, 0, 30, 30, 0.5, 1.5], [30, 0, 10, 10, 0, 0]], [[0, 30, 20, 20, -1, 2]]]);
     const sheets = new Set(roof.faces.flatMap((f) => [f.whole, ...f.tris].map((p) => p.cv)));
     expect(sheets.size, "one canvas for the roof's one sheet").toBe(1);
-    expect([...sheets][0]).toMatchObject({ of: `${m.files[0]!.name}@50,2`, width: 60, height: 60 });
+    const sheet = [...sheets][0] as HTMLCanvasElement;
+    expect(sheet).toMatchObject({ width: 60, height: 60 });
+    b.fill(sheet);
+    expect(cutsOf(sheet)).toEqual([`${m.files[0]!.name}@50,2`]);
     // (Another roof of the same name, a second box of the same art: sheets of its own, as the device painted it twice.)
     expect(P.bakedRoof("roof:a:flat").faces[0]!.whole.cv).not.toBe(roof.faces[0]!.whole.cv);
     for (const f of roof.faces) for (const p of [f.whole, ...f.tris]) P.add(p.cv as HTMLCanvasElement);
     expect(P.list.length).toBe(2);
-    P.roofDone(roof);
-    P.glowDone([1, 2, 3, 4, 5, 6, 0]);
-    expect([P.roofs, P.glows], "nothing noted for a next visit").toEqual([[], []]);
     expect(kept).toEqual([]);
+  });
+  it("pictures are packed as the WebGL atlas holds them (Nov 25; the bake packs each group's with it): pages no bigger than its, the padding clear round each, a big one alone", () => {
+    const { page, pad, big } = ATLAS;
+    const sizes = [...Array.from({ length: 400 }, (_, i) => [10 + ((i * 41) % 500), 10 + ((i * 29) % 300)] as const), [3000, 40] as const, [1025, 1025] as const, [1024, 1024] as const];
+    const { at, pages } = packPictures(sizes);
+    const rects = at.map(([p, x, y], i) => ({ p, x, y, w: sizes[i]![0], h: sizes[i]![1] }));
+    for (const r of rects) {
+      const [pw, ph] = pages[r.p]!;
+      if (r.w > big || r.h > big) {
+        // (A big one: alone, at its page's top left, its page its size: the atlas gives it a texture of its own.)
+        expect([r.x, r.y, pw, ph]).toEqual([0, 0, r.w, r.h]);
+        expect(rects.filter((o) => o.p === r.p).length).toBe(1);
+        continue;
+      }
+      expect(pw).toBeLessThanOrEqual(page);
+      expect(ph).toBeLessThanOrEqual(page);
+      expect(r.x - pad).toBeGreaterThanOrEqual(0);
+      expect(r.y - pad).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.w + pad).toBeLessThanOrEqual(pw);
+      expect(r.y + r.h + pad).toBeLessThanOrEqual(ph);
+    }
+    // (Padding included, no two overlap.)
+    for (let i = 0; i < rects.length; i++)
+      for (let j = i + 1; j < rects.length; j++) {
+        const a = rects[i]!;
+        const b = rects[j]!;
+        if (a.p === b.p) expect(a.x + a.w + pad <= b.x - pad || b.x + b.w + pad <= a.x - pad || a.y + a.h + pad <= b.y - pad || b.y + b.h + pad <= a.y - pad).toBe(true);
+      }
+    expect(new Set(rects.filter((r) => r.w > big || r.h > big).map((r) => r.p)).size).toBe(2);
   });
 });
 
@@ -408,7 +592,7 @@ describe("fetching the baked files (town/baked-files.ts)", () => {
     await wait(20);
     expect(asked).toEqual([]);
     await wait(150);
-    expect(paths()).toEqual([NAME, m.files[0]!.name, m.files[2]!.name]);
+    expect(paths()).toEqual([NAME, m.files[0]!.name, m.files[2]!.name, m.files[3]!.name]);
     expect(asked.every((a) => a.low)).toBe(true);
     stop();
     asked.length = 0;
@@ -423,7 +607,7 @@ describe("fetching the baked files (town/baked-files.ts)", () => {
     mod.fetchTownAhead("player");
     await wait(100);
     expect(paths()).toEqual([NAME, m.files[0]!.name, m.files[1]!.name]);
-    // (Home again: nothing. An admin's town then: only its own home's page. A file the town's load read counts too.)
+    // (Home again: nothing. An admin's town then: only what's its own, and of those not the page the town's load has read.)
     asked.length = 0;
     mod.fetchTownAhead("player");
     await wait(100);
@@ -432,7 +616,7 @@ describe("fetching the baked files (town/baked-files.ts)", () => {
     asked.length = 0;
     mod.fetchTownAhead("admin");
     await wait(100);
-    expect(asked).toEqual([]);
+    expect(paths()).toEqual([m.files[3]!.name]);
   });
   it("home's fetch ahead is stopped as home closes or its queue shows (S1): the file on its way is stopped too, and nothing more is asked for", async () => {
     const m = manifest();

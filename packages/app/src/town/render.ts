@@ -41,16 +41,14 @@ import { HEDGE } from "./dressing.ts";
 import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY } from "./street.ts";
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
-import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, setSolidTop, solidTop, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
+import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, setSolidTop, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, upName, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import type { Baked } from "./baked.ts";
-import { Pictures, type Restored } from "./keep-pictures.ts";
-import { framePixels, glowPixels, type GlowPixels, type PaintSpec, type Pixels } from "./paint-jobs.ts";
-import { BOSS_ART, figureArt, roofKey, makeTownArt, townWants, type ArtCache, type TownArt, type Want } from "./pictures.ts";
-import type { PaintPool } from "./paint-pool.ts";
-import type { Cut } from "./kit/bake.ts";
+import { Pictures } from "./keep-pictures.ts";
+import { framePixels, glowPixels } from "./paint-jobs.ts";
+import { BOSS_ART, SHEET_ANIMS, figureArt, roofKey, makeTownArt, sheetName, sidekickFrame, townWants, type ArtCache, type TownArt, type Want } from "./pictures.ts";
 import { stepChar } from "./kit/bake.ts";
 import { ALL_HOMES, ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { drawZzz } from "./zzz.ts";
@@ -353,13 +351,13 @@ class FrameCache {
     while (i < ends.length - 1 && t >= ends[i]!) i++;
     return this.get(i);
   }
-  /** Frame `i`, painted the first time it's asked for (from `px`, its pixels as a paint worker made them, if given: paint-pool.ts). */
-  get(i: number, px?: Pixels | null): HTMLCanvasElement {
+  /** Frame `i`: the build's baked picture (`kept`, the town's own list), else painted the first time it's asked for (a picture not on the list). */
+  get(i: number): HTMLCanvasElement {
     const frames = (this.laid ?? this.lay()).frames;
     let c = frames[i];
     if (c) return c;
     const t0 = REC ? performance.now() : 0;
-    const { w, h, data } = px ?? framePixels(this.ch, i);
+    const { w, h, data } = framePixels(this.ch, i);
     c = upName(document.createElement("canvas"), `frame ${this.ch.id}`);
     c.width = w;
     c.height = h;
@@ -370,15 +368,15 @@ class FrameCache {
     return c;
   }
   /** Frame `i` one ramp step darker. */
-  dark(i: number, px?: Pixels | null): HTMLCanvasElement {
-    return this.darkFc().get(i, px);
+  dark(i: number): HTMLCanvasElement {
+    return this.darkFc().get(i);
   }
   private darkFc(): FrameCache {
     return (this.darker ??= new FrameCache(null, null, this));
   }
   /**
-   * (The loading screen, with the build's baked pictures or a later visit's kept ones: baked.ts, keep-pictures.ts) Frame `i` (or a step
-   * darker) as it was painted: `made()` is that picture, asked for only if the frame isn't here already.
+   * (The loading screen, with the build's baked pictures: baked.ts) Frame `i` (or a step darker) as the build painted it: `made()` is
+   * that picture, asked for only if the frame isn't here already.
    */
   kept(i: number, dark: boolean, made: () => HTMLCanvasElement): HTMLCanvasElement {
     const fc = dark ? this.darkFc() : this;
@@ -392,17 +390,13 @@ class FrameCache {
   }
 }
 
-const SPRITE_ANIMS: readonly SpriteAnim[] = ["idle", "walk", "sit", "wave"];
-/** Each sidekick's sheet (scripts/bake-sidekicks.ts), by its sprite's file name: its picture's address. */
-const SHEET_URL: Record<string, string> = Object.fromEntries(
-  Object.entries(import.meta.glob<string>("./sidekicks/*.png", { eager: true, query: "?url", import: "default" })).map(([path, url]) => [path.replace(/^.*\/|\.png$/g, ""), url]),
-);
+const SPRITE_ANIMS: readonly SpriteAnim[] = SHEET_ANIMS;
 /**
- * A sidekick's four animations (Oct 28), every frame cut once from its baked sheet into a canvas of its own, never per
- * frame (Eric's frame-rate rule). The sheet is fetched as the town opens and cut when its sidekick first appears (`cut`;
- * Nov 10, phone load: not all 14 sheets into some 875 canvases on entry); until then it isn't drawn. When each frame
- * ends; how tall it stands (its frame's height in squares, so it's a pawn's height from its idle's top to its feet); and
- * where its head is in each animation (its name tag sits there).
+ * A sidekick's four animations (Oct 28), a picture a frame, never cut or made per frame (Eric's frame-rate rule). Since Nov 28 (the
+ * town's structure, phase 1c) each frame is one of the build's baked pictures (pictures.ts `sidekickFrame`, by its sheet's name in
+ * SIDEKICK_SHEETS), put here by the loading screen (`take`); until then the device fetched each sheet and cut it into canvases, 875 of
+ * them, each uploaded alone. When each frame ends; how tall it stands (its frame's height in squares, so it's a pawn's height from its
+ * idle's top to its feet); and where its head is in each animation (its name tag sits there).
  */
 class SpriteFrames {
   readonly frames: Record<SpriteAnim, HTMLCanvasElement[]> = { idle: [], walk: [], sit: [], wave: [] };
@@ -410,9 +404,6 @@ class SpriteFrames {
   readonly top: Record<SpriteAnim, number>;
   readonly squares: number;
   ready = false;
-  /** Its sheet didn't load. */
-  failed = false;
-  private img: HTMLImageElement | null = null;
   constructor(readonly sheet: SidekickSheet) {
     for (const a of SPRITE_ANIMS) {
       let t = 0;
@@ -422,31 +413,18 @@ class SpriteFrames {
     const idle = sheet.top.idle / sheet.h;
     this.top = { idle, walk: idle, wave: idle, sit: sheet.top.sit / sheet.h };
     this.squares = TOWN_FEEL.sidekickSquares / (sheet.foot[1] / sheet.h - idle);
-    const img = new Image();
-    img.src = SHEET_URL[sheet.id.replace(/^sidekick-/, "")]!;
-    // (Decoded off the main thread as it loads (Nov 11): cutting its frames, on the town's loading screen, is then quick. A browser
-    // that can't decode ahead: as it loads, as before.)
-    // (One that fails to load is never drawn, as before; the loading screen doesn't wait for it.)
-    const got = () => void (img.naturalWidth ? (this.img = img) : (this.failed = true));
-    if (img.decode) img.decode().then(got, () => (img.complete ? got() : ((img.onload = got), (img.onerror = got))));
-    else ((img.onload = got), (img.onerror = got));
   }
-  /** Its frames cut from its sheet, once, the first time it's drawn (or its face asked for) after the sheet has loaded. */
-  cut(): void {
-    const img = this.img;
-    if (this.ready || !img) return;
-    const sheet = this.sheet;
-    SPRITE_ANIMS.forEach((a, row) => {
-      this.frames[a] = sheet.ms[a].map((_, col) => {
-        const c = upName(document.createElement("canvas"), "sidekick");
-        c.width = sheet.w;
-        c.height = sheet.h;
-        art2d(c).drawImage(img, col * sheet.w, row * sheet.h, sheet.w, sheet.h, 0, 0, sheet.w, sheet.h);
-        return c;
-      });
-    });
+  /** Each of its frames' pictures' names, in its animations' order (the baked town's: `sidekickFrame`). */
+  names(): string[] {
+    const id = sheetName(this.sheet);
+    return SPRITE_ANIMS.flatMap((a) => this.sheet.ms[a].map((_, k) => sidekickFrame(id, a, k)));
+  }
+  /** (The loading screen) Its frames put in place: `pic(name)` is the baked picture of that name. */
+  take(pic: (name: string) => HTMLCanvasElement): void {
+    if (this.ready) return;
+    const id = sheetName(this.sheet);
+    for (const a of SPRITE_ANIMS) this.frames[a] = this.sheet.ms[a].map((_, k) => upName(pic(sidekickFrame(id, a, k)), "sidekick"));
     this.ready = true;
-    this.img = null;
   }
   /** Its frame `t` ms into `anim` (looping; the wave holds its last frame). */
   at(anim: SpriteAnim, t: number): HTMLCanvasElement {
@@ -459,7 +437,6 @@ class SpriteFrames {
   }
   /** Its idle's first frame cut to what's drawn, as an image's address (the game's strip shows it): made when asked. */
   face(): string | null {
-    this.cut();
     const c = this.frames.idle[0];
     if (!c) return null;
     const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
@@ -624,18 +601,18 @@ function litOf(g: Glow): Uint8Array {
       }
   return lit;
 }
-/** A glow from its sheet (null: no pieces) and seven numbers a piece (paint-jobs.ts GlowPixels; as the last visit kept it: keep-pictures.ts `Manifest.glows`). */
+/** A glow from its sheet (null: no pieces) and seven numbers a piece (paint-jobs.ts GlowPixels; as the build's manifest has it: `TownManifest.glows`). */
 function keptGlow(cv: HTMLCanvasElement | null, row: readonly number[], ch: Character, spots: readonly LightSpot[]): Glow {
   const pieces: GlowPiece[] = [];
   for (let k = 0; cv && k < row.length; k += 7) pieces.push({ cv, sx: row[k]!, sy: row[k + 1]!, w: row[k + 2]!, h: row[k + 3]!, x: row[k + 4]!, y: row[k + 5]!, flicker: row[k + 6] === 1 });
   return { pieces, lit: null, ch, spots };
 }
 /**
- * A picture's lights baked (paint-jobs.ts `glowPixels`, or a paint worker's `px`), its sheet on a canvas: one picture a glow (Nov 26:
+ * A picture's lights baked (paint-jobs.ts `glowPixels`), its sheet on a canvas: one picture a glow (Nov 26:
  * a canvas a piece was 2,551 canvases).
  */
-function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly LightPool[], px?: GlowPixels | null): Glow {
-  const { sheet, pieces: at } = px ?? glowPixels(ch, spots, pools);
+function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly LightPool[]): Glow {
+  const { sheet, pieces: at } = glowPixels(ch, spots, pools);
   if (!sheet) return { pieces: [], lit: null, ch, spots };
   const cv = upName(document.createElement("canvas"), "glow");
   cv.width = sheet.w;
@@ -735,7 +712,7 @@ export class Renderer {
   private statueAt(i: number, made?: () => HTMLCanvasElement): HTMLCanvasElement {
     let c = this.statueImg[i];
     if (!c && made) {
-      // (As the last visit painted it, keep-pictures.ts: its mask read from its pixels, whose alpha is kept exactly.)
+      // (As the build painted it, baked.ts: its mask read from its pixels, whose alpha is kept exactly.)
       c = this.statueImg[i] = made();
       const a = art2d(c).getImageData(0, 0, c.width, c.height).data;
       const m = (this.statueMask[i] = new Uint8Array(c.width * c.height));
@@ -818,7 +795,7 @@ export class Renderer {
   readonly ridersSoon = new Map<string, Rider>();
   /** (Tests) Your ride as the last frame drew it: the animation ("" on foot), its frame, which way it faced, its view (0 side, 1 back, 2 front). */
   readonly youRide = { anim: "" as "" | "idle" | "move", frame: -1, facing: 1, view: 0 };
-  /** Each sidekick's frames, by its sheet: every one cut from it as the town opens (the constructor), never per frame. */
+  /** Each sidekick's frames, by its sheet: put in place by the loading screen (`plan`), never made per frame. */
   private readonly spriteArt = new Map<SidekickSheet, SpriteFrames>();
   /** Tag widths by name and size; sign and bubble layouts by text. */
   /**
@@ -901,8 +878,9 @@ export class Renderer {
     return fc;
   }
   /**
-   * The build's baked town, once the loading screen has it (`takeBaked`; baked.ts): its pictures stand in for the device's paintings
-   * (`plan`), and its manifest has each animation's frame times (`frameTimes`: no animation built to count its frames) and each box's top.
+   * The build's baked town, once the loading screen has it (`takeBaked`; baked.ts): its pictures are the town's (`plan`: none is painted
+   * here since Nov 28, phase 1c), and its manifest has each animation's frame times (`frameTimes`: no animation built to count its
+   * frames) and each box's top.
    */
   private baked: Baked | null = null;
   /** (`takeBaked`) The town's list as it was checked against the baked town: `plan`'s, read once. */
@@ -912,8 +890,8 @@ export class Renderer {
   private readonly frameCount = (ch: Character): number => this.frameTimes(ch.id)?.length ?? ch.anims.idle!.frames.length;
   /**
    * Takes the build's baked town (before the first `warm`): false, and nothing taken, if it isn't this town's: a picture, a roof's or a
-   * glow's pieces, or a box's top this town's list names isn't in it. From then on `plan` puts its pictures where the device's paintings
-   * went, by name, and the boxes' tops are the manifest's.
+   * glow's pieces, a sidekick's frame or a box's top this town's list names isn't in it. From then on `plan` puts its pictures in their
+   * places, by name, and the boxes' tops are the manifest's.
    */
   takeBaked(b: Baked): boolean {
     if (this.pics || this.warmJobs || this.baked) return false;
@@ -929,10 +907,12 @@ export class Renderer {
       } else if (!b.has(w.name)) return false;
     }
     if (!this.boxes.every((bx) => typeof m.tops[bx.box.id] === "number")) return false;
+    // (And every frame of each sidekick this town shows: phase 1c.)
+    for (const sp of this.spriteArt.values()) if (!sp.names().every((n) => b.has(n))) return false;
     this.baked = b;
     this.wants = wants;
+    // (Each box's solid top, boxes.ts `solidTop`: the manifest's, none worked out here, up to 20 to 45 ms a box on a slowed phone.)
     for (const bx of this.boxes) setSolidTop(bx.box, m.tops[bx.box.id]!);
-    this.topsAt = this.boxes.length;
     return true;
   }
   private readonly wallGlow = new Map<Character, Glow | null>();
@@ -1721,16 +1701,15 @@ export class Renderer {
         } else {
           const lk = person.look;
           if (isSprite(lk)) {
-            // A sidekick (Oct 28): its own frames, cut from its sheet the first time it's drawn. It walks, stands, sits (its sit has its own
+            // A sidekick (Oct 28): its own frames, the build's baked pictures. It walks, stands, sits (its sit has its own
             // stool, drawn over the table's: not lowered, no shadow) and waves once when tapped. No hop: its walk steps.
             const sp = this.spriteArt.get(lk.sprite)!;
-            sp.cut();
             this.sitting = false;
             if (sp.ready) {
               const anim = spriteAnim(person, now);
               const sh = sp.sheet;
               this.drawSprite(it, sp.at(anim, anim === "wave" ? now - person.waved : now + it.i * 613), sp.squares, sh.foot[0] / sh.w, sh.foot[1] / sh.h, sh.w / sh.h, 0, 0, facing, table ? 0 : f.sidekickShadow, sp.top[anim]);
-            } else it.on = false; // (its sheet still loading: not drawn, not tapped)
+            } else it.on = false; // (its frames not in place yet: not drawn, not tapped)
           } else {
             // A bot's dressed pawn (its one or two crate items, made once), drawn as yours is; on its ride if it has one.
             const art = this.botArt.get(person.id);
@@ -1844,171 +1823,92 @@ export class Renderer {
   }
   /**
    * The town's loading screen (Nov 11, Eric: "I have no issue with doing a loading screen for the town… loads it all in at once and
-   * then it stays there"): every picture the street town can show, painted and handed to `keep` (the painter's: uploaded now and
-   * kept for good), a slice at a time: each box's sides, back and front frames (and each a step darker), its roof for each of the
-   * four quarters, every home's, boss's, prop's and statue's frames, the hedges' tops, the sidekicks' frames. Spends up to `budgetMs` and says how much is
-   * done (0 to 1). (Measured Nov 11: nothing else is painted as you then walk and turn; the figures, tags and boards are drawn as
-   * before, on the atlas's spare pages.)
+   * then it stays there"): every picture the street town can show put in its place, a slice at a time: each box's sides, back and front
+   * frames (and each a step darker), its roof for each of the four quarters, every home's, boss's, prop's and statue's frames, the
+   * hedges' tops, the lights' glows, the sidekicks' frames; then the labels made (handed to `keep`, the painter's: uploaded now and kept
+   * for good). The pictures are the build's baked ones (`takeBaked` first; Nov 28, phase 1c: none is painted on the device), uploaded
+   * with their files (`Painter.adopt`). Spends up to `budgetMs` and says how much is done (0 to 1). A job that throws stops the load
+   * (the town never shows with a picture short).
    */
-  warm(budgetMs: number, keep: (src: CanvasImageSource) => void, from: Restored | null = null, pool: PaintPool | null = null): number {
-    if (!this.pics) {
-      // (The build's baked pictures, `takeBaked`: none painted, none taken from a visit before.)
-      this.pics = new Pictures(keep, this.baked ? null : from, this.baked);
-      // (A first visit's pictures painted ahead on the device's other cores, as the pool has them: paint-pool.ts. Not with kept ones.)
-      this.pool = from || this.baked ? null : pool;
-    }
-    const jobs = this.plan().jobs;
+  warm(budgetMs: number, keep: (src: CanvasImageSource) => void): number {
+    if (!this.baked) throw new Error("town warm: no baked town");
+    this.pics ??= new Pictures(keep, this.baked);
+    const jobs = this.plan();
     const t0 = performance.now();
-    // (The workers' next pictures first, so they're busy while this thread runs the jobs and waits for its next slice.)
-    this.pool?.pump(budgetMs / 2);
     while (this.warmAt0 < jobs.length) {
-      // (A job that can't be done yet (a sidekick's sheet still loading) waits for the next slice, up to `loadSheetWaitMs` all told.)
-      let done: boolean | "wait" | "more" | void = true;
-      try {
-        done = jobs[this.warmAt0]!();
-      } catch (e) {
-        console.warn("town warm:", e); // (that one picture is made as it shows instead, as before)
-        this.warmClean = false;
-      }
-      // (Its picture is being painted by a worker: meanwhile this thread hands the workers more or, with them all busy, paints the last
-      // pictures no worker has taken, then asks again; with nothing to do, it waits for the next slice.)
-      if (done === "wait") {
-        const left = budgetMs - (performance.now() - t0);
-        if (left <= 0 || !(this.pool!.pump(left) || this.pool!.steal())) break;
-        continue;
-      }
-      if (done === false && t0 - (this.warmWait ||= t0) < TOWN_FEEL.loadSheetWaitMs) break;
       // (A job in steps, the labels: its next step now, or in the next slice.)
-      if (done !== "more") this.warmAt0++;
+      if (jobs[this.warmAt0]!() !== "more") this.warmAt0++;
       if (performance.now() - t0 > budgetMs) break;
     }
     return jobs.length ? this.warmAt0 / jobs.length : 1;
   }
-  /** (`warm`) The first visit's paint workers (paint-pool.ts), while the loading screen runs. */
-  private pool: PaintPool | null = null;
-  private warmJobs: { jobs: (() => boolean | "wait" | "more" | void)[]; sig: string; specs: PaintSpec[] } | null = null;
+  private warmJobs: (() => "more" | void)[] | null = null;
   private warmAt0 = 0;
-  private warmWait = 0;
-  /** The loading screen's pictures, painted or kept from the last visit (keep-pictures.ts; set by the first `warm`). */
+  /** The loading screen's pictures: the build's baked ones, each listed once in the order the jobs come to them (keep-pictures.ts; set by the first `warm`). */
   pics: Pictures | null = null;
-  /** (`warm`) Whether every job ran without throwing: only then are its pictures kept for the next visit. */
-  warmClean = true;
   /**
-   * What the loading screen's pictures are, as a string (keep-pictures.ts keys the kept pictures by it): each job's picture by its art's
-   * id, frame and shade, or its roof's art and painting. The same layout, the same string; an admin's town (more homes) another.
+   * The loading screen's jobs (`warm`): one picture (or one roof) each, in the picture list's order (pictures.ts `townWants`: the list
+   * the build bakes from). Each is the baked picture of its name (`pics.baked`), listed by `pics.add`.
    */
-  pictureSig(): string {
-    return this.plan().sig;
-  }
-  /** The loading screen's pictures painted fresh, in the order its jobs come to them: what paint workers can paint ahead (paint-pool.ts). */
-  paintSpecs(): readonly PaintSpec[] {
-    return this.plan().specs;
-  }
-  /**
-   * The loading screen's jobs (`warm`): one picture (or one roof) each, in the picture list's order (pictures.ts `townWants`, Nov 28: the
-   * list the build bakes from too). Each picture is painted, or on a later visit taken from the last visit's (`pics.from`, in the same
-   * order: keep-pictures.ts), and handed to `pics.add` (the painter's `keep`).
-   */
-  private plan(): { jobs: (() => boolean | "wait" | "more" | void)[]; sig: string; specs: PaintSpec[] } {
+  private plan(): (() => "more" | void)[] {
     if (this.warmJobs) return this.warmJobs;
-    const jobs: (() => boolean | "wait" | "more" | void)[] = [];
-    const sig: string[] = [];
+    const jobs: (() => "more" | void)[] = [];
     const P = () => this.pics!;
-    // (Each picture painted fresh, the first time a job comes to it, for the paint workers to paint ahead (paint-pool.ts): its index there.)
-    const specs: PaintSpec[] = [];
     for (const w of this.wants ?? townWants(this.art, this.frameCount)) {
-      sig.push(w.sig);
       const { name } = w;
       if (w.kind === "frame") {
         const fc = this.fcOf(w.cache);
         const { k, dark } = w;
-        const si = w.fresh ? specs.push(w.spec) - 1 : -1;
-        jobs.push(() => {
-          const p = P();
-          if (p.baked) return p.add(fc.kept(k, dark, () => p.baked!.pic(name)));
-          if (p.from) return p.add(fc.kept(k, dark, () => p.next()));
-          const px = si < 0 || !this.pool ? null : this.pool.take(si);
-          if (px === "wait") return "wait";
-          p.add(dark ? fc.dark(k, px as Pixels | null) : fc.get(k, px as Pixels | null));
-        });
+        jobs.push(() => P().add(fc.kept(k, dark, () => P().baked.pic(name))));
       } else if (w.kind === "roof") {
         const { b, q } = w;
-        const si = w.fresh ? specs.push(w.spec) - 1 : -1;
         jobs.push(() => {
           const p = P();
-          const cuts = si < 0 || p.from || p.baked || !this.pool ? null : this.pool.take(si);
-          if (cuts === "wait") return "wait";
-          let fresh = false;
-          const a = this.roofArt(b, q, (flat, qq) => {
-            fresh = true;
-            return p.baked ? p.bakedRoof(name) : p.from ? p.roof() : bakeRoof(b, b.box, flat ? 0 : qq, (cuts as Cut[][] | null) ?? undefined);
-          });
+          const a = this.roofArt(b, q, () => p.bakedRoof(name));
           for (const f of a.faces) {
             p.add(f.whole.cv);
             for (const t of f.tris) p.add(t.cv);
           }
-          if (fresh) p.roofDone(a);
         });
       } else if (w.kind === "glow") {
-        // The lights (Nov 26): every home's, front's, side's and lamp's glow, baked and kept whatever the sky now (the clock brings dusk as
-        // you play). Eric's laptop at night: 1,211 uploads in 16.7 s of walking, each window's light baked and uploaded as it first shone,
-        // 3 to 12 a frame, the worst frames 50 to 117 ms. First, so this thread bakes them while the paint workers start on the frames; a
-        // later visit takes each glow's sheet and pieces from the kept pages (`pics.glow`). One job a glow, each glow once.
-        const { ch, spots, pools, to } = w;
-        const put = (g: Glow) => {
+        // The lights (Nov 26): every home's, front's, side's and lamp's glow, whatever the sky now (the clock brings dusk as you play).
+        // Eric's laptop at night: 1,211 uploads in 16.7 s of walking, each window's light baked and uploaded as it first shone, 3 to 12 a
+        // frame, the worst frames 50 to 117 ms. One job a glow, each glow once: its sheet and pieces as the build baked them.
+        const { ch, spots, to } = w;
+        jobs.push(() => {
+          const p = P();
+          const row = p.baked.manifest.glows[name]!;
+          const cv = row.length ? p.baked.pic(name) : null;
+          if (cv) p.add(cv);
+          const g = keptGlow(cv, row, ch, spots);
           if (to.of === "place") this.placeGlow[to.i] = g;
           else if (to.of === "front") this.frontGlow.set(this.propFrames[to.i]!, g);
           else if (to.of === "lamp") this.lampGlow = g;
           else this.wallGlow.set(to.ch, g);
-        };
-        const si = specs.push(w.spec) - 1;
-        jobs.push(() => {
-          const p = P();
-          if (p.baked) {
-            const row = p.baked.manifest.glows[name]!;
-            const cv = row.length ? p.baked.pic(name) : null;
-            if (cv) p.add(cv);
-            put(keptGlow(cv, row, ch, spots));
-            return;
-          }
-          if (p.from) {
-            const row = p.glow();
-            const cv = row.length ? p.next() : null;
-            if (cv) p.add(cv);
-            put(keptGlow(cv, row, ch, spots));
-            return;
-          }
-          const px = !this.pool ? null : this.pool.take(si);
-          if (px === "wait") return "wait";
-          const g = bakeGlow(ch, spots, pools, px as GlowPixels | null);
-          put(g);
-          if (g.pieces.length) p.add(g.pieces[0]!.cv);
-          p.glowDone(g.pieces.flatMap((pc) => [pc.sx, pc.sy, pc.w, pc.h, pc.x, pc.y, pc.flicker ? 1 : 0]));
         });
       } else {
         const { i } = w;
-        jobs.push(() => {
-          const p = P();
-          p.add(this.statueAt(i, p.baked ? () => p.baked!.pic(name) : p.from ? () => p.next() : undefined));
-        });
+        jobs.push(() => P().add(this.statueAt(i, () => P().baked.pic(name))));
       }
     }
-    // (The sidekicks' frames: cut from their sheets once they've loaded, as the town opens. Not kept between visits: the sheets are
-    // the site's own files, and cutting them is quick.)
-    for (const sp of this.spriteArt.values())
-      jobs.push(() => {
-        sp.cut();
-        if (!sp.ready) return sp.failed ? undefined : false;
-        for (const a of SPRITE_ANIMS) for (const c of sp.frames[a]) P().keep(c);
-      });
-    // (The labels, Nov 25: once their fonts are in, up to `loadSheetWaitMs` all told; made fresh each visit, as they're quick.)
-    jobs.push(() => this.fontsIn());
+    // (The sidekicks' frames, phase 1c: the baked pictures too, a file a sidekick. Not on the list above: `pics.list` is the painted
+    // pictures', as the picture hash has counted them since phase 1a.)
+    for (const sp of this.spriteArt.values()) jobs.push(() => sp.take((name) => P().baked.pic(name)));
+    // What a 2D context reads of these pictures later, read now (phase 1c), while their files are in memory: each home's first frame
+    // (its top, and a tap's test of its pixels), each park thing's (its taps' mask), each boss's and sidekick's (a chip's face, a
+    // card's). Each is cut from its file onto its own canvas here, a job a picture, so nothing reads the GPU back for it once the
+    // files are let go (baked.ts `release`).
+    this.houseFrames.forEach((_, i) => jobs.push(() => void this.houseTop(i)));
+    for (const fc of new Set(this.propFrames)) jobs.push(() => void this.propMask(fc));
+    for (const fc of this.bossFrames) jobs.push(() => void art2d(fc.get(0)));
+    for (const sp of this.spriteArt.values()) jobs.push(() => void (sp.frames.idle[0] && art2d(sp.frames.idle[0])));
+    // (The labels, Nov 25: made fresh each visit, as they're quick. Their fonts are in by now: Town.tsx waits for `labelFonts`.)
     jobs.push(() => this.makeLabels((c) => P().keep(c)));
     // (Painted ahead by planBoxes from here on: nothing left to paint. Marked done so it doesn't walk them again.)
     jobs.push(() => {
       for (const at of this.warmAt) at.fill(-1);
     });
-    return (this.warmJobs = { jobs, sig: sig.join("|"), specs });
+    return (this.warmJobs = jobs);
   }
   /** The quarters in the order they're painted ahead (planBoxes). */
   private readonly warmQ = new Int32Array(4);
@@ -3388,18 +3288,15 @@ export class Renderer {
   /** (`makeLabels`) The labels' steps still to run (null: not started). */
   private labelSteps: (() => void)[] | null = null;
 
-  /** (The loading screen) Whether the labels' fonts are in (asked for the first time it's called): their pictures wait for them. */
-  private fontsIn(): boolean {
+  /**
+   * (The loading screen) The labels' fonts, asked for now: a promise a font, settled once it's in or has failed (Town.tsx waits for
+   * them before the labels are made, `makeLabels`; a label drawn before its font came is drawn again when it does, as ever).
+   */
+  labelFonts(): Promise<unknown>[] {
     const fonts = typeof document === "undefined" ? undefined : document.fonts;
-    if (!fonts?.check) return true;
-    const list = [TAG_FONT[11]!, NAME_FONT[16]!, BUBBLE_FONT];
-    if (!this.fontsAsked) {
-      this.fontsAsked = true;
-      for (const f of list) void fonts.load(f).catch(() => undefined);
-    }
-    return list.every(fontReady);
+    if (!fonts?.load) return [];
+    return [TAG_FONT[11]!, NAME_FONT[16]!, BUBBLE_FONT].map((f) => fonts.load(f));
   }
-  private fontsAsked = false;
 
   /** Whether the box (x, y, w, h) on screen lies under a street-town building standing nearer than `dz` (drawn this frame): it'd hide it. */
   private overNearer(x: number, y: number, w: number, h: number, dz: number): boolean {
@@ -3707,28 +3604,6 @@ export class Renderer {
   /** The frame a new tag was last painted in (drawTag: one a frame). */
   private newTagAt = -1;
   private tagSlicing = false;
-  /**
-   * Each box's solid top (boxes.ts solidTop: its front's first frame worked out, one box up to 20 to 45 ms on a slowed phone) worked out on
-   * the loading screen, `budgetMs` a slice: true once every box's is done. Not the first time a box shows while walking (Nov 27), nor in
-   * idle slices once the town shows (Nov 28: one took 44 ms in Eric's first seconds; Eric, Nov 27: a little longer loading is fine).
-   */
-  private topsAt = 0;
-  warmTops(budgetMs: number): boolean {
-    const t0 = performance.now();
-    while (this.topsAt < this.boxes.length && performance.now() - t0 < budgetMs) solidTop(this.boxes[this.topsAt++]!.box);
-    return this.topsAt >= this.boxes.length;
-  }
-  /** Every box's solid top (kept for the next visit on this build and layout: Town.tsx `loadTown`). */
-  topsList(): number[] {
-    return this.boxes.map((b) => solidTop(b.box));
-  }
-  /** A later visit: the tops as the last visit worked them out, none to work out again (false: they don't fit these boxes). */
-  takeTops(tops: readonly number[]): boolean {
-    if (this.topsAt > 0 || tops.length !== this.boxes.length || !tops.every((t) => typeof t === "number")) return false;
-    this.boxes.forEach((b, i) => setSolidTop(b.box, tops[i]!));
-    this.topsAt = tops.length;
-    return true;
-  }
   private nextTagSlice(): void {
     this.tagSlicing = true;
     const ric = (globalThis as { requestIdleCallback?: (f: (d: { timeRemaining(): number; didTimeout: boolean }) => void, o?: { timeout: number }) => number }).requestIdleCallback;
@@ -4458,6 +4333,15 @@ export class Renderer {
   /** Is (x, y) on a drawn pixel of a park thing's picture? (A mask made once a kind: no read-back per tap.) */
   private propHit(it: Item, x: number, y: number): boolean {
     const fc = this.propFrames[it.i]!;
+    const m = this.propMask(fc);
+    const w = fc.ch.w;
+    const px = clamp(Math.floor(((x - it.x0) / (it.x1 - it.x0)) * w), 0, w - 1);
+    const py = clamp(Math.floor(((y - it.y0) / (it.y1 - it.y0)) * fc.ch.h), 0, fc.ch.h - 1);
+    return !!m[py * w + px];
+  }
+  private readonly propMasks = new Map<FrameCache, Uint8Array>();
+  /** Which of a park thing's first frame's pixels are drawn, read once a picture. */
+  private propMask(fc: FrameCache): Uint8Array {
     let m = this.propMasks.get(fc);
     if (!m) {
       const img = fc.get(0);
@@ -4466,12 +4350,8 @@ export class Renderer {
       for (let i = 0; i < m.length; i++) m[i] = d[i * 4 + 3]! > 0 ? 1 : 0;
       this.propMasks.set(fc, m);
     }
-    const w = fc.ch.w;
-    const px = clamp(Math.floor(((x - it.x0) / (it.x1 - it.x0)) * w), 0, w - 1);
-    const py = clamp(Math.floor(((y - it.y0) / (it.y1 - it.y0)) * fc.ch.h), 0, fc.ch.h - 1);
-    return !!m[py * w + px];
+    return m;
   }
-  private readonly propMasks = new Map<FrameCache, Uint8Array>();
 
   /** The statue (its figure or its pedestal) drawn under (x, y), or null. */
   private statueHit(x: number, y: number): Statue | null {
