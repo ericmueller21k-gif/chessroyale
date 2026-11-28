@@ -7,5 +7,7 @@ Eric: "it showed the tornado before he even initiated anything"; "it builds more
 - **Calls:** the whole banner before his leap (scene 10 s); the ring gathers by a mask (no new art); one shade on the page, the
   board raised over it, speech boxes lit; the notice decided on the device, one button (a second would leave your climb); his
   battle's figure in the floor room, no sound yet.
+- **Nov 28, Eric ("perfect", plus):** the middle's pieces knocked back on the first stab, blasted to the board's edge on the
+  second, home as he leaps away (drawn only: `THROW`, `thrownAt`), and two big ripples a stab. His three calls stand.
 - **His second line:** "Two worlds. Two blades. One of us falls." / "My world has no one left to fight. Be someone." / picked:
   **"I crossed worlds for a real fight. Be one."** How it works: docs/areas/bosses.md, battle-tower.md.
