@@ -2,19 +2,22 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { inflateSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { BOSS_ADMIN_FIRST } from "@chessroyale/core";
 import { TOWNS, bakeTown, type BakeResult, type TownKind, type TownManifest, type TownOrder } from "../../../scripts/bake-town.ts";
+import { unpng } from "../../../scripts/png.ts";
 import { BAKED_NAME, filesOf, manifestFrom } from "../src/town/manifest.ts";
 import { ATLAS } from "../src/town/paint.ts";
+import { SHEET_ANIMS, sidekickFrame } from "../src/town/pictures.ts";
+import { SIDEKICK_SHEETS, type SidekickSheet } from "../src/town/sidekick-sheets.ts";
 
 /**
  * The build bakes Chess Town's pictures (Nov 28, the town's structure, phase 1a: scripts/bake-town.ts, docs/decisions/2026-11-28-town-bake.md).
  * Every picture the town's loading screen keeps (town/pictures.ts: the list render.ts `plan` reads), painted here by the device's
  * painting code, is in the baked files pixel for pixel, at the place the manifest gives it, in a player's town and an admin's; with it
- * the roofs' and glows' pieces, the animations' frame times and the boxes' tops. (That the device's canvases are this list's pictures,
- * in this order: e2e/town-street.spec.ts, by the town's own picture hash.)
+ * the roofs' and glows' pieces, the animations' frame times and the boxes' tops. And each frame of each sidekick the town shows (phase
+ * 1c), cut from its sheet. (That the device's canvases are this list's pictures, in this order: e2e/perf.spec.ts, by the town's own
+ * picture hash.)
  */
 let dir = "";
 let baked: BakeResult;
@@ -22,35 +25,9 @@ let manifest: TownManifest;
 let order: TownOrder;
 const pages = new Map<number, { w: number; h: number; data: Uint8Array }>();
 
-/** A PNG's pixels as the bake writes them (8 bits a channel, RGBA, no filter). */
-function decode(file: Buffer): { w: number; h: number; data: Uint8Array } {
-  expect(file.subarray(0, 8).toString("latin1")).toBe("\x89PNG\r\n\x1a\n");
-  let w = 0;
-  let h = 0;
-  const idat: Buffer[] = [];
-  for (let at = 8; at < file.length; ) {
-    const len = file.readUInt32BE(at);
-    const type = file.toString("ascii", at + 4, at + 8);
-    const body = file.subarray(at + 8, at + 8 + len);
-    if (type === "IHDR") {
-      w = body.readUInt32BE(0);
-      h = body.readUInt32BE(4);
-      expect([...body.subarray(8, 13)], "8-bit RGBA, not interlaced").toEqual([8, 6, 0, 0, 0]);
-    } else if (type === "IDAT") idat.push(body);
-    at += 12 + len;
-  }
-  const raw = inflateSync(Buffer.concat(idat));
-  expect(raw.length).toBe((w * 4 + 1) * h);
-  const data = new Uint8Array(w * h * 4);
-  for (let y = 0; y < h; y++) {
-    if (raw[y * (w * 4 + 1)] !== 0) throw new Error("a filtered row");
-    data.set(raw.subarray(y * (w * 4 + 1) + 1, (y + 1) * (w * 4 + 1)), y * w * 4);
-  }
-  return { w, h, data };
-}
 const page = (i: number) => {
   let p = pages.get(i);
-  if (!p) pages.set(i, (p = decode(readFileSync(join(dir, manifest.files[i]!.name)))));
+  if (!p) pages.set(i, (p = unpng(readFileSync(join(dir, manifest.files[i]!.name)))));
   return p;
 };
 
@@ -69,9 +46,9 @@ describe("the build bakes Chess Town's pictures (Nov 28, phase 1a)", () => {
       vi.resetModules();
       vi.doMock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: kind === "admin" }));
       const { bakeList } = await import("../src/town/bake.ts");
+      const { GLOW_GAP } = await import("../src/town/paint-jobs.ts");
       const want = bakeList();
       expect(want.pictures.size, "pictures by name").toBeGreaterThan(2000);
-      expect(want.pictures.size).toBe(baked.totals.towns[kind].names);
       const names = Object.keys(manifest.pictures);
       let missing = 0;
       let differ = 0;
@@ -113,18 +90,59 @@ describe("the build bakes Chess Town's pictures (Nov 28, phase 1a)", () => {
             const sheet = manifest.pictures[`${roof}/${f[j]}`]!;
             expect(f[j + 1]! + f[j + 3]! <= sheet[3] && f[j + 2]! + f[j + 4]! <= sheet[4], `${roof}: a piece on its sheet`).toBe(true);
           }
+      let pieces = 0;
+      let glowsOff = 0;
       for (const [glow, g] of Object.entries(want.glows)) {
         const sheet = manifest.pictures[glow];
         expect(!!sheet, `${glow}: a picture only with pieces`).toBe(g.length > 0);
         for (let j = 0; sheet && j < g.length; j += 7) expect(g[j]! + g[j + 2]! <= sheet[3] && g[j + 1]! + g[j + 3]! <= sheet[4], `${glow}: a piece on its sheet`).toBe(true);
+        // (Nov 26; here from the paint workers' test, gone with them: none of a glow's pieces within GLOW_GAP of another, the atlas's
+        // own padding, so a smoothed draw of one reads clear pixels round it; and nothing drawn outside the pieces.)
+        const px = want.pictures.get(glow)?.px;
+        if (!px) continue;
+        const own = new Int32Array(px.w * px.h).fill(-1);
+        for (let k = 0; k < g.length; k += 7) {
+          pieces++;
+          const [sx, sy, w, h] = g.slice(k, k + 4) as [number, number, number, number];
+          for (let y = Math.max(0, sy - GLOW_GAP); y < Math.min(px.h, sy + h + GLOW_GAP); y++)
+            for (let x = Math.max(0, sx - GLOW_GAP); x < Math.min(px.w, sx + w + GLOW_GAP); x++) {
+              if (x >= sx && y >= sy && x < sx + w && y < sy + h) own[y * px.w + x] = k;
+              else if (own[y * px.w + x] !== -1) glowsOff++;
+            }
+        }
+        for (let i = 0; i < own.length; i++) if (own[i]! < 0 && px.data[i * 4 + 3]) glowsOff++;
       }
-      // The sidekicks' sheets: each file as it is.
+      expect(pieces, "the glows' pieces").toBeGreaterThan(2000);
+      expect(glowsOff, "glow pieces too near another, or pixels outside a glow's pieces").toBe(0);
+      // The sidekicks' frames (phase 1c): every frame of every sheet this town shows is a picture of its own, the sheet's pixels
+      // exactly (the device used to fetch the sheet and cut it), on a file of that sidekick's that this town fetches. Named by the
+      // sheet's name in SIDEKICK_SHEETS: Rivet's is `timber`, whatever his art's id (an admin's town never drew him until this).
       expect(want.sheets.length).toBeGreaterThanOrEqual(14);
+      expect(want.sheets.includes("timber"), "Rivet, Timber's kid: in an admin's town only").toBe(kind === "admin");
+      let frames = 0;
       for (const id of want.sheets) {
-        const f = manifest.files[manifest.sheets[id]!]!;
-        expect(f.towns, id).toContain(kind);
-        expect(readFileSync(join(dir, f.name)).equals(readFileSync(new URL(`../src/town/sidekicks/${id}.png`, import.meta.url))), `${id}: its sheet as it is`).toBe(true);
+        const sheet = (SIDEKICK_SHEETS as Record<string, SidekickSheet>)[id]!;
+        const src = unpng(readFileSync(new URL(`../src/town/sidekicks/${id}.png`, import.meta.url)));
+        SHEET_ANIMS.forEach((anim, row) =>
+          sheet.ms[anim].forEach((_, col) => {
+            frames++;
+            const name = sidekickFrame(id, anim, col);
+            const at = manifest.pictures[name];
+            if (!at) throw new Error(`${name}: not in the manifest`);
+            const [f, x, y, w, h] = at;
+            const file = manifest.files[f]!;
+            expect([file.group, file.towns.includes(kind), w, h], name).toEqual([`sidekick:${id}`, true, sheet.w, sheet.h]);
+            const pg = page(f);
+            for (let j = 0; j < h; j++) {
+              const a = Buffer.from(pg.data.buffer, pg.data.byteOffset + ((y + j) * pg.w + x) * 4, w * 4);
+              const b = Buffer.from(src.data.buffer, src.data.byteOffset + ((row * sheet.h + j) * src.w + col * sheet.w) * 4, w * 4);
+              if (!a.equals(b)) throw new Error(`${name}: not its sheet's pixels (row ${j})`);
+            }
+          }),
+        );
       }
+      expect(frames, "sidekick frames").toBeGreaterThan(800);
+      expect(want.pictures.size + frames, "the town's pictures by name: painted, and the sidekicks' frames").toBe(baked.totals.towns[kind].names);
       vi.doUnmock("../src/town/admin-town.ts");
     });
 
@@ -132,13 +150,11 @@ describe("the build bakes Chess Town's pictures (Nov 28, phase 1a)", () => {
     const { pad, big, page: side } = ATLAS;
     const on = new Map<number, Set<string>>();
     for (const [f, x, y, w, h] of Object.values(manifest.pictures)) on.set(f, (on.get(f) ?? new Set()).add(`${x},${y},${w},${h}`));
-    const sheetFiles = new Set(Object.values(manifest.sheets));
     manifest.files.forEach((file, i) => {
       expect(file.name, "a group's name, a hash, .png").toMatch(/^[a-z0-9-]+(\.(player|admin))?\.[0-9a-f]{12}\.png$/);
       expect(file.name.startsWith(file.group.replace(/[^a-z0-9]+/gi, "-").toLowerCase()), `${file.name}: named by its group`).toBe(true);
-      expect(file.name.includes(`.${file.towns[0]}.`), `${file.name}: named by its one town`).toBe(file.towns.length === 1 && !sheetFiles.has(i));
+      expect(file.name.includes(`.${file.towns[0]}.`), `${file.name}: named by its one town`).toBe(file.towns.length === 1);
       expect(file.towns.length).toBeGreaterThan(0);
-      if (sheetFiles.has(i)) return;
       const pg = page(i);
       expect([pg.w, pg.h, file.bytes]).toEqual([file.w, file.h, readFileSync(join(dir, file.name)).length]);
       expect(file.name, "named by its pixels").toContain(createHash("sha256").update(`${pg.w}x${pg.h}:`).update(pg.data).digest("hex").slice(0, 12));
@@ -168,6 +184,8 @@ describe("the build bakes Chess Town's pictures (Nov 28, phase 1a)", () => {
     const groupsOf = (kind: TownKind) => new Set(manifest.files.filter((f) => f.towns.includes(kind)).map((f) => f.group));
     for (const id of BOSS_ADMIN_FIRST) expect([groupsOf("admin").has(`home:${id}`), groupsOf("player").has(`home:${id}`)], id).toEqual([true, false]);
     for (const g of ["home:alfil", "park", "colosseum", "props", "row:south-st:S", "sidekick:boingo"]) expect(groupsOf("player").has(g), g).toBe(true);
+    // (Rivet's and Tick's frames, the admins-first bosses' kids: an admin's files.)
+    for (const g of ["sidekick:timber", "sidekick:blitz"]) expect([groupsOf("admin").has(g), groupsOf("player").has(g)], g).toEqual([true, false]);
     // The printed totals are the files'.
     expect(baked.totals.bytes).toBe(manifest.files.reduce((s, f) => s + f.bytes, 0));
     expect(baked.totals.files).toBe(manifest.files.length);
@@ -180,10 +198,11 @@ describe("the build bakes Chess Town's pictures (Nov 28, phase 1a)", () => {
     expect(order.manifest, "order.json names it (a check's and a tool's way in)").toBe(baked.manifestName);
     expect(manifestFrom(JSON.parse(text)), "the app's own check of a manifest (town/manifest.ts)").toEqual(manifest);
     for (const name of [baked.manifestName, ...manifest.files.map((f) => f.name)]) expect(BAKED_NAME.test(name), name).toBe(true);
-    // A player's town's pages: what its loading screen fetches (not the sidekicks' sheets, nor an admin's own files).
+    // A player's town's pages: what its loading screen fetches (its fourteen sidekicks' among them since phase 1c; none of an admin's own).
     const fetched = filesOf(manifest, "player").map((i) => manifest.files[i]!);
     expect(fetched.length).toBeGreaterThan(20);
-    expect(fetched.filter((f) => f.group.startsWith("sidekick:") || !f.towns.includes("player"))).toEqual([]);
+    expect(fetched.filter((f) => f.group.startsWith("sidekick:")).length).toBe(14);
+    expect(fetched.filter((f) => !f.towns.includes("player"))).toEqual([]);
     // (The bake's inputs, for the dev server: the list's module and a house's among them.)
     expect(baked.inputs.some((p) => p.endsWith("/src/town/pictures.ts")) && baked.inputs.some((p) => p.includes("/src/town/houses/"))).toBe(true);
   });
