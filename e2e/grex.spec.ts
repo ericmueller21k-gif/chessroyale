@@ -168,6 +168,17 @@ test("Grex: his tiles burn in stages counting down, a piece left on one burns, a
   await expect(banner(page, "SPARKLER!")).toBeVisible({ timeout: 30_000 });
   // (His name on the banner is Grex, never his old Grex.)
   await expect(banner(page, "SPARKLER!").locator(".kc-label")).toHaveText("Grex");
+  // (Eric, Nov 28: one face for his name, the title and its line; the title's lines one size, inside the words' share.)
+  const look = await banner(page, "SPARKLER!").evaluate((b) => {
+    const face = (s: string) => getComputedStyle(b.querySelector(s)!).fontFamily;
+    const words = b.querySelector<HTMLElement>(".kc-words")!;
+    const lines = [...b.querySelectorAll<HTMLElement>(".kc-line")];
+    return { faces: new Set([face(".kc-label"), face(".kc-text"), face(".fb-sub")]).size, sizes: new Set(lines.map((l) => getComputedStyle(l).fontSize)).size, widest: Math.max(...lines.map((l) => l.scrollWidth)), room: words.clientWidth, share: parseFloat(getComputedStyle(words).maxWidth) };
+  });
+  expect(look.faces, "one face").toBe(1);
+  expect(look.sizes, "the title's lines one size").toBe(1);
+  expect(look.widest, "each line inside the words").toBeLessThanOrEqual(look.room + 1);
+  expect(look.room, "the words inside their share").toBeLessThanOrEqual(look.share + 1);
   await expect(banner(page, "RAGE!")).toBeVisible({ timeout: 10_000 });
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   const p2 = await powers(page);

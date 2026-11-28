@@ -292,7 +292,7 @@ function candleMoment({ boss, moment, now, t, kit, banner, anim: kitAnim }: Mome
   const times = candleShotTimes(kit).map((x) => moment.at + CANDLE.rexAt + x);
   return (
     <div class="power-moment pm-candle">
-      {banner("ROMAN CANDLE!", `${CANDLE_SHOTS} shots up…`, "fire long")}
+      {banner("ROMAN CANDLE!", `${CANDLE_SHOTS} shots up…`, "fire")}
       {t >= CANDLE.rexAt && (
         <span class={`pm-pogo pm-rex${t >= CANDLE.exitAt ? " out" : ""}`}>
           {/* (His last frame, the candle in hand, holds as he jumps off.) */}

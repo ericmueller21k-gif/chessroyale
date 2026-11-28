@@ -928,7 +928,7 @@ function stormView(p: MomentProps) {
   return (
     <>
       {/* (Up through the moment's lead alone, its whole length: gone as his leap begins, never over his landing.) */}
-      {p.banner("STORM OF TWO WORLDS!", "Three turns of ice and fire", "storm long", 1)}
+      {p.banner("STORM OF TWO WORLDS!", "Three turns of ice and fire", "storm", 1)}
       {stormMoment(p)}
     </>
   );
