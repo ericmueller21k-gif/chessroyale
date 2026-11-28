@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { ITEM_DEFS, RECLUSE_PHASE2, adminCopy } from "@chessroyale/core";
 import { SAW_SWAP_TEST_CHECK } from "@chessroyale/chess";
-import { BOARD_SEL, asAdmin, test, bossAloneFromHome } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, giveItems, test, bossAloneFromHome, wearItem } from "./helpers.ts";
 import { counts, frameStats, instrument } from "./perf-probe.js";
 import { MOCKUP_LOOK, demoProfile, routeProfile } from "./public-profile-data.ts";
 import { START, walkable } from "../packages/app/src/town/world.ts";
@@ -594,9 +594,13 @@ function townRefJob(): number {
 /**
  * The town's first frame may take this many reference jobs (`townRefJob`): set Nov 23 from this machine's runs, a quarter over (20,
  * when its runs read 13.4 to 18.1). Since the paint workers (Nov 23, town/paint-pool.ts): 12, the median of a first visit's runs (8.9 to
- * 11.0 over 3 runs of both towns, median 9.6) and a quarter. docs/decisions/2026-11-23-town-paint-workers.md.
+ * 11.0 over 3 runs of both towns, median 9.6) and a quarter. docs/decisions/2026-11-23-town-paint-workers.md. Nov 28: 14, for the
+ * warm-up under the loading card and the box tops worked out there (about 1.5 s at 4x on a first visit; Eric, Nov 27: a couple of seconds
+ * more loading is fine if it then plays smooth): 11.1 and 12.9 measured. docs/decisions/2026-11-28-town-load-smooth.md. Nov 28, later: 16,
+ * for a first visit's pictures kept under the card (about 1 s at 4x; it was a hitch after the card lifted, Eric: "load the town first so it
+ * doesn't lag"): 12.8 and 14.1 measured.
  */
-const TOWN_LOAD_REFS = 12;
+const TOWN_LOAD_REFS = 16;
 /**
  * (`?paintslow=4`, Nov 23) The paint workers slowed as the page is: CDP's CPU slowing reaches the page's own thread, not its workers, so
  * each worker's picture is made to take 4 times as long (test-switches.ts TOWN_PAINT_ASKED), as on a phone's slower cores.
@@ -751,6 +755,14 @@ async function busyTown(page: Page, wearing: boolean) {
     const tables = busy ? Array.from({ length: 6 }, (_, t) => ({ code: `BUSY${t}`, table: t, seats: [0, 1].map((k) => ({ uid: `seat-${t}-${k}`, name: `Player ${t * 2 + k + 1}`, look: null, pawn: k ? "black" : "white" })) })) : [];
     await route.fulfill({ json: { others, tables } });
   });
+  // (Nov 28, Eric's frame report: his ride's frames and trail marks uploaded as each first showed. Not wearing: you ride the Chirp, whose
+  // frames and marks the loading screen keeps, so the first walk uploads nothing.)
+  if (!wearing) {
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+    const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
+    await wearItem(page, "ride", chirp!);
+  }
   await page.goto(`/town?sky=day&report=120&townroom=busy${Date.now().toString(36)}`);
   const canvas = page.locator("canvas.town-canvas");
   await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
@@ -775,6 +787,11 @@ async function busyTown(page: Page, wearing: boolean) {
     return { ours, frames: s.frames, mean: s.segs[0]!.mean, long: s.long, parts: s.segs[0]!.avg.slice(0, P.outside).map((x) => +x.toFixed(2)).join(" "), uploads: `${s.uploads} uploads: ${s.uploadsBy.map(([k, n]) => `${k} ${n}`).join(", ")}; ${s.resets} pages started again`, frameUps: s.uploadsBy.find(([k]) => k === "dressed pawn frame")?.[1] ?? 0 };
   };
   const empty = await walk();
+  if (!wearing) {
+    const ride = await page.evaluate(() => (window as unknown as { __townRide: () => { you: { ride: string | null; ready: boolean } } }).__townRide().you);
+    expect(ride, "on the Chirp, its frames ready").toMatchObject({ ride: "riding-chirp", ready: true });
+    expect(empty.uploads, "the first walk after the loading screen uploads nothing (its ride's frames and marks kept there)").toMatch(/^0 uploads/);
+  }
   busy = true;
   await expect.poll(() => page.evaluate(() => (window as unknown as W).__townHere().filter((h) => !h.you && h.here).length), { timeout: 30_000, message: "the other players in the town" }).toBeGreaterThanOrEqual(50);
   await expect.poll(() => page.evaluate(() => (window as unknown as { __townHere: () => { here: boolean; match: string | null; table: number | null }[] }).__townHere().filter((h) => h.here && h.match && h.table !== null).length), { timeout: 30_000, message: "the six games' players seated" }).toBe(12);

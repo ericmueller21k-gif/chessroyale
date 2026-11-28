@@ -5,6 +5,7 @@
  * three copies of it, so it costs nothing per frame but three image draws for each away pawn on screen (none when nobody's away).
  */
 import { art2d } from "./paint.ts";
+import { upName } from "./frame-report.ts";
 
 
 /** The Z's pixels (its dark rim is the pixels round them). */
@@ -20,7 +21,7 @@ const ZS = 3;
 let art: HTMLCanvasElement | null = null;
 function glyph(): HTMLCanvasElement {
   if (art) return art;
-  const c = document.createElement("canvas");
+  const c = upName(document.createElement("canvas"), "zzz");
   c.width = c.height = SIDE * PX;
   const g = art2d(c);
   const on = (x: number, y: number) => Z[y - 1]?.[x - 1] === "o";

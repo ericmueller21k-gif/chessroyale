@@ -455,7 +455,7 @@ export function domPageIO(art2d: (c: HTMLCanvasElement) => CanvasRenderingContex
  * Composing and encoding pages in the browser: each page drawn on the main thread, a slice a frame, then encoded as PNG in a worker
  * (null: no worker or OffscreenCanvas). Stops once `alive` says no. Call `done` when finished.
  */
-export function domSaveIO(art2d: (c: HTMLCanvasElement) => CanvasRenderingContext2D, alive: () => boolean): (SaveIO & { done(): void }) | null {
+export function domSaveIO(art2d: (c: HTMLCanvasElement) => CanvasRenderingContext2D, alive: () => boolean, sliceMs: number = TOWN_PICTURES.sliceMs): (SaveIO & { done(): void }) | null {
   if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined" || typeof createImageBitmap !== "function") return null;
   let w: Worker | null = null;
   let n = 0;
@@ -481,12 +481,12 @@ export function domSaveIO(art2d: (c: HTMLCanvasElement) => CanvasRenderingContex
       cv.width = m.pages[p * 2]!;
       cv.height = m.pages[p * 2 + 1]!;
       const g = art2d(cv);
-      // (A few milliseconds a frame (`TOWN_PICTURES.sliceMs`), so the first visit's walk doesn't feel it; stopped if the town closes.)
+      // (`sliceMs` a frame: the loading screen's slice, as it's kept under the card since Nov 28; stopped if the town closes.)
       let t = performance.now();
       for (let i = 0; i < pics.length; i++) {
         if (m.pics[i * 5] !== p) continue;
         g.drawImage(pics[i]!, m.pics[i * 5 + 1]!, m.pics[i * 5 + 2]!);
-        if (performance.now() - t > TOWN_PICTURES.sliceMs) {
+        if (performance.now() - t > sliceMs) {
           await new Promise<void>((go) => requestAnimationFrame(() => go()));
           if (!alive()) throw new Error("kept pictures: the town closed");
           t = performance.now();

@@ -4761,15 +4761,15 @@ export const ALERTS = {
  * town/keep-pictures.ts): the first visit on a build paints every picture on the loading screen, as before, then keeps them on the device
  * (IndexedDB, as PNG pages); a later visit on the same build and layout loads them instead of painting. Anything odd paints as before.
  * `on`: the switch. `maxMB`: the most it keeps (more, and nothing is kept). (Its pages' size is the WebGL atlas's, Nov 25: the app's town/paint.ts `ATLAS`.) `waitMs`: how long the loading
- * screen waits for the kept pictures to be read and decoded before it paints instead. `afterMs`: how long after the first visit's first
- * frame they're kept (composed a page at a time, up to `sliceMs` a frame, encoded in a worker).
+ * screen waits for the kept pictures to be read and decoded before it paints instead. They're kept under the first visit's loading
+ * card, after its box tops (Nov 28: kept after the first frame, it was a hitch about 2 s in): composed a page at a time, encoded in a
+ * worker. `sliceMs`: the default slice a frame for a save outside the loading screen.
  * docs/decisions/2026-11-23-town-keep-pictures.md.
  */
 export const TOWN_PICTURES = {
   on: true,
   maxMB: 24,
   waitMs: 4000,
-  afterMs: 1500,
   sliceMs: 3,
 } as const;
 
