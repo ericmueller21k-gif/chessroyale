@@ -2951,9 +2951,6 @@ function startTown(
   // the frame rate walking a set route, Nov 5). True if there's a way.
   const hookWalk = (sq: readonly [number, number]) => {
     if (!testSwitchesAllowed()) return false;
-    // (A test's walk to a fixed square holds the bots too, as `__townStill` does: one wandering onto the square left you a step short
-    // for a minute, main 182e1fa0, town-rows.spec; Nov 28.)
-    town.nextBotAt = Infinity;
     follow = true;
     glide = null;
     return walkYou(town, { kind: "square", c: wrapI(sq[0]), r: wrapI(sq[1]) });
