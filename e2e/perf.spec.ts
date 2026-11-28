@@ -667,9 +667,12 @@ for (const who of ["a player's town", "an admin's town"] as const)
 
 /** A visit's first frame with its pictures loaded whole, not painted: this many reference jobs. (Nov 23, a second visit with the first's
  * pictures kept, keep-pictures.ts: measured 4.6 to 5.3 over 4 runs, the first visit 14.8 to 15.8; the median and a quarter, as
- * TOWN_LOAD_REFS. docs/decisions/2026-11-23-town-keep-pictures.md. Nov 28, phase 1b: every visit loads the build's baked files, the
- * first as the second; phase 1c measures the budgets again.) */
+ * TOWN_LOAD_REFS. docs/decisions/2026-11-23-town-keep-pictures.md. Nov 28, phase 1b: every visit loads the build's baked files; a
+ * second visit measured 4.7.) */
 const TOWN_KEPT_REFS = 6;
+/** A first visit's, its files fetched from the server (Nov 28, phase 1b: measured 5.9 to 6.0 over 3 runs, a quarter's room; 19.9 painted
+ * on the device, as every first visit was). Phase 1c measures the town's budgets again. */
+const TOWN_BAKED_FIRST_REFS = 8;
 
 test("Chess Town on a slow phone: a first visit and a second both load the build's baked pictures, exactly as the device paints them, and draw as soon as each other (Nov 28; Nov 23: a second visit's kept pictures)", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
@@ -706,7 +709,7 @@ test("Chess Town on a slow phone: a first visit and a second both load the build
   expect(three.pics.baked || three.pics.kept || three.pics.workers, "painted on the main thread alone").toBeFalsy();
   expect(await sum(), "every baked picture, as the main thread paints it").toEqual(first);
   console.log(`Chess Town's baked pictures (slowed phone): first visit ${Math.round(one.loaded)} ms (${(one.loaded / one.ref).toFixed(1)} x ${Math.round(one.ref)} ms; fetching and decoding ${Math.round(one.pics.bakedMs)} ms), second ${Math.round(two.loaded)} ms (${(two.loaded / two.ref).toFixed(1)} x ${Math.round(two.ref)} ms; ${Math.round(two.pics.bakedMs)} ms); painted on the device ${Math.round(three.loaded)} ms (${(three.loaded / three.ref).toFixed(1)} x); ${first.n} pictures in ${one.pics.files} files, ${(one.pics.bytes / 1048576).toFixed(2)} MB`);
-  expect(one.loaded / one.ref, "a first visit's tap to its first frame, in reference jobs").toBeLessThan(TOWN_KEPT_REFS);
+  expect(one.loaded / one.ref, "a first visit's tap to its first frame, in reference jobs").toBeLessThan(TOWN_BAKED_FIRST_REFS);
   expect(two.loaded / two.ref, "a second visit's tap to its first frame, in reference jobs").toBeLessThan(TOWN_KEPT_REFS);
 });
 
