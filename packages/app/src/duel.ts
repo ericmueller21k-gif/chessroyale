@@ -1,4 +1,4 @@
-import { BOSS_BRAIN, ENGINE_MAX_ELO, ENGINE_MIN_ELO, RANKED_1V1, RESIDENTS, WATCH_REFUSED, botLook, rankView, type DuelZone, type ItemLook, type RankView } from "@chessroyale/core";
+import { BOSS_BRAIN, ENGINE_MAX_ELO, ENGINE_MIN_ELO, RANKED_1V1, RESIDENTS, WATCH_REFUSED, botLook, rankView, votedControl, type DuelZone, type ItemLook, type RankView } from "@chessroyale/core";
 import { applyMove, toSan, type ClientMessage, type HumanUciEngine } from "@chessroyale/chess";
 import {
   DUEL_PROTOCOL,
@@ -374,7 +374,11 @@ export class NetDuel implements DuelSession {
     const you = this.you;
     const fallback: DuelSide = { uid: null, name: "…", look: null, rank: rankView(null) };
     // (The versus moment ends at the vote's opening by the clock: the server sends nothing then.)
-    const phase: DuelGamePhase = v ? (v.phase === "versus" && v.voteAt !== null && Date.now() >= v.voteAt ? "vote" : v.phase) : "waiting";
+    // (The vote closes by the clock too: past its close with the server's word not in yet (its alarm late on a busy server, which
+    // once skipped the "Timer" line: it went straight from the vote to play, Nov 28), the line shows from the picks, as the server
+    // closes it; its own overlay or play takes over when it comes.)
+    const closed = v?.phase === "vote" && v.voteEndsAt !== null && Date.now() >= v.voteEndsAt ? votedControl(v.picks.w, v.picks.b) : null;
+    const phase: DuelGamePhase = closed ? "overlay" : v ? (v.phase === "versus" && v.voteAt !== null && Date.now() >= v.voteAt ? "vote" : v.phase) : "waiting";
     return {
       code: this.code,
       bot: false,
@@ -385,8 +389,8 @@ export class NetDuel implements DuelSession {
       voteAt: v?.voteAt ?? null,
       voteEndsAt: v?.voteEndsAt ?? null,
       picks: v?.picks ?? { w: null, b: null },
-      control: v?.control ?? null,
-      clock: v?.clock ?? null,
+      control: closed ? closed.id : (v?.control ?? null),
+      clock: closed ? { baseSeconds: closed.baseSeconds, incrementSeconds: closed.incrementSeconds } : (v?.clock ?? null),
       startsAt: v?.startsAt ?? null,
       fen: v?.fen ?? "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
       moves: v?.moves ?? [],

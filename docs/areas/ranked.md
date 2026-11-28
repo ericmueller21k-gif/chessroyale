@@ -115,6 +115,7 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     The control is halfway between the two picks (`votedControl`): the same pick, that control; neighbors, the one
     between (Bullet 2+1, Blitz 5+3); Bullet against Rapid, Blitz 3+2; one pick counts alone; none: Blitz 3+2;
   - **the overlay** (`overlayMs`, 1.5 s): "Timer: Blitz 3+2" over the board (a line, not a banner); the pawns are gone;
+    the app shows it by its own clock at the vote's close, from the picks, so a late server alarm can't skip it (Nov 28);
   - **play:** each first move within `firstMoveSeconds` (20; White's from the start, Black's from White's) or the game
     is aborted (no result; a dodge for the side that didn't move: "Leaving early", below). The clocks start after Black's first move; then Fischer: the mover's
     thinking off their clock, the increment on after the move. Ends: checkmate; resigning (before both first moves,
