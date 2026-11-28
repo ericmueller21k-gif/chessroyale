@@ -13,8 +13,9 @@ Branch `claude/town-shop` from `origin/main`. Push at each real step.
   reached shows greyed "Reach <Rank> to buy". Rank boards: buyable once you have **ever** reached that rank, still for coins. Coins only.
 - **The preview:** the Italian opening on a loop on the real board (`OwnBoard`), "Loading preview…" while its chunk loads (lazy).
 - **The boards:** the 7 rank boards (Gold … Transcendent) and 5 basics (Walnut, Slate, Lagoon, Blossom, Graphite), hex values from the
-  NOTE; the frame drawn **over the outer edge of the squares** (the board keeps its size: styling only). Prices placeholders in
-  `settings.ts`: basic 150, rank 400.
+  NOTE: **colors only, no frame, no motif** (Eric, Nov 28 a little later: "keep it just the color. That border isn't really working
+  well"; he likes each board's own last-move color with its squares, keep those). Prices placeholders in `settings.ts`: basic 150,
+  rank 400.
 - **Settings:** the free "Gold" board colors become "Classic Gold"; boards you own also show in Settings, Board colors.
 - **Stored data:** owned boards and the one in use are saved on the account (D1 migration; the shop's existing wallet and purchase path,
   never a second wallet). A purchase is one server-side transaction: price checked on the server, never trusted from the client; buying

@@ -1,3 +1,5 @@
+**DROPPED Nov 28 (Eric: "we don't need to do the artwork for now. Our usage is ridiculous already"). Kept for reference only.**
+
 # Build: the town shop, part 2 (rank piece sets at the board keeper). Opus, xhigh (coins). Full lane. Runs after part 1 merges.
 
 Eric, Nov 28, to the mockup (`stills/rank-pieces`, its `NOTE.md`; the throwaway code is `claude/rank-pieces-mockup-preview`): "I do like the
