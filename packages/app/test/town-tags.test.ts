@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { NAMES_CHOICE, NAMES_KEY, NAMES_LABEL, NAMES_MODES, TAG_STYLE, TagCache, easeTag, loadNamesMode, nameAlpha, namesMode, namesNote, onNamesMode, saveNamesMode, setNamesMode, tagAlpha, type TagKind } from "../src/town/tags.ts";
+import { NAMES_CHOICE, NAMES_KEY, NAMES_LABEL, NAMES_MODES, TAG_STYLE, easeTag, loadNamesMode, nameAlpha, namesMode, namesNote, onNamesMode, saveNamesMode, setNamesMode, tagAlpha, type TagKind } from "../src/town/tags.ts";
 
 /**
  * The people's name tags (Eric, Oct 28, after trying 50 bots; docs/areas/town-square.md, "Name tags"): tags show only near you by default
  * and fade in and out at the edge of a radius of 5 squares; your own tag, a figure whose card is open and one at a table with you always
  * show; "Everyone" is every tag as before; the choice is remembered on this device; a boss's sidekick wears a blue tag with white
- * text (WCAG AA: 4.5:1), pawns white and you gold; and the drawings are cached by name, size and kind.
+ * text (WCAG AA: 4.5:1), pawns white and you gold. (Their pictures: the picture service's, town-picture-service.test.ts.)
  */
 
 describe("the near rule: a tag's alpha by its figure's distance from you (squares, the larger of the two directions)", () => {
@@ -205,60 +205,5 @@ describe("the kinds of tag: yours gold, a pawn's white, a boss's sidekick's blue
   it("tells the three kinds apart", () => {
     const kinds: TagKind[] = ["you", "bot", "sidekick"];
     expect(new Set(kinds.map((k) => TAG_STYLE[k].pill)).size).toBe(3);
-  });
-});
-
-describe("the tag cache is keyed by name, size and kind (not a gold-or-not flag)", () => {
-  type Art = { id: string; s: number; kind: TagKind; used: number };
-  const art = (id: string, s: number, kind: TagKind, used = 0): Art => ({ id, s, kind, used });
-
-  it("holds one drawing per name, size and kind: a sidekick's blue, a pawn's white and yours gold are three of the same name at the same size", () => {
-    const c = new TagCache<Art>(64);
-    const bot = art("bot", 11, "bot");
-    const side = art("sidekick", 11, "sidekick");
-    const you = art("you", 11, "you");
-    for (const a of [bot, side, you]) c.add("Squirt", a);
-    expect(c.n).toBe(3);
-    expect(c.find("Squirt", 11, "bot")).toBe(bot);
-    expect(c.find("Squirt", 11, "sidekick")).toBe(side);
-    expect(c.find("Squirt", 11, "you")).toBe(you);
-    expect(c.find("Squirt", 10, "bot"), "another size is another drawing").toBeUndefined();
-    expect(c.find("Tex", 11, "bot"), "another name too").toBeUndefined();
-    // Asking for one kind never hands back another's (a white tag for a sidekick, or a blue one for a pawn).
-    c.clear();
-    c.add("Squirt", bot);
-    expect(c.find("Squirt", 11, "sidekick")).toBeUndefined();
-    expect(c.find("Squirt", 11, "you")).toBeUndefined();
-  });
-
-  it("lets go of the least lately used drawing when full, never one drawn this frame or the last, and hands it back to reuse", () => {
-    const c = new TagCache<Art>(3);
-    c.add("A", art("A", 11, "bot", 5));
-    c.add("B", art("B", 11, "sidekick", 2));
-    c.add("C", art("C", 11, "you", 7));
-    expect(c.n).toBe(3);
-    expect(c.evict(10)!.id, "the least lately used: B").toBe("B");
-    expect(c.n).toBe(2);
-    expect(c.find("B", 11, "sidekick")).toBeUndefined();
-    // Not full: nothing is let go.
-    expect(c.evict(10)).toBeNull();
-    c.add("D", art("D", 11, "bot", 9));
-    // Full again, but its least lately used (A, frame 5) is the frame before the next (6): it may still be drawn, so nothing goes.
-    expect(c.evict(6)).toBeNull();
-    expect(c.n, "the cache grows past its max rather than losing one in use").toBe(3);
-    expect(c.evict(7)!.id).toBe("A");
-    expect(c.n).toBe(2);
-    c.clear();
-    expect(c.n).toBe(0);
-    expect(c.find("A", 11, "bot")).toBeUndefined();
-  });
-
-  it("keeps a name's other drawings when one of its kinds is let go", () => {
-    const c = new TagCache<Art>(2);
-    c.add("Squirt", art("old-white", 11, "bot", 1));
-    c.add("Squirt", art("new-blue", 11, "sidekick", 50));
-    expect(c.evict(60)!.id).toBe("old-white");
-    expect(c.find("Squirt", 11, "sidekick")!.id).toBe("new-blue");
-    expect(c.find("Squirt", 11, "bot")).toBeUndefined();
   });
 });

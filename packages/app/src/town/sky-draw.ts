@@ -91,11 +91,14 @@ interface Cloud {
   /** Where it floats: across the strip (CSS pixels) and up the sky (a fraction of the sky's height above the horizon). */
   x: number;
   v: number;
-  /** Drawn: one canvas per look (made the first time that look shows). */
-  art: Partial<Record<Look, HTMLCanvasElement>>;
+  /** Its picture's key in each look (the picture service's: `SkyPainter.ask`). */
+  keys: Record<Look, string>;
   /** Night shows only some of the clouds. */
   night: boolean;
 }
+/** The clouds' pictures' keys by cloud (cloud `i` is the same shape at any width of the box), and the sun's and moon's by look. */
+const CLOUD_KEYS: Record<Look, string>[] = [];
+const SUN_KEYS = Object.fromEntries(LOOKS.map((l) => [l, `sun|${l}`])) as Record<Look, string>;
 
 export class SkyPainter {
   private W = 0;
@@ -106,33 +109,40 @@ export class SkyPainter {
   private drift = 0;
   private grad: CanvasGradient | null = null;
   private gradHy = NaN;
-  private sun: Partial<Record<Look, HTMLCanvasElement>> = {};
+  /**
+   * Asks the town's picture service for one of the sky's pictures (render.ts sets it: picture-service.ts): the picture once it's on the
+   * GPU, else null (left out). Since Nov 28, phase 2: until then the sun and the clouds were made, and uploaded, at the first draw
+   * after every change of the box (a turned phone, a window dragged wider).
+   */
+  ask: <T extends { cv: HTMLCanvasElement }>(key: string, stamp: number, make: () => T) => T | null = (_k, _s, make) => make();
   /** The stars: where, how big, how bright, and whether it twinkles (its phase; -1: it doesn't). */
   private stars: { x: number; y: number; s: number; a: number; p: number }[] | null = null;
   private weights: SkyWeights = { dawn: 0, day: 1, dusk: 0, night: 0 };
 
-  /** The box changed: clouds, sun, moon and stars are made again (at the next draw). */
+  /**
+   * The box changed: the clouds are laid out again and the stars placed again. Their pictures stay: a cloud's is its shape's at the
+   * device's pixels, the sun's its size's (each asked for again only when that changes, the one it had drawn meanwhile).
+   */
   resize(W: number, H: number, DPR: number): void {
     this.W = W;
     this.H = H;
     this.DPR = DPR;
-    this.sun = {};
     this.stars = null;
     this.layoutClouds();
   }
 
   /**
-   * (The town's loading screen, Nov 25) The sun's or moon's picture and every cloud's for the sky's looks showing now, made here and
-   * handed to `keep`, so none is made (and uploaded) as it first drifts into view. A look the clock brings later is made as it comes.
+   * (The town's loading screen, Nov 25) The sun's or moon's picture and every cloud's asked for (`ask`), so each is made and uploaded
+   * under the loading card, none as it first drifts into view.
    */
-  warm(keep: (c: HTMLCanvasElement) => void): void {
+  warm(): void {
     if (!this.W || !this.H) return;
     const R = clamp(Math.min(this.W, this.H) * TOWN_FEEL.sunSize, 22, 80);
     // (Every look's, not only the sky's now (Nov 26): the clock turns it as you play, and a look's sun and clouds made as it first
     // shows were uploads while walking.)
     for (const l of LOOKS) {
-      keep(this.sunArt(l, R));
-      for (const c of this.clouds) if (l !== "night" || c.night) keep(this.cloudArt(c, l));
+      this.sunArt(l, R);
+      for (const c of this.clouds) if (l !== "night" || c.night) this.cloudArt(c, l);
     }
   }
 
@@ -154,16 +164,19 @@ export class SkyPainter {
       const shape = kind === 0 ? puffy(r, 42 + Math.floor(r() * 20), 15 + Math.floor(r() * 5)) : kind === 1 ? puffy(r, 20 + Math.floor(r() * 10), 9 + Math.floor(r() * 3)) : wisp(r, 30 + Math.floor(r() * 22), 3 + Math.floor(r() * 2));
       const [lo, hi] = f.cloudBand;
       const v = lo + (hi - lo) * (((i * 0.618) % 1) * 0.8 + r() * 0.2);
-      this.clouds.push({ shape, x: ((i + r() * 0.5) / n) * this.stripW - (shape.w * px) / 2, v, art: {}, night: i % 2 === 0 });
+      // (Cloud `i`'s shape is the same whatever the strip's width (the random numbers before it don't depend on it): its pictures' keys too.)
+      this.clouds.push({ shape, x: ((i + r() * 0.5) / n) * this.stripW - (shape.w * px) / 2, v, keys: (CLOUD_KEYS[i] ??= Object.fromEntries(LOOKS.map((l) => [l, `cloud|${i}|${l}`])) as Record<Look, string>), night: i % 2 === 0 });
     }
   }
 
-  private cloudArt(c: Cloud, look: Look): HTMLCanvasElement {
-    let a = c.art[look];
-    if (a) return a;
-    const { w, h, cells } = c.shape;
+  /** A cloud's picture in a look, once the picture service has it (null: left out). */
+  private cloudArt(c: Cloud, look: Look): HTMLCanvasElement | null {
     const s = Math.max(1, Math.round(TOWN_FEEL.cloudPixel * this.DPR));
-    a = upName(document.createElement("canvas"), "sky");
+    return this.ask(c.keys[look], s, () => ({ cv: this.paintCloud(c, look, s) }))?.cv ?? null;
+  }
+  private paintCloud(c: Cloud, look: Look, s: number): HTMLCanvasElement {
+    const { w, h, cells } = c.shape;
+    const a = upName(document.createElement("canvas"), "sky");
     a.width = w * s;
     a.height = h * s;
     const g = art2d(a);
@@ -175,18 +188,19 @@ export class SkyPainter {
         g.fillStyle = cols[k - 1]!;
         g.fillRect(x * s, y * s, s, s);
       }
-    c.art[look] = a;
     return a;
   }
 
+  /** The sun's or moon's picture in a look at radius `R`, once the picture service has it (null: left out; one of another size, drawn at this one, while this one's is made). */
+  private sunArt(look: Look, R: number): HTMLCanvasElement | null {
+    return this.ask(SUN_KEYS[look], Math.round(R * 64) * 8 + this.DPR, () => ({ cv: this.paintSun(look, R) }))?.cv ?? null;
+  }
   /** The sun (dawn, day, dusk) or the moon (night): a big soft disc and its glow. */
-  private sunArt(look: Look, R: number): HTMLCanvasElement {
+  private paintSun(look: Look, R: number): HTMLCanvasElement {
     const L = lookOf(look);
-    let a = this.sun[look];
-    if (a) return a;
     const D = this.DPR;
     const size = Math.ceil(R * 4.4);
-    a = upName(document.createElement("canvas"), "sky");
+    const a = upName(document.createElement("canvas"), "sky");
     a.width = a.height = Math.ceil(size * D);
     const g = art2d(a);
     g.scale(D, D);
@@ -223,7 +237,6 @@ export class SkyPainter {
       g.arc(c, c, R, 0, Math.PI * 2);
       g.fill();
     }
-    this.sun[look] = a;
     return a;
   }
 
@@ -281,7 +294,8 @@ export class SkyPainter {
       if (w[l] < 0.01) continue;
       const sx = W * lookOf(l).sunX - swing;
       const a = this.sunArt(l, R);
-      const size = a.width / this.DPR;
+      if (!a) continue;
+      const size = Math.ceil(Math.ceil(R * 4.4) * this.DPR) / this.DPR;
       g.globalAlpha = w[l];
       g.drawImage(a, sx - size / 2, sy - size / 2, size, size);
     }
@@ -303,7 +317,8 @@ export class SkyPainter {
         if (x + cw < 0 || x > W) continue;
         // (Whole, inside the sky: never cut by the top of the box, never down on the horizon.)
         const y = Math.round(Math.max(4, Math.min(v.hy - c.v * v.hy - ch, v.hy * (1 - f.cloudBand[0]) - ch)));
-        g.drawImage(this.cloudArt(c, l), Math.round(x), y, cw, ch);
+        const art = this.cloudArt(c, l);
+        if (art) g.drawImage(art, Math.round(x), y, cw, ch);
       }
     }
     g.globalAlpha = 1;

@@ -134,6 +134,11 @@ export interface RunData {
   bakes: Uint16Array;
   /** (Nov 26) The run's uploads by what each picture is (`upName`: "glow", "tag", "bubble"…; a reason after it: "glow (redrawn)"). */
   upsBy: Map<string, number>;
+  /**
+   * (Nov 28, phase 2) The picture service's work between the run's frames (picture-service.ts): pictures made and their time, pictures
+   * uploaded and theirs. None of it is inside a frame: the painter uploads nothing as it draws.
+   */
+  between: Between;
   /** (Nov 27) The browser's long animation frames in the run (`watchLongFrames`; where it has them): what the main thread did. */
   long: LongFrames;
 }
@@ -152,8 +157,16 @@ export interface LongFrames {
   by: Map<string, number>;
 }
 
+/** Pictures made and uploaded between frames (counts and ms). */
+export interface Between {
+  made: number;
+  madeMs: number;
+  ups: number;
+  upMs: number;
+}
+
 export function newRun(max = MAX_FRAMES): RunData {
-  return { n: 0, total: new Float32Array(max), part: new Float32Array(max * NP), flags: new Uint16Array(max), turn: new Float32Array(max), ups: new Uint16Array(max), bakes: new Uint16Array(max), upsBy: new Map(), long: { seen: false, n: 0, ms: 0, scripts: 0, layout: 0, by: new Map() } };
+  return { n: 0, total: new Float32Array(max), part: new Float32Array(max * NP), flags: new Uint16Array(max), turn: new Float32Array(max), ups: new Uint16Array(max), bakes: new Uint16Array(max), upsBy: new Map(), between: { made: 0, madeMs: 0, ups: 0, upMs: 0 }, long: { seen: false, n: 0, ms: 0, scripts: 0, layout: 0, by: new Map() } };
 }
 
 /**
@@ -196,8 +209,11 @@ export class FrameRec {
     this.cur.fill(0);
     this.ups = this.bakes = this.flags = 0;
     this.frameNow = now;
+    this.inFrame = true;
   }
   private frameNow = 0;
+  /** Between `begin` and `end`: a frame is being timed. */
+  private inFrame = false;
   mark(p: PartId): void {
     const t = this.clock();
     this.cur[p] = this.cur[p]! + t - this.last - this.stolen;
@@ -211,6 +227,11 @@ export class FrameRec {
   }
   /** A picture uploaded (`src`: which, named by `upName`; `why`: "redrawn", "after a lost context"…, or none for a first upload). */
   upload(ms: number, src?: object, why = ""): void {
+    // (Between frames, the picture service's: counted apart, no frame's time. Since Nov 28, phase 2, every upload is.)
+    if (!this.inFrame) {
+      if (this.state === "rec") ((this.run.between.ups += 1), (this.run.between.upMs += ms));
+      return;
+    }
     this.take(P.uploads, ms);
     this.ups++;
     this.flags |= F.upload;
@@ -221,6 +242,12 @@ export class FrameRec {
     const k = why ? `${name} (${why})` : name;
     const by = this.run.upsBy;
     by.set(k, (by.get(k) ?? 0) + 1);
+  }
+  /** (picture-service.ts `pump`) `n` pictures made between frames, in `ms`. */
+  made(n: number, ms: number): void {
+    if (this.state !== "rec") return;
+    this.run.between.made += n;
+    this.run.between.madeMs += ms;
   }
   /** A picture painted the first time it shows (a roof, a wall, a figure's frame). */
   paint(ms: number): void {
@@ -241,6 +268,7 @@ export class FrameRec {
    * else marks it (F.room).
    */
   end(walking: boolean, heading: number, zoom: number, more = 0): void {
+    this.inFrame = false;
     const now = this.frameNow;
     const dt = this.prevNow < 0 ? 0 : now - this.prevNow;
     this.prevNow = now;
@@ -318,6 +346,7 @@ export class FrameRec {
   again(): void {
     this.run.n = 0;
     this.run.upsBy.clear();
+    Object.assign(this.run.between, { made: 0, madeMs: 0, ups: 0, upMs: 0 });
     const L = this.run.long;
     L.n = L.ms = L.scripts = L.layout = 0;
     L.by.clear();
@@ -467,6 +496,8 @@ export interface Summary {
   uploadsBy: [string, number][];
   bakes: number;
   resets: number;
+  /** (Nov 28, phase 2) Pictures made and uploaded between the run's frames (`RunData.between`). */
+  between: Between;
   /** (Nov 27) The browser's long animation frames (null: it doesn't report them): count, ms, other scripts, style and layout, top scripts. */
   long: { n: number; ms: number; scripts: number; layout: number; by: [string, number][] } | null;
 }
@@ -594,6 +625,7 @@ export function summarize(r: RunData): Summary {
     uploadsBy: [...r.upsBy].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)),
     bakes,
     resets,
+    between: { ...r.between },
     long: L.seen ? { n: L.n, ms: L.ms, scripts: L.scripts, layout: L.layout, by: [...L.by].sort((a, b) => b[1] - a[1]).slice(0, 4) } : null,
   };
 }

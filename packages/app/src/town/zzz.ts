@@ -19,7 +19,8 @@ const TRIP_MS = 2400;
 const ZS = 3;
 
 let art: HTMLCanvasElement | null = null;
-function glyph(): HTMLCanvasElement {
+/** The Z's picture, made once. (The town asks its picture service for it, so it's on the GPU before a frame draws it: render.ts.) */
+export function zzzGlyph(): HTMLCanvasElement {
   if (art) return art;
   const c = upName(document.createElement("canvas"), "zzz");
   c.width = c.height = SIDE * PX;
@@ -45,10 +46,9 @@ interface Drawer {
 
 /**
  * Draws a "zzz" whose first Z starts at (x, y) (just over a head, a little right of it), `s` its scale (1: a Z from 8 to 13 px tall),
- * at `alpha`, as it is at `now` (ms). Leaves globalAlpha at 1.
+ * at `alpha`, as it is at `now` (ms); `img`: the Z's picture (the town's, from its picture service). Leaves globalAlpha at 1.
  */
-export function drawZzz(g: Drawer, x: number, y: number, s: number, now: number, alpha = 1): void {
-  const img = glyph();
+export function drawZzz(g: Drawer, x: number, y: number, s: number, now: number, alpha = 1, img: CanvasImageSource = zzzGlyph()): void {
   // (Pixel art, drawn without smoothing: crisp, and the cheapest draw there is for a software renderer.)
   const smooth = g.imageSmoothingEnabled;
   g.imageSmoothingEnabled = false;

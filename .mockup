@@ -1,0 +1,13 @@
+Town phase 2: the text-size stills are up, for the director (branch stills/town-phase2, 5 images and a README).
+
+Before (a picture for every size), new with one size (a tag made at 12 px, a home's name at 20, scaled by the GPU), new with two sizes
+(9 and 12; 14 and 20): the names and tags at every zoom step, a phone and a computer.
+- Phone (the canvas at 2x): the three can't be told apart.
+- Computer at 1x: the smallest tags (8 px) are softer with one size, and two sizes doesn't improve them (9 scaled to 8 is as soft as 12
+  scaled to 8). `text-smallest-tags-computer-7x.png` is that hardest case, 7 times over. e2e/town-tags.spec.ts measures it: of a
+  sidekick's pill's pixels, 3% were fully white before, 0.6% scaled (its check, unchanged, failed on the computer).
+
+So, my call (one line to change, packages/app/src/town/feel.ts `picOneSizeFrom`, 1.5): one size from a device pixel ratio of 1.5 up
+(every phone, a 2x laptop), where it can't be seen; a picture for every size, as before, on a 1x screen, where its text is a quarter
+of a 2x screen's pixels anyway. Text pixels on the phone: 8.67 M before, 1.29 M now. On the 1x computer: 2.58 M, as before.
+`picOneSizeFrom: 0` is one size everywhere; `tagPicSizes: [9, 12]`, `namePicSizes: [14, 20]` two sizes.

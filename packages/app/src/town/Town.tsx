@@ -33,7 +33,7 @@
  * docs/areas/town-square.md.
  */
 import { roomLoadSlice } from "./shops/load-slice.ts";
-import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, reportMs, setFps, setRec, summarize, timerStep, upName, watchLongFrames } from "./frame-report.ts";
+import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, reportMs, setFps, setRec, summarize, timerStep, watchLongFrames } from "./frame-report.ts";
 import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
@@ -75,6 +75,7 @@ import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportBakedFallback, reportTownFallback, reportTownLate } from "../problems.ts";
 import { ADMIN_TOWN } from "./admin-town.ts";
+import { PIC_GROUP } from "./picture-service.ts";
 import { adoptOrKeep, loadBaked, settledOrStalled, type Baked, type BakedNet } from "./baked.ts";
 import { bakedFile, bakedManifest } from "./baked-files.ts";
 import { domPageIO } from "./keep-pictures.ts";
@@ -2196,6 +2197,9 @@ function startTown(
   const draw = (now: number, dt = 0) => {
     drawnAt = now;
     if (!dark()) r.draw(now, camX, camY, zoomCur, dt, heading);
+    // (What this draw asked the picture service for, someone's tag or outfit, the labels at a new pixel ratio: made and uploaded
+    // between frames, never in one. `pumpSoon`, below.)
+    if (r.svc.busy) pumpSoon();
     placeChips();
     placeCard();
     const h = town.you.walker.here();
@@ -2274,6 +2278,23 @@ function startTown(
     }
     FPS?.tick(now);
     raf = requestAnimationFrame(frame);
+  };
+  /**
+   * The picture service's slice between frames (Nov 28, the town's structure, phase 2; picture-service.ts): after each draw that
+   * leaves it work (`draw`), in a task of its own once the frame is on its way to the screen, up to `picSliceMs` of making and uploading what
+   * the frames asked for. Every frame, whatever the device has to spare: waiting for the browser to be idle, a busy phone (which
+   * never is) took a ride half a minute to put on. With no frame coming (the town held, behind a room, the tab hidden) the slices
+   * go on by a timer while there's more. Not under the loading card, whose own loop does it.
+   */
+  let pumping = false;
+  const pumpSoon = () => {
+    if (pumping || !alive) return;
+    pumping = true;
+    setTimeout(() => {
+      pumping = false;
+      if (!alive || failed || loading || dark()) return;
+      if (r.svc.pump(f.picSliceMs) && !raf) setTimeout(pumpSoon, 50);
+    }, 0);
   };
   /** The frames start again. `gap`: after a pause (a hidden tab, a test's hold): the recorder and the pill start afresh. Back from a
    * room (`resume`) they don't: the room's frames led up to this one, and its time is seen. */
@@ -2811,6 +2832,10 @@ function startTown(
           speech: town.speech.boss?.home.id ?? null,
           // (The line in that bubble, "" for none: a boss's goodbye on the way back from its battle, Eric, Nov 7.)
           speechLine: town.speech.boss ? town.speech.line : "",
+          // (Whether the last frame had the speaker's bubble to draw, the speaker drawn in it, and drew it: its picture is made ahead of
+          // the line, Nov 28.)
+          speechWanted: r.bubbleWanted,
+          speechBubble: r.bubbleShown,
         }
       : null;
   // ... and `__townGather()` sends the three bots nearest you to stand beside you (to see a ring form).
@@ -2905,6 +2930,8 @@ function startTown(
   // ... `__townTags()`: the name tags drawn in the last frame: name, kind ("you", "bot", "sidekick"), alpha, pill and ink colors, and
   // where the pill is on the screen (Oct 28: they show only near you unless Town settings says "Everyone"; a sidekick's is blue).
   const hookTags = () => (testSwitchesAllowed() ? r.tagList() : null);
+  // ... `__townNames()`: the homes' floating names drawn in the last frame (render.ts namesList).
+  const hookNames = () => (testSwitchesAllowed() ? r.namesList() : null);
   // ... `__townTurns(ms)`: the bots' turns every `ms` instead of a minute, the next one now (to watch one go home and another come out).
   const hookTurns = (ms: number) => {
     if (!testSwitchesAllowed()) return;
@@ -3041,7 +3068,7 @@ function startTown(
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
     // (`lost`: nothing can be drawn now: the context lost, or back with the pictures still on their way to it again, `restoreTown`.)
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: dark(), uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, warmMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0, open: !!baked?.open }, tagsQueued: r.tagsQueued };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: dark(), uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, warmMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0, open: !!baked?.open }, tagsQueued: r.svc.waiting, service: r.svc.stats() };
   };
   /** (Tests) A hash of every picture the loading screen kept, their pixels in order: a later visit's must be the first's. */
   const hookPictureSum = (each = false) => {
@@ -3069,7 +3096,7 @@ function startTown(
   };
   /** (Tests) The chips: how many faces have been drawn (one a place at most, `chipFaceFor`). */
   const hookChips = () => (testSwitchesAllowed() ? { faces: chipFaces } : null);
-  const offHooks = setHooks({ __townChips: hookChips, __townAt: hookAt, __townPick: hookPick, __townGlide: hookGlide, __townGather: hookGather, __townCam: hookCam, __townSeat: hookSeat, __townTables: hookTables, __townCall: hookCall, __townBots: hookBots, __townTurns: hookTurns, __townPlayer: hookPlayer, __townFull: hookFull, __townBossBack: hookBossBack, __townTags: hookTags, __townHold: hookHold, __townPaint: hookPaint, __townBench: hookBench, __townWalk: hookWalk, __townPace: hookPace, __townHeading: hookHeading, __townHush: hookHush, __townStill: hookStill, __townRide: hookRide, __townYou: hookYou, __townHere: hookHere, __townReport: hookReport, __townPictureSum: hookPictureSum });
+  const offHooks = setHooks({ __townChips: hookChips, __townAt: hookAt, __townPick: hookPick, __townGlide: hookGlide, __townGather: hookGather, __townCam: hookCam, __townSeat: hookSeat, __townTables: hookTables, __townCall: hookCall, __townBots: hookBots, __townTurns: hookTurns, __townPlayer: hookPlayer, __townFull: hookFull, __townBossBack: hookBossBack, __townTags: hookTags, __townNames: hookNames, __townHold: hookHold, __townPaint: hookPaint, __townBench: hookBench, __townWalk: hookWalk, __townPace: hookPace, __townHeading: hookHeading, __townHush: hookHush, __townStill: hookStill, __townRide: hookRide, __townYou: hookYou, __townHere: hookHere, __townReport: hookReport, __townPictureSum: hookPictureSum });
 
   /**
    * The loading screen (Nov 11, Eric: "loads it all in at once and then it stays there if you go in and out of buildings"): every
@@ -3092,7 +3119,9 @@ function startTown(
     w.__townLoads = (w.__townLoads ?? 0) + 1;
     // (Your name now, as each frame sets it: the loading screen makes your tag's pictures, render.ts `makeLabels`.)
     town.you.name = playerName();
-    const keep = (src: CanvasImageSource) => painter.keep?.(src);
+    // (The room the picture service's groups have on the GPU beyond what this screen puts there: feel.ts `picRoom`, paint-gl.ts.)
+    painter.reserve?.(PIC_GROUP.text, f.picRoom.text);
+    painter.reserve?.(PIC_GROUP.looks, f.picRoom.looks);
     try {
       // The town's pictures as the build baked them (Nov 28, the town's structure, phase 1: baked.ts): the manifest and this town's files
       // fetched (the service worker keeps them), decoded off the main thread, and below handed to the painter whole. None is painted here
@@ -3124,13 +3153,18 @@ function startTown(
       // the rides each had 3 s, `loadSheetWaitMs`, and the card lifted without what was late): each is waited for until it's in or has
       // failed. The only way out is the no-progress guard (`settledOrStalled`: nothing of them in for `TOWN_PICTURES.stallMs`, the page
       // showing): then the town shows without, they show when they land, and the page says so (`reportTownLate`).
+      // (One stall for the three of them, the review of phase 1c: once nothing has come for `stallMs`, the waits after it get a second
+      // each, not `stallMs` again: a dead connection held the card for up to three times it.)
+      let stalled = false;
       const wait = async (what: "fonts" | "items" | "rides", all: readonly Promise<unknown>[]) => {
-        if (!(await settledOrStalled(all, undefined, townClosed.signal)) && alive) reportTownLate(what);
+        if (await settledOrStalled(all, stalled ? 1000 : undefined, townClosed.signal)) return;
+        stalled = true;
+        if (alive) reportTownLate(what);
       };
       await wait("fonts", fonts);
       // (Each picture put in its place, the labels made: the bar's share left after the files' bytes.)
       for (let share = 0; share < 1 && alive; ) {
-        share = r.warm(f.loadSliceMs, keep);
+        share = r.warm(f.loadSliceMs);
         onLoading((f.loadFetchShare + (1 - f.loadFetchShare) * share) * f.loadPaintShare, "pictures");
         await aFrame();
       }
@@ -3141,13 +3175,11 @@ function startTown(
       const riders = new Set([r.youSoon, ...r.ridersSoon.values()].filter((rd): rd is Rider => !!rd));
       await wait("rides", [...riders].map((rd) => new Promise<void>((go) => rd.settled(go))));
       if (!alive) return;
-      for (const rd of riders) for (const c of rd.pictures()) keep(c);
-      for (const a of new Set([r.youArt, ...r.botArt.values()]))
-        if (a) {
-          keep(upName(a.img, "dressed pawn"));
-          // (An item's loop frames, Nov 27: kept with it, so walking uploads none.)
-          for (const fr of a.loop?.frames ?? []) keep(upName(fr, "dressed pawn frame"));
-        }
+      // (Each one's outfit and ride, and an item's loop frames, Nov 27: asked of the picture service now, uploaded below with the rest,
+      // so walking uploads none. And whatever else was asked for meanwhile, someone come in during the load: made now.)
+      r.askLooks();
+      while (alive && r.svc.pump(f.loadSliceMs, false)) await aFrame();
+      if (!alive) return;
       loadPaintMs = performance.now() - t0;
       if (!(await onGpu())) return;
     } catch (e) {
@@ -3238,6 +3270,8 @@ function startTown(
       }
       if (!alive) return false;
       if (lost()) continue;
+      // (What the picture service handed over is on the GPU: ready to draw.)
+      r.svc.settle(true);
       // (Uploaded whole: the decoded files let go. A picture's pixels, should a 2D context still ask, are read back from the GPU.)
       if (whole && b.open) b.release((c) => painter.read?.(c) ?? null);
       const tw = performance.now();
@@ -3248,6 +3282,12 @@ function startTown(
         const ms = performance.now() - t1;
         best = Math.min(best, ms);
         smooth = ms < f.loadWarmSmoothMs || ms <= best * f.loadWarmSettled ? smooth + 1 : 0;
+        // (What those frames asked the picture service for, the bubble of a boss on screen's next line: made and uploaded here, under
+        // the card, a slice a frame, and a frame that waited on any isn't counted settled.)
+        if (r.svc.busy) {
+          r.svc.pump(f.loadSliceMs);
+          smooth = 0;
+        }
         await aFrame();
       }
       warmMs = performance.now() - tw;
@@ -3303,8 +3343,9 @@ function startTown(
      */
     others: (left: Person[], dressed: Person[], came: Person[] = []) => {
       if (card?.kind === "person" && left.includes(town.people[card.i]!)) setCard(null);
-      // (Newcomers' tags made between frames, Nov 27: render.ts queueTags.)
-      r.queueTags(came);
+      // (Newcomers' tags asked for ahead, made between frames, Nov 27: render.ts askTags.)
+      r.askTags(came);
+      pumpSoon();
       for (const p of dressed) {
         r.botArt.delete(p.id);
         r.riders.delete(p.id);

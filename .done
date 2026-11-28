@@ -1,0 +1,56 @@
+Town phase 2 done (claude/town-phase2, from origin/main ce78c043). PR title and body: .pr-body.md. No PR opened, so CI has not run (it
+runs on a PR): please open it with the `full-e2e` label (it changes the town's loading screen). One branch, nothing split off. About
+5 hours, over the 4 the brief names: the last hour went on two things the first e2e run found (below), not on new scope.
+
+What it does (the brief's five points)
+1. The picture service (town/picture-service.ts): tags, home names, bubbles and their tail, signs, the clock, table pieces, the zzz,
+   pawns, outfits and rides, the sky, the statues' close-ups and quotes are asked for by key (`svc.ask`), made and uploaded in a
+   slice after each draw (3 ms, feel.ts `picSliceMs`; under the loading card until nothing waits), drawn when ready, left out until
+   then. paint-gl.ts `entry` no longer uploads: that call is gone, with the painter's own text and shadowed-fill canvases, `changed`,
+   the sweep and the page reset. A picture that didn't come through the door isn't drawn. 1c's leftovers are ended too: `planBoxes`
+   paints nothing ahead, `FrameCache.get`, `roofArt` and the glows only look up, and a roof that isn't baked fails the load.
+2. Text at one size: the stills went up first (stills/town-phase2, 5 images and a README; `.mockup` on this branch). My reading, and
+   what's built: one picture a name scaled by the GPU from a pixel ratio of 1.5 (every phone, a 2x laptop: it can't be told apart);
+   on a 1x screen a picture for every size, as before. Not "two sizes": at 1x the smallest tags went dim scaled (e2e/town-tags.spec.ts's
+   own check failed on the computer: a sidekick's pill's fully white pixels, 3% → 0.6%), and two sizes didn't help (9 scaled to 8 is as
+   soft as 12 scaled to 8). One line to change: feel.ts `picOneSizeFrom` (0: one size everywhere); `tagPicSizes`, `namePicSizes`.
+   This is my call, not the director's answer: nothing came back before I had to go on.
+3. Bubbles ahead of their line: each boss's next line is picked ahead (world.ts `bossNextLine`), its bubble asked for while the boss is
+   on screen, and a boss talks only once it's made (`lineReady`). The goodbye line's bubble is made on the loading screen.
+4. Tags never overflow: the text has atlas pages of its own (2 on a phone), a freed place is the next picture's, a full group lets go
+   what was drawn least lately (never one drawn in this frame or the last). The reset code is deleted, not guarded.
+5. Measured, same machine, main's build then this one (headless Chromium, software WebGL, phone slowed 4x)
+   - Busy walk, 55 players and 12 seated: uploads inside frames 143 → 0; pages started again 1 → 0. Half wearing, second walk:
+     152 → 0 and 1 → 0. Between frames on the walks: the two statues' close-ups (about 30 ms in all), nothing else.
+   - Our parts a frame: busy 16.2 → 14.9 ms; the empty town 20.0 → 13.5 (the close-ups were built inside frames). Budget held
+     (busy under 1.25 of empty).
+   - Text 8.67 M pixels → 1.29 M (with the 67 players' tags: 3.61 M, on its 2 pages). Atlas 15 pages → 14 (a 1x computer: 13 → 14).
+   - Load, in reference jobs: main 5.6 to 7.1, this 4.2 to 5.0 (budget 8; this machine was noisier than in 1c's runs).
+   - Same pixels: a player's town n 2250, hash 81fb216, gpu 8f62dba3 (main's, 1c's).
+
+Found by the first e2e run, fixed
+- I had the slice wait for the browser to be idle. A busy device never is: a ride took about half a minute to appear (e2e "rides
+  lazy" failed). It runs after every draw now, in its own task.
+- A statue's quote size was read from its picture, which now arrives a frame or two later: it's read from the layout.
+
+Not verified, for the director
+- CI. Locally green: typecheck; the app's town unit tests (435); e2e town-street, town-tags, town, town-fixed, town-rows,
+  town-controls, town-desktop, town-afk, town-ranked, town-leave, boss-challenge, town-chat on both projects (188 passed) at ab51ab70;
+  after that the freed-places refactor, the pixel-ratio test and its counter went in, and I re-ran only the changed and nearby tests
+  (the pixel ratio's 3 times, the roam, both lost-context tests, the bubble, rides lazy, tags) and the 5 @perf town tests. Not run
+  locally: the rest of the suite (the area's other traced specs: boss-character, boss-smoke, colosseum, front-door, lobby-chat, shop,
+  town-chat-history).
+- Real GPUs and iOS Safari: a freed place taken again is cleared with a zero upload first (texSubImage3D from a typed array), new in
+  this phase and run only on software WebGL here. Worth a `/town?report` on Eric's phone and laptop: its line now says
+  "Between frames: N made, M uploaded (X ms)".
+- One step of a statue's close-up is 16 to 30 ms on the slowed phone (one layer drawn), now in a task between frames where it was
+  inside one. Unchanged work, better placed, but still a long task.
+
+Left, not done
+- 1c's review nit "a lost context in a room can end the visit": not touched (it's the restore's failure path, not this phase's).
+- Looks have no cap beyond their pages' room (2 or 3 pages): past it a newcomer stays plain or on foot until someone's look, not drawn
+  for a while, makes room. Before, the spare pages thrashed. Fifty-five different rides at once would show it.
+- The rooms (ShopRoom) and the Colosseum draw with their own code: untouched.
+
+Changed checks, old → new: in .pr-body.md. No check that guards a rule in docs/rules/eric.md changed. Stills: branch
+stills/town-phase2. Local e2e needed its own Playwright config for this container's browser build: not committed.

@@ -52,8 +52,6 @@ export type Ctx = Pick<
   | "fillRect"
   | "clearRect"
   | "drawImage"
-  | "fillText"
-  | "strokeText"
   | "measureText"
   | "createLinearGradient"
 >;
@@ -114,12 +112,24 @@ export interface Painter {
   /** A new light layer (one canvas's size, sized by the caller). */
   layer(): PaintLayer;
   /**
-   * (The street town's loading screen, Nov 11) `src` uploaded now and kept for good (WebGL: never let go, its atlas page never
-   * started again). Canvas 2D has nothing to upload: none.
+   * `src` handed over to be uploaded and kept (WebGL; the street town's loading screen since Nov 11, and since Nov 28, phase 2, the only
+   * way a picture reaches the GPU: the picture service's, picture-service.ts). It waits for `kept`, which uploads it onto the atlas
+   * pages of its `group` (`PIC_GROUP`: 0, the town's own; the others have pages of their own, their room set by `reserve`). Never
+   * uploaded as it's drawn: a picture not handed over is not drawn at all. Canvas 2D has nothing to upload: none.
    */
-  keep?(src: CanvasImageSource): void;
-  /** (With `keep`) Uploads what it was handed, a slice of up to `budgetMs` at a time; says how much is done (0 to 1). */
+  keep?(src: CanvasImageSource, group?: number): void;
+  /**
+   * (With `keep`) Uploads what it was handed, a slice of up to `budgetMs` at a time, between frames only (inside one it does nothing);
+   * says how much is done (0 to 1). Its first call (and the first after a lost context) makes the atlas, once, as deep as every
+   * group needs.
+   */
   kept?(budgetMs: number): number;
+  /** (With `keep`, before the first `kept`) Group `group`'s pages: room for what it's handed on the loading screen and `px` texels more. */
+  reserve?(group: number, px: number): void;
+  /** (With `keep`) Whether `src` is on the GPU now: uploaded, and its place not lost with the context. */
+  holds?(src: CanvasImageSource): boolean;
+  /** (With `keep`) Lets `src` go: its place on its page is free for another picture (a big one's own texture is deleted). */
+  free?(src: CanvasImageSource): void;
   /**
    * (With `keep`, the loading screen, before `kept`; Nov 25) Whole pages (the build's baked files), uploaded whole by `kept`, each
    * placed on the atlas's layers: each picture on them kept as `keep` keeps one, where its page put it, never uploaded alone. `fill`
@@ -139,8 +149,6 @@ export interface Painter {
    * under the loading card pays its textures' and shaders' first use there, not in the first frames you see.
    */
   settle?(): void;
-  /** `src`, drawn before, has been drawn on again: the next draw shows its new pixels (the WebGL backend uploads it again). */
-  changed(src: CanvasImageSource): void;
   /**
    * The far softening (render.ts's `blitSoft`) in one draw, or undefined where render.ts does it its own way (Canvas 2D:
    * a scratch canvas). `k`: the shrunk copy's pixels a CSS pixel; `haze`: how far toward `horizon` (a CSS color).
@@ -190,7 +198,6 @@ export function painter2d(cv: HTMLCanvasElement): Painter {
         },
       };
     },
-    changed() {},
     drawCalls: 0,
     lost: false,
     pixels: (x, y, w, h) => ctx.getImageData(x, y, w, h),

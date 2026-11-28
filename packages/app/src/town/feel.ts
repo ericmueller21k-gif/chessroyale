@@ -232,10 +232,26 @@ export const TOWN_FEEL = {
    */
   boxStripFine: 1.5,
   boxStripsFine: 24,
-  /** How long a frame may spend getting buildings' roofs ready before they're seen (ms; the nearest first). (Round 4: 2.5 before.) */
-  boxBakeMs: 1.5,
-  /** The same while you stand still and the view isn't turning (Nov 11: a still frame has room, and what a look round shows gets ready sooner). */
-  boxBakeStillMs: 4,
+  /**
+   * The picture service (Nov 28, the town's structure, phase 2; picture-service.ts): what the device makes itself (a name tag, a
+   * bubble, an outfit, a ride's frames) is made and uploaded between frames, never in one.
+   * `picSliceMs`: the most one slice between two frames spends (ms). (Until then a frame spent up to `boxBakeMs`, 1.5, or 4 standing
+   * still, painting roofs ahead: every roof is the build's baked picture now.)
+   * `picRoom`: the room each group of pictures has on the GPU beyond what the loading screen puts there, in texels (a 2048 px atlas
+   * page is 4.2 million, 16 MB): the text's (55 players' tags and a few bubbles, with room to spare); the looks' (outfits, rides).
+   * When a group is full the picture least lately drawn makes room; no page is ever started again.
+   * `tagPicSizes`, `namePicSizes`: the font sizes a name tag's and a home's name's picture is made at, rising (a tag shows at 8 to 12
+   * px, a name at 12 to 20): one each, the biggest, scaled down by the GPU.
+   * `picOneSizeFrom`: the device pixel ratio from which that is so (a phone, a 2x laptop: it can't be told from a picture a size, for
+   * a seventh of the pixels). Under it (a 1x screen) a label keeps a picture for every size it shows at, as before: there small text
+   * scaled down goes dim (a tag's white on blue, 8 px: 3% of its pill's pixels fully white, 0.6% scaled), and its text is a quarter
+   * of a 2x screen's pixels anyway. docs/decisions/2026-11-28-town-picture-service.md.
+   */
+  picSliceMs: 3,
+  picRoom: { text: 3_000_000, looks: 6_000_000 },
+  tagPicSizes: [12] as readonly number[],
+  namePicSizes: [20] as readonly number[],
+  picOneSizeFrom: 1.5,
   /**
    * The street town's loading screen (Nov 11, Eric: "loads it all in at once and then it stays there"; Town.tsx `loadTown`): the work done
    * between two of its frames (ms; the bar moves between them), and the bar's share for painting every picture (the rest: uploading them).

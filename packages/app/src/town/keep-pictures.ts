@@ -40,17 +40,14 @@ export interface PageIO {
 
 /**
  * The loading screen's pictures, in the order its jobs come to them (render.ts `plan`), each once: the build's baked ones (`baked`,
- * baked.ts), a job's picture the one of its name and a roof's pieces the manifest's (`bakedRoof`). None is handed to `keep`: the
- * painter is given their files whole once every job has run (`Painter.adopt`). `keep` is the painter's, for what the device makes
- * itself (the labels).
+ * baked.ts), a job's picture the one of its name and a roof's pieces the manifest's (`bakedRoof`). None is handed to the painter one
+ * by one: it's given their files whole once every job has run (`Painter.adopt`). (What the device makes itself goes through the
+ * picture service, picture-service.ts.)
  */
 export class Pictures {
   readonly list: HTMLCanvasElement[] = [];
   private readonly at = new Set<object>();
-  constructor(
-    readonly keep: (c: CanvasImageSource) => void,
-    readonly baked: Baked,
-  ) {}
+  constructor(readonly baked: Baked) {}
   /** A picture the loading screen puts in place (kept with its file), listed the first time. */
   add(c: HTMLCanvasElement): void {
     if (this.at.has(c)) return;

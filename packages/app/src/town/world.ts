@@ -890,6 +890,13 @@ export interface Boss {
   /** Held where it is (its card is open): it doesn't roam off. */
   held: boolean;
   lastLine: string | null;
+  /**
+   * The line it says next, as the bubble shows it (`bossNextLine`: picked ahead, Nov 28, so its bubble's picture is made before the
+   * line starts); null: not picked yet.
+   */
+  nextLine: string | null;
+  /** Whether that line's bubble is made (render.ts sets it as it draws the boss on screen; true where nothing draws): it talks only then. */
+  lineReady: boolean;
 }
 
 export interface Town {
@@ -968,7 +975,7 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
   }
   // Each boss starts on the square in front of its home's middle (toward the camera); in the street town, on its rest square. (A home
   // whose boss is inside: its stand-in, there for good; in today's town, beside its door rather than on it, the others' start.)
-  const bosses: Boss[] = HOMES.filter(hasFigure).map((home) => ({ home, walker: new Walker(hasTownBoss(home) || home.wander ? home.rest : { c: wrapI(home.cx + 1), r: home.rest.r }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
+  const bosses: Boss[] = HOMES.filter(hasFigure).map((home) => ({ home, walker: new Walker(hasTownBoss(home) || home.wander ? home.rest : { c: wrapI(home.cx + 1), r: home.rest.r }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null, nextLine: null, lineReady: true }));
   // Who's out (`botsOut` of them, shuffled by the town's seed, so the town opens the same way every time, as the tests
   // need; back from a game, the bot you played among them); the others are at home, and the turns change who's out.
   const order = TOWN_BOTS.map((_, i) => i);
@@ -1584,16 +1591,29 @@ function updateSpeech(t: Town, now: number): void {
   }
   if (s.boss || now < s.next) return;
   s.next = now + between(t, f.speechGapMs);
-  const cands = t.bosses.filter((b) => b.onScreen && hasTownBoss(b.home)); // (a stand-in talks only when you Talk to him)
+  // (Its next line picked ahead and its bubble made, Nov 28: `bossNextLine`, `lineReady`.)
+  const cands = t.bosses.filter((b) => b.onScreen && b.lineReady && bossNextLine(t, b) !== null);
   if (!cands.length) return;
   const b = pick(t, cands);
+  s.boss = b;
+  s.line = b.nextLine!;
+  b.nextLine = null;
+  s.until = now + f.speechMs;
+}
+
+/**
+ * The line boss `b` says next, as its bubble shows it (null: it has none; a stand-in talks only when you Talk to him): picked the
+ * first time it's asked for after its last line, never the one it said last. Known before it's said (Nov 28, the town's structure,
+ * phase 2), so the town makes its bubble's picture ahead (render.ts) and the line starts with its bubble there.
+ */
+export function bossNextLine(t: Town, b: Boss): string | null {
+  if (b.nextLine !== null) return b.nextLine;
+  if (!hasTownBoss(b.home)) return null;
   const pool = SELECT_LINES[b.home.id] ?? [];
-  if (!pool.length) return;
+  if (!pool.length) return null;
   const line = pool.length > 1 ? pick(t, pool.filter((l) => l !== b.lastLine)) : pool[0]!;
   b.lastLine = line;
-  s.boss = b;
-  s.line = line.replace("{heart}", "♥").replace("{question}", "?"); // (Moo's pixel icons, as plain characters here)
-  s.until = now + f.speechMs;
+  return (b.nextLine = line.replace("{heart}", "♥").replace("{question}", "?")); // (Moo's pixel icons, as plain characters here)
 }
 
 /** You walk to a target (a square, someone, a home): to the square `destFor` gives. False if there's none. */

@@ -36,7 +36,10 @@ export function panelHtml(s: Summary, d: Device): string {
   const part = (k: number, g: { avg: number[] }) => `<b>${esc(SUM_NAMES[k]!)}</b> ${ms(g.avg[k]!)}`;
   const most = s.top >= 0 ? `${s.frames} frames in ${s.secs.toFixed(1)} s. Most time: ${part(s.top, all!)} of ${ms(all!.mean)} ms (ours: ${part(s.ours, all!)})` : "No frames recorded";
   const mostTurn = s.topTurn >= 0 ? `. Turning, to ${Math.round(s.maxTurn)}°/s: ${part(s.topTurn, turn!)} of ${ms(turn!.mean)} (ours: ${part(s.oursTurn, turn!)})` : ". No turning";
-  lines.push(`<div class="tfr-most">${most}${mostTurn}. ${s.bakes} painted, ${s.uploads} uploads, ${s.resets} atlas resets.</div>`);
+  // (Nov 28, phase 2) The picture service's work between frames, never a frame's time: said in a few words, on the same line (the
+  // panel must fit a phone's box).
+  const off = s.between.made || s.between.ups ? ` Between frames: ${s.between.made} made, ${s.between.ups} uploaded (${Math.round(s.between.madeMs + s.between.upMs)} ms).` : "";
+  lines.push(`<div class="tfr-most">${most}${mostTurn}. ${s.bakes} painted, ${s.uploads} uploads, ${s.resets} atlas resets.${off}</div>`);
   // (Nov 27) Outside our code, split: the wait for the screen's next refresh (idle) and the stalls past it; and what the browser saw.
   if (s.frames) {
     const L = s.long;
