@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import { STORM_SCENE } from "@chessroyale/chess";
 import { localSql, openBossRaid, submitMove, tapInTown, test } from "./helpers.ts";
 
 /**
@@ -100,7 +101,7 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   // (Every frame from the start, recorded in the page: the scene's own element and his figure's box, the ring, the dock's words.)
-  await page.addInitScript(() => {
+  await page.addInitScript((fireAt) => {
     const w = window as any;
     w.__storm = { scene: [] as number[], outside: [] as string[], ring: 0, drawn: 0, rift: [] as number[], burn: 0, docks: [] as string[], wide: [] as number[], swords: false, early: [] as string[], build: [] as number[], riftSee: [] as string[], home: [] as number[] };
     const look = () => {
@@ -109,8 +110,11 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
       // (Eric, Nov 27: "it showed the tornado before he even initiated anything": from the battle's first frame to his first sword,
       // nothing of the storm is drawn: no ring, no rift, no shade. Then the ring gathers: its strength through his swords.)
       const stage = document.querySelector(".pm-storm")?.getAttribute("data-stage") ?? "";
-      const art = w.__stormArt as { ring: number; rift: number; strength: number } | undefined;
+      const art = w.__stormArt as { ring: number; rift: number; strength: number; sceneT: number | null } | undefined;
       if (stage && stage !== "leap" && stage !== "draw") w.__storm.swords = true;
+      // (His first sword on either clock: the scene's stage, or the clock his sprite, the ring and the rift draw on, read a few ms later
+      // each frame (by tens of ms on a busy runner): his slam and the rift's opening share that frame. Main's run 46121764433.)
+      if ((art?.sceneT ?? -1) >= fireAt) w.__storm.swords = true;
       if (!w.__storm.swords) {
         const shade = document.querySelector(".sg-shade");
         const seen = [(art?.strength ?? 0) > 0 || (art?.ring ?? -1) >= 0 ? "ring" : "", (art?.rift ?? -1) >= 0 ? "rift" : "", shade && Number(getComputedStyle(shade).opacity) > 0 ? "shade" : "", !stage && document.querySelector(".sg-storm, .sg-rift") ? "canvas" : ""].filter(Boolean).join("+");
@@ -148,7 +152,7 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
       requestAnimationFrame(look);
     };
     requestAnimationFrame(look);
-  });
+  }, STORM_SCENE.fireAt);
   // (A narrow phone, 360 px: the dock's words measured at their tightest.)
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=stranger&wip=1&power=storm`);
