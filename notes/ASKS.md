@@ -38,7 +38,7 @@
 - Nov 27 · Chub & Chirp: 5-carrot line "Chub & Chirp wins" (was "they win") · PR #1021
 - Nov 27 · Animated items in Chess Town (tube, candy cane first) · LIVE #1022 5645e3a. Next: crown flames, parrot, tommy gun, confetti (a table line each)
 - Nov 27 · Stranger storm redrawn (GBA ring, rift, opening crack animation) · LIVE #1023 7811257
-- Nov 27 · Don Dough: back room (his head covered by the table), timer bottom-left of the board on a computer + bigger, counts down 1 every turn (not 2 on his), tick 30% quieter; no destination ring on a ride · PR #1026 (CI)
+- Nov 27 · Don Dough: back room (his head covered by the table), timer bottom-left of the board on a computer + bigger, counts down 1 every turn (not 2 on his), tick 30% quieter; no destination ring on a ride · MERGED #1026 1e1fe3a
 - Nov 27 · Town tables: Ranked live (1v1 search overlay; seated during the match with the opponent's pawn; others spectate from the town; back to town after); Casual stays Coming soon · PR #1027 (full-e2e; review queued)
 - Nov 27 · Stranger: an elevator entrance on his tower floors (~10 s, 2 lines, a fire/ice touch, blades drawn as it starts); Big Boy: his line after the block toss (box not moving) · entrance moved into stranger-polish.md; Big Boy part QUEUED
 - Nov 27 · Tower: Back to town loaded the town twice and dropped him in the plaza; land in the tower at the clerk; remember the last town spot (account) · LIVE #1028 5a3d65a (memory: 780 MB -> 40 MB; tower its own load; last building kept on the device). Account-saved spot: full-lane follow-up
