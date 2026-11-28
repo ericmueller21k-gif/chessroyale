@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "@chessroyale/core";
 import { readFileSync } from "node:fs";
-import { applyMove, blunderCost, fenAfter, gameEnd, inCheck, keptEnPassant, legalMoves, pickOpenings, sanLineToUci, sideToMove, START_FEN, startsInCheck, toSan, usableAt, type Opening } from "../src/index.ts";
+import { applyMove, blunderCost, fenAfter, gameEnd, inCheck, keptEnPassant, legalMoves, pickOpenings, pieceAt, sanLineToUci, sideToMove, START_FEN, startsInCheck, toSan, usableAt, type Opening } from "../src/index.ts";
 
 describe("rules", () => {
   it("lists legal moves in UCI and applies them", () => {
@@ -128,5 +128,16 @@ describe("what a blunder costs (the God King's Last Stand names it)", () => {
     const qgd = after(["d4", "d5", "c4", "e6", "Nc3", "Nf6", "cxd5", "exd5", "Bg5", "c6"]);
     expect(blunderCost(qgd, "c3e4")).toEqual({ kind: "chances" });
     expect(blunderCost(qgd, "c3e4", "e2e4")).toEqual({ kind: "chances" });
+  });
+});
+
+describe("pieceAt reads a drawn position, not a game (Nov 28)", () => {
+  it("a board drawn without a king (a moment's piece in the air) is read, never thrown on", () => {
+    // (The Stranger's Storm threw the white king off e1 for a moment: chess.js's "missing white king" took the screen down.)
+    const kingless = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQ1BNR w kq - 0 1";
+    expect(() => pieceAt(kingless, "e1")).not.toThrow();
+    expect(pieceAt(kingless, "e1")).toBeNull();
+    expect(pieceAt(kingless, "d1")).toEqual({ color: "w", type: "q" });
+    expect(pieceAt("8/8/8/8/8/8/8/8 w - - 0 1", "a1")).toBeNull();
   });
 });

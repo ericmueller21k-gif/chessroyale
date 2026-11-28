@@ -38,7 +38,9 @@ export function toSan(fen: string, uci: string): string {
  */
 export function pieceAt(fen: string, square: string): { color: "w" | "b"; type: "p" | "n" | "b" | "r" | "q" | "k" } | null {
   let board = boards.get(fen);
-  if (!board) board = remember(boards, fen, new Chess(plainFen(fen)).board(), 32);
+  // (Read as drawn, never checked as a game: a position drawn for a moment can lack a king, a piece in the air. Nov 28: the Stranger's
+  // second Storm threw the white king, and the drawn board's "missing white king" took the screen down. Reading a square needs no rules.)
+  if (!board) board = remember(boards, fen, new Chess(plainFen(fen), { skipValidation: true }).board(), 32);
   const file = square.charCodeAt(0) - 97;
   const rank = square.charCodeAt(1) - 48;
   const p = square.length === 2 && file >= 0 && file < 8 && rank >= 1 && rank <= 8 ? board[8 - rank]![file] : null;
