@@ -178,6 +178,9 @@ async function fetching<T>(o: LoadBaked, run: (ask: NetAsk, again: <V>(why: () =
     if (stalled) return "stall";
     return got ?? failed ?? "file";
   } finally {
+    // (Whatever ended it, the other files stop: after one failed for good, none keeps downloading or decoding under the card; the
+    // review of phase 1c. Safe after a success: `pagesOf` took its listener off.)
+    stop.abort();
     watch.stop();
     closed?.removeEventListener("abort", onClose);
   }

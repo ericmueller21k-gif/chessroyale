@@ -3084,6 +3084,8 @@ function startTown(
    * first (Nov 15, music.ts `townMusic`): decoded and played as soon as it's in, then its two solos, then the bosses'.
    */
   const loadTown = async () => {
+    // (WebGL failed as the town started: its message shows, and nothing is fetched or decoded under it; the review of phase 1c.)
+    if (failed) return;
     const t0 = performance.now();
     // (Tests: how many times this page has loaded the street town; back from a tower floor it never loads twice, Nov 27.)
     const w = window as unknown as { __townLoads?: number };

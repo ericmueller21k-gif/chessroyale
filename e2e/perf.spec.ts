@@ -767,8 +767,7 @@ async function busyTown(page: Page, wearing: boolean) {
   await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
   type W = { __townHush: (on: boolean) => void; __townWalk: (s: readonly [number, number]) => boolean; __townYou: () => { moving: boolean } | null; __townHere: () => { you: boolean; here: boolean }[]; __townSay: (n: string, l: string, k?: string) => void; __townReport: () => { state: string; summary: { frames: number; uploads: number; resets: number; uploadsBy: [string, number][]; segs: { avg: number[]; mean: number }[]; long: { n: number; ms: number; scripts: number; layout: number; by: [string, number][] } | null } | null } | null; __chat?: number };
   await page.evaluate(() => (window as unknown as W).__townHush(true));
-  // (A first visit's pictures saved, so their packing isn't in either walk.)
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __townPaint: () => { pictures: { saved?: number } } }).__townPaint().pictures.saved), { timeout: 90_000 }).not.toBeUndefined();
+  // (Nothing is saved after the card since phase 1c: the build's pictures are kept by the worker, so neither walk waits for it.)
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
   const walk = async () => {
