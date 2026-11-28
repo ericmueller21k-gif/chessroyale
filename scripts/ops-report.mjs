@@ -95,12 +95,12 @@ if (h.live) {
   lines.push(`Live: ${h.live.online} online, ${h.live.players} in lobbies${modes.length ? `; ${modes.join("; ")}` : "; no lobbies"}`);
 }
 lines.push(`Errors: ${e.thisHour} this hour, ${e.lastHour} the hour before, ${e.day} in 24 hours (${e.kinds} kinds)`);
-if (h.cron) lines.push(`Scheduled jobs: ${h.cron.length ? `${h.cron.map((c) => jobName(c.job)).join(", ")} failed in the last 24 hours (above)` : "none failed in the last 24 hours"}`);
 for (const x of e.top.slice(0, 5)) {
   // (A device's error names its own kind; the server's kinds are its code's.)
   const what = x.source === "server" ? `server ${x.kind}` : `client error ${quote("a device's name for its error", x.kind)}`;
   lines.push(`  ${String(x.day).padStart(4)} in 24 h (${x.thisHour} this hour)  ${what}, message ${quote("error message", x.message)}  (last ${utc(x.lastSeen)}; ${x.versions})`);
 }
+if (h.cron) lines.push(`Scheduled jobs: ${h.cron.length ? `${h.cron.map((c) => jobName(c.job)).join(", ")} failed in the last 24 hours (above)` : "none failed in the last 24 hours"}`);
 // (Not errors: counted apart. The reasons are the server's own list, TOWN_GL_FALLBACK; a reason a device made up isn't counted.)
 const fb = h.townFallbacks;
 if (fb) {
