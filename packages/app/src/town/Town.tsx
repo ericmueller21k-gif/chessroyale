@@ -3007,7 +3007,7 @@ function startTown(
         console.warn("town: kept pictures didn't match; painting next time");
         void shelf?.clear().catch(() => undefined);
       }
-      // A first visit's pictures kept for the next, after the first frame (`keepPictures`).
+      // A first visit's pictures kept for the next (`keepPictures`), under the card after the box tops (below).
       if (!from && r.warmClean && alive) keepLater = () => keepPictures(shelf, key);
       loadPaintMs = performance.now() - t0;
       // (Each box's solid top, Nov 28: here, not in idle slices once the town shows, where one took 44 ms on Eric's computer.)
@@ -3034,12 +3034,22 @@ function startTown(
         onLoading(f.loadPaintShare + (1 - f.loadPaintShare) * share, "building");
         if (share < 1) await tick();
       }
-      // The warm-up (Nov 28): the town's first frames drawn under the loading card and waited for on the GPU, then the card lifts.
+      // A first visit's pictures kept for the next, here under the card (Nov 28: kept after the first frame, it was a 38-62 ms hitch
+      // about 2 s in; Eric: "load the town first so it doesn't lag").
+      if (keepLater) {
+        onLoading(1, "building");
+        await keepLater();
+        keepLater = null;
+      }
+      // The warm-up (Nov 28): the town's first frames drawn under the loading card, each waited for on the GPU, until loadWarmFrames in a
+      // row are smooth; then the card lifts. No time cap (Eric, Nov 28: "That doesn't mean so it lags for a few seconds… It means load the
+      // town so it doesn't lag"): only a device that is slow with everything already loaded lifts after loadWarmMaxFrames.
       const tw = performance.now();
-      const warmBy = tw + f.loadWarmMs;
-      for (let i = 0; i < f.loadWarmFrames && alive && !painter.lost && performance.now() < warmBy; i++) {
-        r.draw(performance.now(), camX, camY, zoomCur, 0, heading);
+      for (let i = 0, smooth = 0; smooth < f.loadWarmFrames && i < f.loadWarmMaxFrames && alive && !painter.lost; i++) {
+        const t1 = performance.now();
+        r.draw(t1, camX, camY, zoomCur, 0, heading);
         painter.settle?.();
+        smooth = performance.now() - t1 < f.loadWarmSmoothMs ? smooth + 1 : 0;
         await tick();
       }
       warmMs = performance.now() - tw;
@@ -3070,7 +3080,6 @@ function startTown(
       townMusic(true, testParams().has("townsolo"));
       void preloadMusic();
     }, MUSIC.townPreloadAfterMs);
-    if (keepLater) setTimeout(keepLater, TOWN_PICTURES.afterMs);
   };
   let loadMs = 0;
   let loadPaintMs = 0;
@@ -3084,11 +3093,11 @@ function startTown(
   const pictures: { kept: boolean; restoreMs: number; saved: number | null | undefined; saveMs: number; workers: number; byWorkers: number; whileWaiting: number } = { kept: false, restoreMs: 0, saved: undefined, saveMs: 0, workers: 0, byWorkers: 0, whileWaiting: 0 };
   /** (`loadTown`) The first visit's paint workers while its loading screen runs. */
   let pool: PaintPool | null = null;
-  let keepLater: (() => void) | null = null;
+  let keepLater: (() => Promise<void>) | null = null;
   /** This visit's pictures kept for the next (keep-pictures.ts `save`), in the background: a page at a time, encoded in a worker. */
   const keepPictures = async (shelf: Shelf | null, key: string) => {
     const t = performance.now();
-    const io = domSaveIO(art2d, () => alive);
+    const io = domSaveIO(art2d, () => alive, TOWN_FEEL.loadSliceMs);
     pictures.saved = alive && r.pics ? await save(shelf, key, r.pics, io) : null;
     io?.done();
     pictures.saveMs = performance.now() - t;

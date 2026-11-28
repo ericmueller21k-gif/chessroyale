@@ -1364,7 +1364,9 @@ Anything odd paints as before and clears the entry. `?paintall` skips it.
 **Warm before it shows (Nov 28; [decision](../decisions/2026-11-28-town-load-smooth.md)):** the loading screen also waits for every rider it
 knows (yours, the bots') and keeps their frames and trail marks (`Rider.pictures`; "ride frame", "ride trail" in the report), works out each
 box's solid top (`warmTops`; kept between visits under the pictures' key, `brc.townTops`), then draws `loadWarmFrames` (3) frames under the
-card, each waited for on the GPU (`settle`), at most `loadWarmMs` (2 s). Hooks: `__townPaint()`'s `topsMs`, `warmMs`. Test: `@perf` "Chess
+card, each waited for on the GPU (`settle`), until 3 in a row take under `loadWarmSmoothMs`; no time cap (Eric, Nov 28: "load the town
+first so it doesn't lag"; only a device slow with everything loaded lifts after `loadWarmMaxFrames`). A first visit's pictures are kept
+under the card too, before the warm-up (`keepPictures`). Hooks: `__townPaint()`'s `topsMs`, `warmMs`. Test: `@perf` "Chess
 Town busy" (you ride the Chirp: its first walk uploads nothing). Hooks: `__townPaint().pictures`, `__townPictureSum()` (its `gpu`:
 what the atlas holds for each picture; `(true)`: each one's hash). Tests: `town-keep-pictures.test.ts`, `e2e/perf.spec.ts` ("a second
 visit…": canvas and GPU hashes the same on all three visits), `e2e/town-street.spec.ts` ("the town's loading screen…": a lost context on
