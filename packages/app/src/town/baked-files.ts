@@ -7,11 +7,23 @@
  * holds it.
  */
 import { TOWN_PICTURES } from "@chessroyale/core";
-import { TOWN_PICTURES_DIR, filesOf, manifestFrom, type TownKind, type TownManifest } from "./manifest.ts";
+import { BAKED_NAME, TOWN_PICTURES_DIR, filesOf, manifestFrom, type TownKind, type TownManifest } from "./manifest.ts";
 
 declare const __TOWN_PICTURES__: string | undefined;
-/** This build's baked town's manifest's name (null: none baked for it; tests). */
+/**
+ * This build's baked town's manifest's name (null: none baked for it; tests). In the dev server, `order.json`: the bake's file that
+ * names its manifest, read fresh each time the town loads (the dev server bakes when the town first asks, and again after the art
+ * changes: vite.config.ts `townPictures`).
+ */
 export const TOWN_MANIFEST: string | null = typeof __TOWN_PICTURES__ === "string" && __TOWN_PICTURES__ ? __TOWN_PICTURES__ : null;
+const NAMED_BY = "order.json";
+/** The manifest's name: this build's own, or (the dev server) the one its latest bake's order.json gives. */
+const manifestName = (): Promise<string> =>
+  TOWN_MANIFEST !== NAMED_BY
+    ? Promise.resolve(TOWN_MANIFEST ?? "")
+    : fetch(`/${TOWN_PICTURES_DIR}/${NAMED_BY}`, { cache: "no-store" })
+        .then((res) => res.json() as Promise<{ manifest?: unknown }>)
+        .then((o) => String(o.manifest));
 
 /** Files being fetched now, by name: the town's loading screen and home's fetch ahead never download one twice at once. */
 const fetching = new Map<string, Promise<Blob>>();
@@ -36,7 +48,8 @@ let manifest: Promise<TownManifest | null> | null = null;
 /** This build's manifest, fetched and read once a page (null: none, or it couldn't be read; asked again next time then). */
 export function bakedManifest(): Promise<TownManifest | null> {
   if (!TOWN_MANIFEST || !TOWN_PICTURES.baked) return Promise.resolve(null);
-  return (manifest ??= bakedFile(TOWN_MANIFEST)
+  return (manifest ??= manifestName()
+    .then((name) => (BAKED_NAME.test(name) ? bakedFile(name) : Promise.reject(new Error("no manifest"))))
     .then((b) => b.text())
     .then((t) => manifestFrom(JSON.parse(t)))
     .catch(() => null)
@@ -63,7 +76,8 @@ export function fetchTownAhead(kind: TownKind): () => void {
   };
   const saving = (navigator as { connection?: { saveData?: boolean } }).connection?.saveData === true;
   const idle = (globalThis as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
-  const timer = saving || !TOWN_MANIFEST ? null : setTimeout(() => (idle ? idle(() => void go(), { timeout: 3000 }) : void go()), TOWN_PICTURES.homeFetchAfterMs);
+  // (Nor in the dev server, where asking would bake the town for every page that rests on home.)
+  const timer = saving || !TOWN_MANIFEST || TOWN_MANIFEST === NAMED_BY ? null : setTimeout(() => (idle ? idle(() => void go(), { timeout: 3000 }) : void go()), TOWN_PICTURES.homeFetchAfterMs);
   return () => {
     live = false;
     if (timer !== null) clearTimeout(timer);

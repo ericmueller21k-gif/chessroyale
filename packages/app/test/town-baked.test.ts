@@ -251,6 +251,37 @@ describe("fetching the baked files (town/baked-files.ts)", () => {
     expect(await (await mod.bakedFile(m.files[0]!.name)).text()).toBe(`/town-pictures/${m.files[0]!.name}`);
     expect(asked.filter((a) => a.path.endsWith(".json")).length).toBe(2);
   });
+  it("the dev server's build is handed order.json: the manifest is the one it names, asked fresh; a name that isn't a baked file's is no manifest; home fetches nothing ahead", async () => {
+    const m = manifest();
+    let named: unknown = NAME;
+    const asked: string[] = [];
+    vi.stubGlobal("__TOWN_PICTURES__", "order.json");
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("fetch", async (path: string) => (asked.push(path), path.endsWith("order.json") ? json({ manifest: named, player: [] }) : json(m)));
+    const mod = await import("../src/town/baked-files.ts");
+    expect(await mod.bakedManifest()).toEqual(m);
+    expect(asked).toEqual(["/town-pictures/order.json", `/town-pictures/${NAME}`]);
+    vi.resetModules();
+    named = "../../api/me.json";
+    asked.length = 0;
+    const again = await import("../src/town/baked-files.ts");
+    expect(await again.bakedManifest()).toBeNull();
+    expect(asked).toEqual(["/town-pictures/order.json"]);
+    // (Home's fetch ahead would make the dev server bake the town for every page that rests on home: none there.)
+    vi.doMock("@chessroyale/core", async (orig) => {
+      const core = await orig<typeof import("@chessroyale/core")>();
+      return { ...core, TOWN_PICTURES: { ...core.TOWN_PICTURES, homeFetchAfterMs: 10 } };
+    });
+    try {
+      vi.resetModules();
+      asked.length = 0;
+      (await import("../src/town/baked-files.ts")).fetchTownAhead("player");
+      await new Promise((go) => setTimeout(go, 80));
+      expect(asked).toEqual([]);
+    } finally {
+      vi.doUnmock("@chessroyale/core");
+    }
+  });
   it("an error's answer is no file; a file being fetched is never fetched twice at once", async () => {
     let go: (r: Response) => void = () => {};
     const { asked, mod } = await load((path) => (path.includes("gone") ? new Response("", { status: 404, headers: { "content-type": "image/png" } }) : new Promise<Response>((ok) => (go = ok))));

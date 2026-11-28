@@ -68,20 +68,44 @@ function maiaBox(): Plugin {
  * name (`__TOWN_PICTURES__`, named by its contents: the config below), fetches it and its files on the town's loading screen
  * (src/town/baked.ts) and uploads them; the service worker keeps them (`serviceWorker` below).
  *
- * The dev server bakes as it starts too (phase 1b). There, when a source file the pictures are painted from changes, it starts again
- * (about 10 s): the bake runs again and the page loads the new town. docs/decisions/2026-11-28-town-load-baked.md.
+ * The dev server bakes too (phase 1b), the first time anything under /town-pictures/ is asked for (the town opening: about 10 s,
+ * once; never for the many scripts that start a dev server and don't open the town), and again after a source file the pictures are
+ * painted from changes. There the app is handed `order.json`, which names the manifest of the latest bake. This plugin answers the
+ * files itself, fresh each time. docs/decisions/2026-11-28-town-load-baked.md.
  */
-function townPictures(baked: BakeResult | null): Plugin {
-  let restarting = false;
+function townPictures(): Plugin {
+  const dir = join(APP, "public", TOWN_PICTURES_DIR);
+  let baked: Promise<BakeResult> | null = null;
+  let inputs: string[] = [];
   return {
     name: "bake-town",
     apply: "serve",
-    handleHotUpdate({ file, server }) {
-      if (!baked || restarting || !baked.inputs.includes(resolve(file))) return;
-      restarting = true;
-      server.config.logger.info("The town's art changed: baking it again (the dev server restarts).");
-      void server.restart();
-      return [];
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const name = req.url?.startsWith(`/${TOWN_PICTURES_DIR}/`) ? req.url.slice(TOWN_PICTURES_DIR.length + 2).split("?")[0]! : null;
+        if (name === null || !(name === "order.json" || BAKED_NAME.test(name))) return next();
+        baked ??= bakeTown(dir).then((r) => {
+          inputs = r.inputs;
+          server.config.logger.info(report(r));
+          return r;
+        });
+        baked.then(
+          () => {
+            if (!existsSync(join(dir, name))) return next();
+            res.setHeader("Content-Type", name.endsWith(".json") ? "application/json" : "image/png");
+            res.setHeader("Cache-Control", "no-store");
+            res.end(readFileSync(join(dir, name)));
+          },
+          (e) => {
+            baked = null;
+            next(e);
+          },
+        );
+      });
+    },
+    handleHotUpdate({ file }) {
+      // (A source of the pictures changed: baked again the next time the town asks.)
+      if (inputs.includes(resolve(file))) baked = null;
     },
   };
 }
@@ -209,19 +233,19 @@ function maiaFileBytes(): Record<string, number> {
 
 // (`__TOWN_ART__`, Nov 28: the town's art's fingerprint, which keys the town's pictures kept between visits, so a deploy that doesn't
 // change the art keeps them: town-art.ts. The dev server keeps no pictures, so it takes none.)
-// (`__TOWN_PICTURES__`, Nov 28, phase 1b: the baked town's manifest's name, by its contents. Baked here, before the app is built, so the
-// app is handed the name: every build, and the dev server as it starts (not `vite preview`, which serves a build as it is).)
-export default defineConfig(async ({ command, isPreview }) => {
-  const baked = isPreview ? null : await bakeTown(join(APP, "public", TOWN_PICTURES_DIR));
+// (`__TOWN_PICTURES__`, Nov 28, phase 1b: the baked town's manifest's name, by its contents. A build bakes here, before the app is
+// built, so the app is handed the name. The dev server is handed `order.json`, which names the latest bake's: `townPictures` above.)
+export default defineConfig(async ({ command }) => {
+  const baked = command === "build" ? await bakeTown(join(APP, "public", TOWN_PICTURES_DIR)) : null;
   if (baked) console.log(report(baked));
   return {
     define: {
       __MAIA_FILE_BYTES__: JSON.stringify(maiaFileBytes()),
       __APP_VERSION__: JSON.stringify(VERSION),
       __TOWN_ART__: JSON.stringify(command === "build" ? await townArt() : "dev"),
-      ...(baked ? { __TOWN_PICTURES__: JSON.stringify(baked.manifestName) } : {}),
+      __TOWN_PICTURES__: JSON.stringify(baked?.manifestName ?? "order.json"),
     },
-    plugins: [stockfish(), maiaBox(), townPictures(baked), preact(), serviceWorker(), versionFile()],
+    plugins: [stockfish(), maiaBox(), townPictures(), preact(), serviceWorker(), versionFile()],
     server: { host: true },
     build: { target: "es2020", chunkSizeWarningLimit: 1000 },
   };
