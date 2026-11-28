@@ -214,7 +214,7 @@ function BoardPreview({ skin, ply, loading, wide }: { skin: Skin; ply: number; l
           {skin.name}
         </strong>
         <span class="small item-preview-tier">{skin.tier ? `Rank board · ${skin.tier}` : "Basic board"}</span>
-        <span class="small">{owned ? "Owned" : open ? "The Italian Game, playing on a loop" : `Reach ${skin.tier} in 1 v 1 to buy`}</span>
+        <span class="small">{owned ? "Owned" : open ? "The Italian Game, playing on a loop" : `Reach ${skin.tier} to buy`}</span>
         <div class="locker-dialog-actions bk-actions">
           {owned ? (
             <button type="button" class="ff-button small" disabled={YOU.on === skin.id}>
