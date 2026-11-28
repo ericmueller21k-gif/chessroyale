@@ -1051,11 +1051,6 @@ export class Renderer {
     const { ctx, W, H, DPR } = this;
     this.paint.frame();
     this.frameNo++;
-    // (Once the loading screen is done: none of its time taken.)
-    if (this.topsAt < 0 && this.boxes.length && this.warmJobs && this.warmAt0 >= this.warmJobs.jobs.length) {
-      this.topsAt = 0;
-      this.nextTops();
-    }
     this.nSoft = 0;
     this.camX = camX;
     this.camY = camY;
@@ -3717,19 +3712,15 @@ export class Renderer {
   private newTagAt = -1;
   private tagSlicing = false;
   /**
-   * (Nov 27) Each box's solid top (boxes.ts solidTop: its front's first frame worked out, a few ms) worked out between frames from the first
-   * frame on, a box a slice, not the first time the box shows while walking (nor on the loading screen: it added 0.6 s there at 4x).
+   * Each box's solid top (boxes.ts solidTop: its front's first frame worked out, one box up to 20 to 45 ms on a slowed phone) worked out on
+   * the loading screen, `budgetMs` a slice: true once every box's is done. Not the first time a box shows while walking (Nov 27), nor in
+   * idle slices once the town shows (Nov 28: one took 44 ms in Eric's first seconds; Eric, Nov 27: a little longer loading is fine).
    */
-  private topsAt = -1;
-  private nextTops(): void {
-    const go = (budgetMs: number) => {
-      const t0 = performance.now();
-      while (this.topsAt < this.boxes.length && performance.now() - t0 < budgetMs) solidTop(this.boxes[this.topsAt++]!.box);
-      if (this.topsAt < this.boxes.length) this.nextTops();
-    };
-    const ric = (globalThis as { requestIdleCallback?: (f: (d: { timeRemaining(): number; didTimeout: boolean }) => void, o?: { timeout: number }) => number }).requestIdleCallback;
-    if (ric) ric((d) => go(d.didTimeout ? 4 : Math.min(4, d.timeRemaining())), { timeout: 1000 });
-    else setTimeout(() => go(3), 32);
+  private topsAt = 0;
+  warmTops(budgetMs: number): boolean {
+    const t0 = performance.now();
+    while (this.topsAt < this.boxes.length && performance.now() - t0 < budgetMs) solidTop(this.boxes[this.topsAt++]!.box);
+    return this.topsAt >= this.boxes.length;
   }
   private nextTagSlice(): void {
     this.tagSlicing = true;

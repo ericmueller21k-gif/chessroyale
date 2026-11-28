@@ -2983,7 +2983,14 @@ function startTown(
         await tick();
       }
       // (The pawns' crate items, Nov 26: waited for, up to loadSheetWaitMs from here, and kept with the rest.)
-      await Promise.race([Promise.allSettled(dressing), new Promise((go) => setTimeout(go, f.loadSheetWaitMs))]);
+      const sheetsBy = performance.now() + f.loadSheetWaitMs;
+      const until = () => new Promise((go) => setTimeout(go, Math.max(0, sheetsBy - performance.now())));
+      await Promise.race([Promise.allSettled(dressing), until()]);
+      // (The rides' frames and trail marks too, Nov 28: Eric's first 6 s uploaded 35 frames of his ride and 19 of its marks as each first
+      // showed. Waited for within the same time and kept.)
+      const riders = new Set([r.youSoon, ...r.ridersSoon.values()].filter((rd): rd is Rider => !!rd));
+      await Promise.race([Promise.all([...riders].map((rd) => new Promise<void>((go) => (rd.coming ? rd.then(() => go()) : go())))), until()]);
+      for (const rd of riders) for (const c of rd.pictures()) keep(c);
       for (const a of new Set([r.youArt, ...r.botArt.values()]))
         if (a) {
           keep(upName(a.img, "dressed pawn"));
@@ -3001,6 +3008,9 @@ function startTown(
       // A first visit's pictures kept for the next, after the first frame (`keepPictures`).
       if (!from && r.warmClean && alive) keepLater = () => keepPictures(shelf, key);
       loadPaintMs = performance.now() - t0;
+      // (Each box's solid top, Nov 28: here, not in idle slices once the town shows, where one took 44 ms on Eric's computer.)
+      onLoading(f.loadPaintShare, "building");
+      while (alive && !r.warmTops(f.loadSliceMs)) await tick();
       for (let share = 0; share < 1 && alive; ) {
         share = painter.kept?.(f.loadSliceMs) ?? 1;
         onLoading(f.loadPaintShare + (1 - f.loadPaintShare) * share, "building");

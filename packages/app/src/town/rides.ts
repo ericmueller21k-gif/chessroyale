@@ -26,6 +26,7 @@ import { FACINGS, HIDE_ALL, viewOf, type RiderDraft, type RiderFacing } from "..
 import { loadRide, rideCells } from "../components/rides/load.ts";
 import { RideLayer, RideMark, svgImage, svgText, type RideColors } from "../components/rides/draw.tsx";
 import { art2d } from "./paint.ts";
+import { upName } from "./frame-report.ts";
 
 /** The pawn a rider carries: its picture (the square's, dressed or plain), the margin round the pawn's box in it, and its top (a share of the picture, down). */
 export interface RiderPawn {
@@ -247,7 +248,7 @@ export class Rider {
               make: () => [svgText(h(RideMark, { d, view: FACINGS[v]!, c: this.colors, f, n }), box, s * k)],
               // (As a canvas: an SVG image would be drawn again from its shapes every time it's drawn.)
               done: ([img]) => {
-                const c = document.createElement("canvas");
+                const c = upName(document.createElement("canvas"), "ride trail");
                 c.width = img!.width;
                 c.height = img!.height;
                 art2d(c).drawImage(img!, 0, 0);
@@ -287,6 +288,17 @@ export class Rider {
       if (j + 1 < jobs.length) next = Promise.all(jobs[j + 1]!.make().map(svgImage));
     }
   }
+  /**
+   * Every picture it draws, once ready: each view's frames and its trail marks (Nov 28: the town's loading screen keeps them on the GPU, so
+   * walking uploads none; Eric's report showed 35 ride frames and 19 trail marks uploaded in his first 6 s).
+   */
+  pictures(): HTMLCanvasElement[] {
+    if (!this.ready) return [];
+    const out: HTMLCanvasElement[] = [];
+    for (const rv of new Set(this.views)) for (const c of [...rv.frames.idle, ...rv.frames.move]) if (c) out.push(c);
+    if (this.trail) for (const v of this.trail.frames) for (const n of v) for (const c of n) if (c) out.push(c);
+    return out;
+  }
   /** Stops composing and frees its frames (no one rides on them any more, or the town closed). */
   drop(): void {
     this.dead = true;
@@ -304,7 +316,7 @@ export class Rider {
   private frame(rv: RiderView, anim: "idle" | "move", i: number, back: HTMLImageElement, front: HTMLImageElement, hide?: string): HTMLCanvasElement {
     const s = RIDE_PX;
     const pawn = rv.pawn;
-    const c = document.createElement("canvas");
+    const c = upName(document.createElement("canvas"), "ride frame");
     c.width = Math.ceil(rv.w * s);
     c.height = Math.ceil(rv.h * s);
     const g = art2d(c);
