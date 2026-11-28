@@ -160,6 +160,61 @@ describe("the 1 v 1 queue and game in the app", () => {
   });
 });
 
+describe("watching a game from the town (#1027's review, S5)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("a refused watch (a guest, a full game, one not from the town): its reason on the watch screen, and no more tries; a dropped one tries again", async () => {
+    const made: { url: string; onopen?: () => void; onclose?: (e: { code: number; reason: string }) => void }[] = [];
+    vi.stubGlobal(
+      "WebSocket",
+      class {
+        static OPEN = 1;
+        readyState = 0;
+        constructor(readonly url: string) {
+          made.push(this as never);
+        }
+        send() {}
+        close() {}
+      },
+    );
+    vi.stubGlobal("location", { protocol: "https:", host: "hunchess.test" });
+    vi.stubGlobal("document", { addEventListener() {}, removeEventListener() {}, visibilityState: "visible" });
+    const asked = vi.fn(async () => new Response(JSON.stringify({ open: true, phase: "play" })));
+    vi.stubGlobal("fetch", asked);
+    vi.useFakeTimers();
+    const { NetDuel } = await import("../src/duel.ts");
+    for (const [code, reason, line] of [
+      [4029, "Too many are watching this game.", "Too many are watching this game."],
+      [4003, "Make a free account to watch.", "Make a free account to watch."],
+      [4003, "", "This game can't be watched."],
+    ] as const) {
+      const d = new NetDuel("ABCDE", true);
+      d.connect();
+      const ws = made.at(-1)!;
+      expect(ws.url).toBe("wss://hunchess.test/api/1v1/game/ABCDE/ws?watch=1");
+      ws.onopen!();
+      ws.onclose!({ code, reason });
+      expect(d.snapshot().gone).toBe(line);
+      const sockets = made.length;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(made.length, `${code}: never tried again`).toBe(sockets);
+    }
+    expect(asked).not.toHaveBeenCalled();
+    // (A watch that dropped for any other reason comes back.)
+    const d = new NetDuel("ABCDE", true);
+    d.connect();
+    made.at(-1)!.onopen!();
+    made.at(-1)!.onclose!({ code: 1006, reason: "" });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(made.at(-1)!.url).toContain("?watch=1");
+    expect(d.snapshot().gone).toBeNull();
+    d.dispose();
+  });
+});
+
 /** NetDuel's insides a test drives (its socket's messages, and what it sends). */
 interface NetDuelInside {
   onMessage(m: unknown): void;

@@ -571,7 +571,7 @@ for (const st of [
   });
 }
 
-test("a chess table in the park: a tap on one walks you to a free stool and you sit; its card (no title: Eric, Oct 27) shows 'Casual' and 'Ranked' greyed and 'Coming soon'; a tap elsewhere closes it and you stand", { tag: "@phone-only" }, async ({ page }) => {
+test("a chess table in the park: a tap on one walks you to a free stool and you sit; its card (no title: Eric, Oct 27) shows 'Ranked' (Nov 27: live) and 'Casual' greyed and 'Coming soon'; a tap elsewhere closes it and you stand", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
@@ -582,11 +582,10 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
   const card = page.getByRole("dialog", { name: "Chess table", exact: true });
   await expect(card).toBeVisible();
   await expect(card.getByRole("heading")).toHaveCount(0);
-  for (const name of ["Casual", "Ranked"]) {
-    const b = card.getByRole("button", { name, exact: true });
-    await expect(b).toBeVisible();
-    await expect(b).toBeDisabled();
-  }
+  for (const name of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name, exact: true })).toBeVisible();
+  // (Ranked live since Nov 27, Eric: the 1 v 1 search from the table, town-ranked.spec.ts; Casual still to come.)
+  await expect(card.getByRole("button", { name: "Ranked", exact: true })).toBeEnabled();
+  await expect(card.getByRole("button", { name: "Casual", exact: true })).toBeDisabled();
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
   // You walk to its nearer stool (nobody on it at the start) and sit.
   await expect.poll(async () => (await you(page)).join(","), { message: "you walk to a stool", timeout: 5000 }).toMatch(/^(18|20),26$/);
@@ -784,7 +783,7 @@ test("a town bot: a tap opens its card ('<name> (bot)', its rating, Play); Play 
   expect(errors).toEqual([]);
 });
 
-test("a bot sitting at a table: a tap on the table walks you to the free stool; its card's first button plays it ('Play <name> (bot) · <rating>', Casual and Ranked greyed under it); a reload or the back button from the game lands you back at the table", { tag: "@phone-only" }, async ({ page }) => {
+test("a bot sitting at a table: a tap on the table walks you to the free stool; its card's first button plays it ('Play <name> (bot) · <rating>', Ranked and Casual greyed under it); a reload or the back button from the game lands you back at the table", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors = watchErrors(page);
   await page.goto("/town?debug");
@@ -798,7 +797,8 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   const play = card.getByRole("button").first();
   await expect(play).toHaveText(`Play ${bot.name} (bot) · ${bot.rating}`);
   await expect(play).toBeEnabled();
-  for (const name of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name, exact: true })).toBeDisabled();
+  await expect(card.getByRole("button", { name: "Ranked", exact: true })).toBeEnabled();
+  await expect(card.getByRole("button", { name: "Casual", exact: true })).toBeDisabled();
   // You walk to the free (east) stool and sit, across from it; it stays while the card is open.
   await expect.poll(async () => (await you(page)).join(","), { timeout: 5000 }).toBe("20,26");
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
@@ -1291,7 +1291,8 @@ test("the other cards on the same dark look: the boss's, the home's, the Colosse
   await page.waitForTimeout(600);
   await tapAt(page, "table", 7);
   card = page.getByRole("dialog", { name: "Chess table", exact: true });
-  for (const b of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name: b, exact: true })).toBeDisabled();
+  await expect(card.getByRole("button", { name: "Ranked", exact: true })).toBeEnabled();
+  await expect(card.getByRole("button", { name: "Casual", exact: true })).toBeDisabled();
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
   await onDark("a table's card", []);
   await page.keyboard.press("Escape");

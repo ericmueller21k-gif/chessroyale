@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TOWN_TABLES } from "@chessroyale/core";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
 import { APRON, BOTS, COLISEUM, HOMES, START, STATUES, TABLES, Walker, createTown, destFor, onColiseum, seated, statueAt, stoolAt, tableStates, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
@@ -214,6 +215,10 @@ describe("town square: the park's tables", () => {
   /** The table nearest your start, and its stool nearer you. */
   const near = TABLES.reduce((a, b) => (king(b, START) < king(a, START) ? b : a));
   const nearStool = near.stools.reduce((a, b) => (Math.hypot(b.c - START.c, b.r - START.r) < Math.hypot(a.c - START.c, a.r - START.r) ? b : a));
+
+  it("the park has the tables the server knows of (TOWN_TABLES.parkTables: a beat's seat past them is refused, #1027's review, N4)", () => {
+    expect(TABLES.length).toBe(TOWN_TABLES.parkTables);
+  });
 
   it("a tap on a table walks you to its nearest free stool, where you sit; both taken, beside it; walking on, you stand", () => {
     const t = still();

@@ -29961,3 +29961,48 @@ piece.bd-smashed {
     -6px 0 var(--fb-glow, 24px) rgba(253, 186, 116, 0.9),
     6px 0 var(--fb-glow, 24px) rgba(186, 230, 253, 0.9);
 }
+
+/*
+ * Ranked at the town's tables (Nov 27; docs/areas/town-square.md, "Ranked at the tables"): a table's Ranked opens the 1 v 1 search over
+ * the town, you seated under it (Eric: "it just does an overlay"). The same stage as PLAY's, in a box of its own over a dimmed town: no
+ * Home on it (Cancel is the way back, still seated); the box is sized to fit any phone with "Few players online" and Cancel in it.
+ */
+.dv-town-search {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
+  background: var(--fd-scrim);
+  touch-action: none;
+}
+.dv-town-box {
+  width: min(420px, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--fd-line);
+  border-radius: 16px;
+  background: var(--fd-bg);
+  color: var(--fd-text);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+.dv-town-box .dv-stage {
+  min-height: 0;
+  padding: 16px 12px 18px;
+}
+.dv-town-box .dv-st-pair {
+  --dv-pw: min(50cqi - 6px, (var(--app-h) - 470px) * 1.08, 160px);
+}
+/* Watching a game from the town: Back to town under the board, the width of the result card. */
+.dv-watch .dv-watch-back {
+  align-self: center;
+  min-width: 180px;
+}
+.town-card .town-vs {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

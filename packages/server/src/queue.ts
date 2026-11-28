@@ -144,6 +144,11 @@ export class QueueCore {
     return this.byId.has(ticketId) || this.seating.has(ticketId) || this.placed.has(ticketId);
   }
 
+  /** Whether this ticket is being seated this moment (taken from the line, its lobby or game being opened). */
+  seatingNow(ticketId: string): boolean {
+    return this.seating.has(ticketId);
+  }
+
   /** The lobby a ticket was placed in (undefined while it waits). */
   placedIn(ticketId: string): string | undefined {
     return this.placed.get(ticketId)?.code;

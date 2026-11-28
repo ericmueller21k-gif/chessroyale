@@ -46,6 +46,8 @@ export type DuelOutgoing = DuelServerMessage extends infer M ? (M extends unknow
 export interface DuelIO {
   now(): number;
   send(c: Color, msg: DuelOutgoing): void;
+  /** To everyone watching (the town's spectator view, Nov 27): what both players hear of the game, never a chat or an outcome. */
+  watch?(msg: DuelOutgoing): void;
   /** A socket of this side is open now. */
   connected(c: Color): boolean;
 }
@@ -102,6 +104,12 @@ export interface DuelRecord {
    */
   conduct?: DuelConduct | null;
   excused?: boolean;
+  /**
+   * Found from a town's park table (the queue's `town`, Nov 27): the town is told once it's over, so the table is free (duel-do.ts
+   * `tellTown`); `townTold` once it has been.
+   */
+  town?: true;
+  townTold?: true;
   /** Each side has connected at least once (it saw the game). */
   seen?: Partial<Record<Color, true>>;
   /**
@@ -114,8 +122,9 @@ export interface DuelRecord {
   chat: DuelChat;
 }
 
-export function newDuelRecord(code: string, now: number, players: Record<Color, DuelPlayerView>, opts: { testSeconds?: number | null } = {}): DuelRecord {
+export function newDuelRecord(code: string, now: number, players: Record<Color, DuelPlayerView>, opts: { testSeconds?: number | null; town?: boolean } = {}): DuelRecord {
   return {
+    ...(opts.town ? { town: true as const } : {}),
     code,
     id: `${code}-${now.toString(36)}`,
     createdAt: now,
@@ -194,6 +203,7 @@ export class DuelCore {
   private both(msg: DuelOutgoing) {
     this.io.send("w", msg);
     this.io.send("b", msg);
+    this.io.watch?.(msg);
   }
 
   /** The game in full to both: a phase changed, or the game ended. */
@@ -223,7 +233,14 @@ export class DuelCore {
   /** A player's last socket closed: the other sees them gone (their clock keeps running; they can come back). */
   disconnect(c: Color) {
     if (!this.io.connected(c)) this.r.goneAt = { ...this.r.goneAt, [c]: this.io.now() };
-    this.io.send(other(c), { t: "presence", connected: { w: this.io.connected("w"), b: this.io.connected("b") } });
+    const presence: DuelOutgoing = { t: "presence", connected: { w: this.io.connected("w"), b: this.io.connected("b") } };
+    this.io.send(other(c), presence);
+    this.io.watch?.(presence);
+  }
+
+  /** Someone watching (the town's spectator view, Nov 27): the game as it is now; nothing of the chat. */
+  welcomeWatcher(): DuelOutgoing {
+    return { t: "welcome", you: "w", watch: true, game: this.view(), v: DUEL_PROTOCOL };
   }
 
   /** Both here, in time: the versus moment, then the vote. */

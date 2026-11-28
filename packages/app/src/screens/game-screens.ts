@@ -14,7 +14,7 @@ export { BossScreen } from "./Boss.tsx";
 export { SpectateScreen } from "./Spectate.tsx";
 export { StageBreakScreen } from "./StageBreak.tsx";
 export { SquadsQueue, SquadsScreen } from "./Squads.tsx";
-export { DuelFront } from "./Duel.tsx";
+export { DuelFront, DuelWatch } from "./Duel.tsx";
 export { BossStageFigure, prewarmBoss } from "../components/BossStage.tsx";
 // (Dash's clock tap: an overlay beside the match's screens, so in this chunk, never the first load: the Nov 19 sweep found its static
 // import in App.tsx had pulled every boss's kit back into the entry, undoing the Nov 16 split.)

@@ -6,7 +6,7 @@ import { AWAY_LIMITS, AwayClock, GuestTime, readAwaySwitch, readGuestSwitch, typ
 import { mayReadTownChat, mayTownChat } from "./chat-net.ts";
 import { N } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
-import { Walker, spotNear, taken, walkWalker, walkable, type Person, type Sq, type Town } from "./world.ts";
+import { TABLES, Walker, seated, spotNear, taken, walkWalker, walkable, type Person, type Sq, type Town } from "./world.ts";
 
 /**
  * Who else is in the town square, and you being away (Eric, Nov 7; afk.ts; the server's side: server/src/town-here.ts). A
@@ -28,7 +28,21 @@ export interface HereOther {
   look?: ItemLook;
   /** Their default pawn color (absent: white). */
   pawn?: PawnColor;
+  /** Seated at a park table (on the stool their square is). */
+  sit?: boolean;
 }
+
+/** A ranked 1 v 1 at a park table, as the server says (server/src/town-tables.ts `TableMatch`): its code, its table, stool 0's and 1's player. */
+export interface TableMatch {
+  code: string;
+  table: number;
+  seats: { uid: string; name: string; look?: ItemLook | null; pawn?: PawnColor }[];
+}
+
+const isMatch = (o: unknown): o is TableMatch => {
+  const x = o as TableMatch;
+  return !!x && typeof x.code === "string" && Number.isInteger(x.table) && Array.isArray(x.seats) && x.seats.length === 2 && x.seats.every((s) => !!s && typeof s.uid === "string" && typeof s.name === "string");
+};
 
 const isOther = (o: unknown): o is HereOther => {
   const x = o as HereOther;
@@ -76,6 +90,8 @@ export function applyHere(t: Town, others: readonly HereOther[], now: number): {
     if (p.name !== o.name && !came.includes(p)) came.push(p);
     p.name = o.name;
     p.zzz = o.zzz;
+    // (Seated at a table, Nov 27: once they stop on its stool, as a bot sits.)
+    p.sit = o.sit === true;
     const wear = o.look ? cleanLook(o.look) : null;
     const was = "sprite" in p.look ? null : p.look;
     if (!was || was.side !== side || lookKey(wear) !== lookKey(was.wear)) {
@@ -85,7 +101,7 @@ export function applyHere(t: Town, others: readonly HereOther[], now: number): {
   }
   const gone: Person[] = [];
   for (const p of t.people) {
-    if (!p.remote || p.home || listed.has(p.id)) continue;
+    if (!p.remote || p.match || p.home || listed.has(p.id)) continue;
     p.home = true;
     p.zzz = false;
     const i = t.all.indexOf(p.walker);
@@ -93,6 +109,80 @@ export function applyHere(t: Town, others: readonly HereOther[], now: number): {
     gone.push(p);
   }
   return { gone, dressed, came };
+}
+
+/**
+ * The ranked games at the park's tables, from the server's list (Eric, Nov 27: "whoever your opponent is, he doesn't have to be in the
+ * town ... just show their pawn ... sitting on the bench next to them ... with their name above their head"): each player a pawn seated
+ * on their stool (`match`: the game's code), in their look and pawn color, for as long as the list has it; a match no longer listed
+ * leaves (`home`). Whoever else stands on, or is walking to, one of its stools steps off beside it (a bot, someone in from the server,
+ * you: `you` says so). Answers as `applyHere` does.
+ */
+export function applyTables(t: Town, list: readonly TableMatch[], now: number): { gone: Person[]; dressed: Person[]; came: Person[]; you: boolean } {
+  const dressed: Person[] = [];
+  const came: Person[] = [];
+  let you = false;
+  const listed = new Set<string>();
+  for (const m of list) {
+    const tb = TABLES[m.table];
+    if (!tb) continue;
+    for (const k of [0, 1] as const) {
+      const s = m.seats[k]!;
+      const id = `match:${m.code}:${k}`;
+      listed.add(id);
+      const sq = tb.stools[k]!;
+      let p = t.people.find((x) => x.id === id);
+      if (!p || p.home) {
+        // (Its stool cleared first: anyone else on it, or on their way to stop there, steps off beside it.)
+        for (const o of t.people) {
+          if (o.home || o.match || o === p) continue;
+          const g = o.walker.goal();
+          if (g.c !== sq.c || g.r !== sq.r) continue;
+          const to = spotNear(t, o.walker, sq, true);
+          if (to) walkWalker(o.walker, to);
+          if (o.you) ((o.sit = false), (you = true));
+        }
+        const w = new Walker(sq, TOWN_FEEL.botStepMs, true);
+        if (!p) {
+          p = { id, name: s.name, look: { side: "light", tint: null, wear: null }, you: false, walker: w, sit: true, bot: null, waved: -Infinity, home: false, came: now, leaves: Infinity, going: false, trip: null, due: false, uid: s.uid, remote: true, match: m.code };
+          t.people.push(p);
+        } else {
+          p.walker = w;
+          p.home = false;
+          p.came = now;
+        }
+        t.all.push(w);
+        came.push(p);
+      }
+      if (p.name !== s.name && !came.includes(p)) came.push(p);
+      p.name = s.name;
+      const side = s.pawn === "black" ? "dark" : "light";
+      const wear = s.look ? cleanLook(s.look) : null;
+      const was = "sprite" in p.look ? null : p.look;
+      if (!was || was.side !== side || lookKey(wear) !== lookKey(was.wear) || came.includes(p)) {
+        p.look = { side, tint: null, wear: lookKey(wear) ? wear : null };
+        dressed.push(p);
+      }
+    }
+  }
+  const gone: Person[] = [];
+  for (const p of t.people) {
+    if (!p.match || p.home || listed.has(p.id)) continue;
+    p.home = true;
+    const i = t.all.indexOf(p.walker);
+    if (i >= 0) t.all.splice(i, 1);
+    gone.push(p);
+  }
+  return { gone, dressed, came, you };
+}
+
+/** The table and stool you sit at now ([table, stool]), for your beat; null: not sitting. */
+export function seatNow(t: Town): [number, 0 | 1] | null {
+  const tb = seated(t.you);
+  if (!tb) return null;
+  const h = t.you.walker.here();
+  const k = tb.stools.findIndex((s) => s.c === h.c && s.r === h.r);
+  return k === 0 || k === 1 ? [tb.i, k] : null;
 }
 
 /** What a beat says about you. */
@@ -104,6 +194,8 @@ export interface HereSelf {
   shop: string | null;
   /** Back from a Battle Tower floor (server town-here.ts `HereBeat.floor`). */
   floor?: true;
+  /** Sitting at a park table: [table, stool] (server town-here.ts `HereBeat.seat`). */
+  seat?: [number, 0 | 1];
 }
 
 /**
@@ -150,6 +242,8 @@ export function watchAway(o: {
   onState: (s: AwayState) => void;
   onOut: () => void;
   onOthers?: (gone: Person[], dressed: Person[], came: Person[]) => void;
+  /** The ranked games at the tables put in the town (`applyTables`): `you`, you were stood up off one's stool. */
+  onTables?: (gone: Person[], dressed: Person[], came: Person[], you: boolean) => void;
   floor?: boolean;
 }): () => void {
   const limits = awayLimits();
@@ -167,7 +261,8 @@ export function watchAway(o: {
   let floor = !!o.floor;
   const self = (): HereSelf => {
     const h = o.town.you.walker.here();
-    return { c: h.c, r: h.r, idleMs: clock.idleMs(Date.now()), hidden: document.hidden, shop: o.shop(), ...(floor ? { floor: true } : {}) };
+    const seat = o.shop() ? null : seatNow(o.town);
+    return { c: h.c, r: h.r, idleMs: clock.idleMs(Date.now()), hidden: document.hidden, shop: o.shop(), ...(floor ? { floor: true } : {}), ...(seat ? { seat } : {}) };
   };
   const post = (body: Record<string, unknown>, keepalive: boolean) =>
     fetch("/api/town/here", { method: "POST", credentials: "same-origin", keepalive, headers: { "content-type": "application/json" }, body: JSON.stringify({ ...body, ...extras }) });
@@ -177,14 +272,18 @@ export function watchAway(o: {
     inFlight = true;
     const me = self();
     beatAt = Date.now();
-    sent = `${me.c},${me.r},${state},${me.shop}`;
+    sent = `${me.c},${me.r},${state},${me.shop},${me.seat ?? ""}`;
     void post(online ? { ...me } : { watch: true }, false)
       .then((res) => {
         if (res.ok) floor = false;
         return res.ok ? res.json() : null;
       })
-      .then((b: { others?: unknown } | null) => {
+      .then((b: { others?: unknown; tables?: unknown } | null) => {
         if (done || !b || !Array.isArray(b.others)) return;
+        // (The tables' games first: whoever the list says is in a match isn't in `others`, and their stools are held before anyone's
+        // placed.)
+        const m = applyTables(o.town, Array.isArray(b.tables) ? b.tables.filter(isMatch) : [], performance.now());
+        o.onTables?.(m.gone, m.dressed, m.came, m.you);
         const { gone, dressed, came } = applyHere(o.town, b.others.filter(isOther), performance.now());
         o.onOthers?.(gone, dressed, came);
       })
@@ -222,7 +321,7 @@ export function watchAway(o: {
     }
     if (document.hidden) return;
     const h = o.town.you.walker.here();
-    const key = `${h.c},${h.r},${state},${o.shop()}`;
+    const key = `${h.c},${h.r},${state},${o.shop()},${(!o.shop() && seatNow(o.town)) || ""}`;
     if ((online && key !== sent) || now - beatAt >= TOWN_AFK.beatSec * 1000) beat();
   };
   const onInput = () => {

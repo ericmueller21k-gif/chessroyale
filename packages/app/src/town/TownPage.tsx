@@ -41,12 +41,20 @@ type Props = {
   /** The Hidden Boss's room's four go in (hidden-net.ts): the summoning has played to black; into his fight with your pass and seat. */
   onHiddenFight: (lobby: string, pass: string, seat: number, stand: Stand | null) => void;
   onPlayBot: (game: BotGameAsk) => void;
+  /** A table's Ranked (Nov 27): you sit at that seat ("6.0") and the 1 v 1 search opens over the town. */
+  onRanked: (seat: string) => void;
+  /** A table's Spectate on a ranked game there: its spectator view; back to where you stood. */
+  onWatchGame: (code: string, stand: Stand) => void;
+  /** The search from a table is up over the town (it holds the away clock and the keys). */
+  searching: boolean;
   onColosseum: () => void;
   seat: string | null;
   /** Back from a boss's challenge: where you stood as you challenged it. */
   stand: Stand | null;
   /** Back from a Battle Tower floor's match (PR 11b): the town opens in the tower (Town.tsx TowerBack). */
   tower: TowerBack | null;
+  /** Back from a table's Spectate, read once as the town opens (Town.tsx's `fromWatch`). */
+  fromWatch?: () => boolean;
   /** A phone's bar's Quests, Shop & crates and Friends (Nov 22): each opens over the town (App.tsx's town layer). */
   pages?: TownPages;
 };
