@@ -1,0 +1,63 @@
+Town phase 1c done (claude/town-phase1c, from origin/main 182e1fa0; origin/main fdebdd97 merged in, no file in common). PR title and body: .pr-body.md. No PR opened, so CI has not run
+(it runs on a PR): the director opens it, with the `full-e2e` label. One branch, nothing split off. About 2 h 10 min.
+
+What it does (the brief's five points)
+1. The sidekicks' frames are baked: scripts/bake-town.ts cuts each sheet (town/sidekicks/<name>.png) into its frames, each a padded
+   picture `sidekick:<sheet>:<animation>#<frame>`, a file a sidekick, by its SIDEKICK_SHEETS name. A player's town: 14 files, 853
+   frames (the same pixels stored once: 28 to 63 a file), 8 to 16 KB each; an admin's 16 (Rivet's and Tick's are `.admin`). Manifest
+   v 2 (no `sheets`). Rivet shows in an admin's town: stills/town-phase1c, rivet-admin-town-phone.png and -desktop.png (checked: he
+   and his tag are whole and inside the screen on both). ShopRoom and the Colosseum still import the sheets themselves: untouched.
+2. No time caps: `loadSheetWaitMs` is gone. The labels' fonts, the pawns' crate items and the rides are each waited for until in or
+   failed (baked.ts `settledOrStalled`); only `TOWN_PICTURES.stallMs` (15 s) with none of them settling, the page showing, ends a
+   wait: the town shows, they show as they land, reported once as kind `town-load-late` (`fonts`, `items`, `rides`). A ride whose
+   drawing fails now ends its wait at once (rides.ts `settled`); before, only the 3 s cap did.
+3. Memory: each decoded page is closed once the painter has uploaded it (`Baked.release`). After a lost context the loading card
+   comes back, the files are fetched again (`reopen`: the worker's cache) and everything is uploaded as on the loading screen, then it
+   draws. A 2D reader's own source: what the town reads (each home's and park thing's first frame, each boss's and sidekick's) is cut
+   under the card, a loading job each; anything else is read back from the GPU (`Painter.read`), which gives the same pixels (the
+   picture hash, read that way, is main's).
+4. Device painting removed: paint-pool.ts, paint.worker.ts, keep-pictures.worker.ts, keep-pictures.ts's save and restore, town-art.ts
+   and `__TOWN_ART__`, `?paintall` / `?paintworkers` / `?paintslow`, `TOWN_PAINT_WORKERS`, `TOWN_PICTURES.on/maxMB/waitMs/sliceMs/baked`,
+   the warm/plan paths painting used, the box tops worked out on the device. The old IndexedDB database is deleted once a page.
+   A failed load: each file (and the manifest) asked for again after 0.5 s and 1.5 s (`TOWN_PICTURES.retryMs`), then "The town didn't
+   load. Please retry." with Retry (the WebGL rule's card, reused: no new text), reported as `town-baked-fallback` with its reason
+   (new reason `gpu`: a loading job failed, or the files didn't fit the atlas again). Still on stills/town-phase1c.
+   The evidence I deleted it on: `npm run ops:report` at 11:47 and 12:45 UTC, no `town-baked-fallback` row (3 errors in 24 h, none of
+   that kind). That is thin: 1b had been live about 90 minutes, to Eric alone. No device class is known to fall back; none is known
+   not to. If the director wants more evidence first, the PR can wait for a day of rows: nothing else depends on the order.
+5. Measured, same machine, `main`'s build then this one (headless Chromium, software WebGL; 3 to 5 runs each)
+   - Slowed phone (iPhone 13, CPU 4x), a player's town: tap to the town 4.9 to 5.2 s → 4.0 to 5.2 s first visit, 4.0 to 5.1 s →
+     4.0 to 5.1 s later, 3.9 s after a deploy (1 run: the same town built under another commit id, the same profile; 49 of 49 files
+     from the worker). Decoded pages 144.5 MB → 0; canvases 57.6 → 54.2 MB (1,228 → 565); textures 251.7 MB both (15 layers);
+     454 → 306 MB in all. An admin's: 493 → 330 MB. Held frame, 200 draws: 15.0 → 15.0 ms. Tasks over 200 ms: 3 → 3.
+   - Computer (1280 x 800): 2.0 to 2.3 s → 2.0 to 2.3 s; after a deploy 2.0 s; pages 144.5 MB → 0; canvases 30.7 → 27.3 MB.
+   - "Halved" holds for memory outside the GPU (-73%), not for the total (-33%): the textures are two thirds of it (phase 3).
+   - Same pixels: a player's town n 2250, hash 81fb216, gpu 8f62dba3; an admin's 2398, 76475003, c432b637 (1a's, 1b's, main's).
+   - Budgets (e2e/perf.spec.ts): TOWN_LOAD_REFS 16 → 8, TOWN_LONG_REFS 2 → 1, one TOWN_VISIT_REFS 8 for a first and a later visit.
+
+Found on the way, fixed here
+- The painter dropped a picture handed to `keep` while the context was lost. If a loss fell on the moment the loading screen made the
+  labels, they uploaded in frames later. `keep` now queues it; e2e "the WebGL context lost while the town loads…" covers both steps.
+- A load that stalled with one request hung kept the pages already decoded in memory for good (my first version; caught by the unit test).
+
+Not verified, for the director
+- CI. Locally green, both projects: typecheck; app, core and server unit tests; e2e town-street, town-controls, town, town-fixed,
+  town-rows, problems' WebGL 2 guard, battle-tower's memory check, the three @perf town tests. Not run locally: the rest of the suite.
+- iOS Safari (1b's "Not reached" still stands, and matters more now: there is no painting to fall back on). `Painter.read` and the
+  reopen after a lost context are new on it. Worth Eric's look on his iPhone after the deploy: open the town, leave the app a few
+  minutes, come back (iOS drops the context in the background), and `/town?report`.
+- The read-ahead costs about 10 MB of canvases (218 small ones) to keep GPU read-backs out of play; a mask a picture would be about
+  2 MB. Left as it is: simpler.
+
+Left, not in the brief
+- render.ts still paints a picture the first time it's drawn if it isn't one of the list's (the Colosseum's chip icon, a statue's
+  close-up; `FrameCache.get`, `roofArt`, `bakeGlow` at their draw sites), and planBoxes still walks its paint-ahead tiers each frame,
+  finding nothing. Phase 2's door (no picture made inside a draw) is the place to end both; I didn't touch the frame loop.
+- A tab left on home across a deploy that changed the town's art, its town files never fetched: its town says it didn't load, and
+  Retry (a reload) gets the new app. 1b's note offered an automatic reload as a stale chunk does; the brief asked for the card.
+- The stall guard for the rides counts a ride finished, not a frame composed: with very many riders at load on a slow phone it could
+  end the wait while they're still composing (15 s; today one or two rides are there at load).
+
+Changed checks, old → new: in .pr-body.md. No check that guards a rule in docs/rules/eric.md changed; the lost-context guard and the
+WebGL 2 guard pass as they are. Stills: branch stills/town-phase1c (3 images). Local e2e needed its own Playwright config for this
+container's browser build: not committed.
