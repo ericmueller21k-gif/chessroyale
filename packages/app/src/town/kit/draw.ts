@@ -27,9 +27,17 @@ export interface Piece {
 }
 const SHEET = 512;
 
-/** Packs pictures into sheets (shelves, SHEET px wide), each with a 2 px gap: a few big pictures for WebGL's atlas, not hundreds of small ones. */
-export function pack(items: Cut[]): Piece[] {
-  const out: Piece[] = new Array(items.length);
+/** A sheet's pixels, and where each picture went: its sheet, its rectangle there, and where its texture's (0, 0) lies on the sheet. */
+export interface Packed {
+  sheets: { w: number; h: number; data: Uint8ClampedArray }[];
+  at: { sheet: number; sx: number; sy: number; w: number; h: number; ox: number; oy: number }[];
+}
+/**
+ * Packs pictures into sheets (shelves, SHEET px wide), each with a 2 px gap: a few big pictures for WebGL's atlas, not hundreds of small
+ * ones. Pure (no canvas): the town's build packs its roofs with it too (scripts/bake-town.ts), so a baked sheet is the device's.
+ */
+export function packCuts(items: Cut[]): Packed {
+  const at: Packed["at"] = new Array(items.length);
   const sheets: { w: number; h: number; place: { i: number; x: number; y: number }[] }[] = [];
   let cur = { w: 0, h: 0, place: [] as { i: number; x: number; y: number }[] };
   let x = 0;
@@ -58,19 +66,34 @@ export function pack(items: Cut[]): Piece[] {
     shelf = Math.max(shelf, h);
   }
   if (cur.place.length) sheets.push(cur);
-  for (const s of sheets) {
+  return {
+    at,
+    sheets: sheets.map((s, sheet) => {
+      const W = Math.max(1, s.w);
+      const H = Math.max(1, s.h);
+      const data = new Uint8ClampedArray(W * H * 4);
+      for (const p of s.place) {
+        const it = items[p.i]!;
+        for (let j = 0; j < it.h; j++) data.set(it.data.subarray(j * it.w * 4, (j + 1) * it.w * 4), ((p.y + j) * W + p.x) * 4);
+        at[p.i] = { sheet, sx: p.x, sy: p.y, w: it.w, h: it.h, ox: p.x + it.ox, oy: p.y + it.oy };
+      }
+      return { w: W, h: H, data };
+    }),
+  };
+}
+/** Pictures packed into sheets (`packCuts`), each sheet on a canvas. */
+export function pack(items: Cut[]): Piece[] {
+  const { sheets, at } = packCuts(items);
+  const cvs = sheets.map((s) => {
     const cv = document.createElement("canvas");
-    cv.width = Math.max(1, s.w);
-    cv.height = Math.max(1, s.h);
-    const img = new ImageData(cv.width, cv.height);
-    for (const p of s.place) {
-      const it = items[p.i]!;
-      for (let j = 0; j < it.h; j++) img.data.set(it.data.subarray(j * it.w * 4, (j + 1) * it.w * 4), ((p.y + j) * cv.width + p.x) * 4);
-      out[p.i] = { cv, sx: p.x, sy: p.y, w: it.w, h: it.h, ox: p.x + it.ox, oy: p.y + it.oy };
-    }
+    cv.width = s.w;
+    cv.height = s.h;
+    const img = new ImageData(s.w, s.h);
+    img.data.set(s.data);
     art2d(cv).putImageData(img, 0, 0);
-  }
-  return out;
+    return cv;
+  });
+  return at.map((p) => ({ cv: cvs[p.sheet]!, sx: p.sx, sy: p.sy, w: p.w, h: p.h, ox: p.ox, oy: p.oy }));
 }
 
 /** A face's pieces: whole, and its triangles (triangle k: corners 0, k + 1, k + 2). */
