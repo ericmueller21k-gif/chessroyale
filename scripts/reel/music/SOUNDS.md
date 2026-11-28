@@ -1053,4 +1053,12 @@ the same soft piano (with one bass note a bar under it, on the bass, as all thro
 - `sheets/check_sheet.py <the .midi> a` checks the sheet against the song's own notes (song_ad.py): 291 notes, each
   at its beat and pitch, nothing extra. It takes `b` for the second solo when that has a sheet.
 - No composer's name is on the page: his to add.
+- **The same solo as a MIDI file (Nov 28).** Eric: "Can you send me a MIDI file for the piano solo 1 for the town? Like
+  the two-handed, because I think it's 2 hands. Even if it's not written that way, I feel like the whatever opens up
+  sounds like the left hand playing." It is two hands, and the opening four bars are the left alone.
+  `sheets/solo_midi.py <out.mid> [a|b]` writes it from the song's own notes: a tempo track, the right hand (131
+  notes: its line, the notes under it, the octave under it the second time) and the left (160), a channel each, the
+  pedal changed at every bar, the song's loudness for each part. `check_sheet.py` passes on it (291 notes, each at
+  its beat and pitch). The bass's note a bar and the last bars' strings are not in it, as on the sheet. `b` makes
+  the second solo's when he wants it.
 
