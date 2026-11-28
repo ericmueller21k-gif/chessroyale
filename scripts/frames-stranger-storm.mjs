@@ -63,7 +63,11 @@ cdp.on("Page.screencastFrame", async (f) => {
   frames.push({ t: f.metadata.timestamp * 1000, data: f.data });
   await cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => undefined);
 });
-await p.goto(`${url}?debug&clock=60&nolanding&laststand=0&brain=stockfish&boss=stranger&wip=1&power=storm`);
+// (CROWD=<n>: a crowded middle for the storm's throw: no early storm; n of your moves into the middle first, then the admins' test
+// trigger brings the storm at his next turn. 4 is the one that works: his Frostfire strikes on turn 3 and burns on 4, and no storm
+// comes while a strike is under way; the next is on turn 7. MP4=1: an MP4 of the scene too, 30 frames a second. HIRES=1: frames at the screen's 2x.)
+const CROWD = Number(process.env.CROWD || 0);
+await p.goto(`${url}?debug&clock=60&nolanding&laststand=0&brain=stockfish&boss=stranger&wip=1${CROWD ? "" : "&power=storm"}`);
 await p.getByRole("main").getByRole("button", { name: /^Boss Battle/ }).click();
 // (START only once the engine has loaded: a tap before does nothing.)
 for (let i = 0; i < 600 && (await p.getByText("Loading the engine").count()); i++) await p.waitForTimeout(200);
@@ -79,7 +83,8 @@ const waitFor = async (want, ms = 90_000) => {
   return false;
 };
 /** One move with two taps: on a fire turn, a marked piece of yours left where it stands (or a step onto a mark); else a quiet move. */
-async function move() {
+const MIDDLE = ["e2e4", "d2d4", "g1f3", "b1c3", "c1f4", "f1d3", "c1e3", "f1c4", "d1d3", "d1e2", "c2c4", "f2f4", "f3e5", "c3d5", "f3d4", "c3e4", "a1d1", "h1e1"];
+async function move(middle = false) {
   if (!(await waitFor(["play"], 90_000))) return null;
   await p.waitForTimeout(700);
   const s = await p.evaluate(() => {
@@ -101,6 +106,7 @@ async function move() {
     const mine = marks.filter((sq) => chess.get(sq)?.color === chess.turn());
     pick = mine.length ? ok.find((m) => !marks.includes(m.from) && !marks.includes(m.to)) : ok.find((m) => marks.includes(m.to) && m.piece !== "k");
   }
+  if (middle) pick = MIDDLE.map((u) => ok.find((m) => m.uci === u && !m.captured)).find(Boolean) ?? ok.find((m) => !m.captured && "cdef".includes(m.to[0]) && "3456".includes(m.to[1]) && m.piece !== "k") ?? null;
   pick = pick ?? ok.find((m) => m.piece === "n" && !m.captured) ?? ok.find((m) => !m.captured) ?? ok[0];
   if (!pick) return null;
   const board = await p.locator(".hb-board").first().boundingBox();
@@ -145,20 +151,32 @@ await waitFor(["play"], 60_000);
 // The recording: true screenshots one after another (about 15 to 20 a second), each named by the page's clock. Not Chrome's screencast:
 // headless, it delivers no frames for a quarter second now and then (as a text box's line ends, Nov 27: the page draws every frame, a
 // trace's draws and commits have no gap), a hole in the GIF at whatever plays then, his leap for one. (CAST=1: the screencast all the same.)
+if (CROWD) {
+  for (let i = 0; i < CROWD; i++) if ((await move(true)) === null) break;
+  await waitFor(["play"], 90_000);
+  // (The admins' trigger, straight on the runner: this dev server has no account to be an admin's. It says whether it took.)
+  const took = await p.evaluate(() => {
+    const m = window.match;
+    const ok = m.runner.triggerUltimate();
+    m.emit?.();
+    return { ok, next: m.boss?.powers?.ultNext ?? null, turn: m.boss?.powers?.turn ?? 0 };
+  });
+  console.log(`${tag} the storm's trigger pulled on turn ${took.turn}: ${JSON.stringify(took)}`);
+}
 let recording = !PERF;
 const recorder = (async () => {
   if (PERF) return;
   if (process.env.CAST) return void (await cdp.send("Page.startScreencast", { format: "jpeg", quality: 88, everyNthFrame: 1, maxWidth: which === "desktop" ? 1440 : 585, maxHeight: 1300 }));
   while (recording) {
     const a = Date.now();
-    const shot = await p.screenshot({ type: "jpeg", quality: 90, scale: "css" }).catch(() => null);
+    const shot = await p.screenshot({ type: "jpeg", quality: 90, scale: process.env.HIRES ? "device" : "css" }).catch(() => null);
     if (shot) frames.push({ t: (a + Date.now()) / 2, data: shot.toString("base64") });
   }
 })();
-for (let i = 0; i < 6; i++) {
-  if ((await move()) === null) break;
-  const turn = await p.evaluate(() => window.match?.boss?.powers?.turn ?? 0);
-  if (turn >= 6) break;
+for (let i = 0; i < (CROWD ? 10 : 6); i++) {
+  if ((await move(!!CROWD && i === 0)) === null) break;
+  const at = await p.evaluate(() => ({ turn: window.match?.boss?.powers?.turn ?? 0, storm: window.match?.boss?.powers?.stranger?.storm?.at ?? 0 }));
+  if (CROWD ? at.storm && at.turn >= at.storm + (process.env.MP4 ? 1 : 3) : at.turn >= 6) break;
 }
 await waitFor(["play"], 60_000);
 await p.waitForTimeout(1500);
@@ -211,6 +229,23 @@ if (process.env.RAW && !PERF) {
   rmSync(raw, { recursive: true, force: true });
   mkdirSync(raw, { recursive: true });
   for (const f of frames) if (f.t >= sceneFrom - 1500 && f.t <= sceneTo + 3000) writeFileSync(join(raw, `${String(Math.round(f.t - sceneFrom) + 100000)}.jpg`), Buffer.from(f.data, "base64"));
+}
+// (MP4=1: the scene from its banner to the storm's first turn, every frame held until the next, 30 a second.)
+if (process.env.MP4 && !PERF) try {
+  const mdir = join(outDir, `${tag}-mp4-frames`);
+  rmSync(mdir, { recursive: true, force: true });
+  mkdirSync(mdir, { recursive: true });
+  const part = frames.filter((f) => f.t >= sceneFrom - 600 && f.t <= sceneTo + 3000);
+  let n = 0;
+  for (let t = sceneFrom - 300; t <= sceneTo + 2600; t += 1000 / 30) {
+    const f = part.filter((x) => x.t <= t).at(-1) ?? part[0];
+    if (f) writeFileSync(join(mdir, `${String(n++).padStart(5, "0")}.jpg`), Buffer.from(f.data, "base64"));
+  }
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", "30", "-i", join(mdir, "%05d.jpg"), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", "-movflags", "+faststart", join(outDir, `${tag}.mp4`)]);
+  rmSync(mdir, { recursive: true, force: true });
+  console.log(`${tag}.mp4: ${n} frames, ${(n / 30).toFixed(1)} s (${part.length} shots)`);
+} catch (e) {
+  console.log("mp4 failed", e.message);
 }
 // (PERF=1 records no frames: no GIFs.)
 if (!PERF) try {

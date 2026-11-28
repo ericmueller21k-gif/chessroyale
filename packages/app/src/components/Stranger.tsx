@@ -743,38 +743,121 @@ function Ripples({ t }: { t: number }) {
       return [<circle key={`${cls}${k}`} class={cls} cx={at.x} cy={at.y} r={r2(2 + u * 30)} style={{ opacity: String(r2((1 - u) * 0.8)) }} />];
     });
   };
+  // (Each stab's own two big ripples, Eric, Nov 28: out from the sword's point to the board's edge, cut there, one a beat behind the other.)
+  const big = (from: number, at: Pt, cls: string) =>
+    [0, 1].flatMap((k) => {
+      const u = (t - from - k * THROW.rippleGap) / THROW.rippleMs;
+      if (u < 0 || u >= 1) return [];
+      const reach = Math.max(Math.hypot(at.x, at.y), Math.hypot(100 - at.x, at.y), Math.hypot(at.x, 100 - at.y), Math.hypot(100 - at.x, 100 - at.y));
+      return [<circle key={`big-${cls}${k}`} class={`${cls} sg-big`} cx={at.x} cy={at.y} r={r2(3 + ease(u) * (reach - 3))} style={{ opacity: String(r2((1 - u) * 0.9)), strokeWidth: String(r2(2.2 - 1.4 * u)) }} />];
+    });
   return (
     <svg class="sg-cracks" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <clipPath id="sg-board-clip">
+        <rect x="0" y="0" width="100" height="100" />
+      </clipPath>
       {rings(S.fireAt, pts.fire, "sg-ripple sg-fire")}
       {rings(S.iceAt, pts.ice, "sg-ripple sg-ice")}
+      <g clip-path="url(#sg-board-clip)">
+        {big(S.fireAt, pts.fire, "sg-ripple sg-fire")}
+        {big(S.iceAt, pts.ice, "sg-ripple sg-ice")}
+      </g>
     </svg>
   );
 }
 
-/** The pieces his landing nudges aside (drawn only: the position never changes): those near where he lands, and how far each goes. */
-export function nudged(fen: string, o: Orientation): { square: string; code: string; dx: number; dy: number }[] {
-  const out: { square: string; code: string; dx: number; dy: number }[] = [];
-  for (const f of "cdef")
-    for (const r of [3, 4, 5, 6]) {
+/**
+ * The pieces his storm throws (Eric, Nov 28: "the pieces in the center 5x5 fly back hard a little on the first stab, are blasted to the
+ * board's edge on the second, reset when he jumps away"; drawn only: the position never changes): every piece within `reach` of the
+ * point between his swords (% of the board: about two and a half squares, the middle five by five). As he lands, those nearest are
+ * shoved aside a little (`land`); the first stab knocks each back `knock` (less the further out it stands) with a small bounce and a
+ * tilt; the second blasts it along its line from him to the board's edge (`edge`: an edge square's middle; pieces on one line land one
+ * behind another, `queue` apart), tumbling `turns` on the way, a hop high `hop`, a bounce off the edge; as he leaps away each flies home.
+ * A thrown piece trails two ghosts while it moves (`trailMs` apart). `rippleMs`, `rippleGap`: each stab's two big ripples.
+ */
+export const THROW = { reach: 36, land: 6.5, knock: 10, knockMs: 320, blastMs: 560, edge: 6.25, queue: 8, turns: 1.5, hop: 7, trailMs: 45, rippleMs: 950, rippleGap: 170 } as const;
+export interface Thrown {
+  square: string;
+  code: string;
+  /** Its way out from him (a unit), and how far it goes at each beat (% of the board): the landing's shove, the knock, the edge. */
+  ux: number;
+  uy: number;
+  shove: number;
+  knock: number;
+  far: number;
+  /** Which way it tumbles (1 or -1). */
+  spin: number;
+}
+let thrownMemo: { key: string; list: Thrown[] } | null = null;
+export function nudged(fen: string, o: Orientation): Thrown[] {
+  const key = `${fen.split(" ")[0]}:${o}`;
+  if (thrownMemo?.key === key) return thrownMemo.list;
+  const from: Pt = { x: STORM_STAND.x, y: STORM_STAND.y - 3 };
+  const out: (Thrown & { d: number })[] = [];
+  for (const f of "abcdefgh")
+    for (let r = 1; r <= 8; r++) {
       const square = `${f}${r}`;
       const pc = pieceAt(fen, square);
       if (!pc) continue;
       const c = centreOf(square, o);
-      const vx = c.x - STORM_STAND.x;
-      const vy = c.y - (STORM_STAND.y - 6);
-      const d = Math.max(1, Math.hypot(vx, vy));
-      const push = Math.max(0, (24 - d) / 24) * 6.5;
-      if (push < 0.5) continue;
-      out.push({ square, code: `${COLOR[pc.color as "w" | "b"]} ${PIECE_WORD[pc.type] ?? "pawn"}`, dx: r2((vx / d) * push), dy: r2((vy / d) * push) });
+      let vx = c.x - from.x;
+      let vy = c.y - from.y;
+      const d = Math.hypot(vx, vy);
+      if (d > THROW.reach) continue;
+      // (Right on the spot: out to one side.)
+      if (d < 1) [vx, vy] = [f.charCodeAt(0) % 2 ? 1 : -1, 0];
+      const n = Math.max(1, Math.hypot(vx, vy));
+      const ux = vx / n;
+      const uy = vy / n;
+      // (Along its line to the box of the edge squares' middles.)
+      const E = THROW.edge;
+      const tx = ux > 0 ? (100 - E - from.x) / ux : ux < 0 ? (E - from.x) / ux : Infinity;
+      const ty = uy > 0 ? (100 - E - from.y) / uy : uy < 0 ? (E - from.y) / uy : Infinity;
+      out.push({ square, code: `${COLOR[pc.color as "w" | "b"]} ${PIECE_WORD[pc.type] ?? "pawn"}`, ux, uy, shove: Math.max(0, (24 - d) / 24) * THROW.land, knock: THROW.knock * (1 - (0.5 * d) / THROW.reach), far: Math.max(0, Math.min(tx, ty) - d), spin: (f.charCodeAt(0) + r) % 2 ? 1 : -1, d });
     }
-  return out;
+  // (Those on one line from him: the furthest out reaches the edge, each nearer one stops a little short of the one before.)
+  for (const a of out) {
+    const ahead = out.filter((b) => b !== a && b.d > a.d && a.ux * b.ux + a.uy * b.uy > 0.985).length;
+    a.far = Math.max(a.knock, a.far - ahead * THROW.queue);
+  }
+  thrownMemo = { key, list: out.map(({ d: _d, ...n }) => n) };
+  return thrownMemo.list;
 }
-/** How far the nudged pieces are out at `t` (0 on their squares, 1 all the way): out as he lands, back as the board heals. */
-const nudgeAt = (t: number): number => {
+const backOut = (u: number) => 1 + 2.2 * (clamp01(u) - 1) ** 3 + 1.2 * (clamp01(u) - 1) ** 2;
+/**
+ * Where a thrown piece is at `t` (the scene's clock): how far out along its line (% of the board), how high its hop lifts it, and its
+ * turn (degrees). On its square until his landing; shoved as he lands; knocked back at the fire sword's slam; blasted to the edge at the
+ * ice sword's; home again from his leap away (STORM_SCENE.healAt, healMs). Pure.
+ */
+export function thrownAt(n: Thrown, t: number): { out: number; up: number; turn: number; moving: boolean } {
   const S = STORM_SCENE;
-  if (t < S.nudgeAt) return 0;
-  if (t < S.healAt) return ease((t - S.nudgeAt) / S.nudgeMs);
-  return 1 - ease((t - S.healAt) / S.healMs);
+  const T = THROW;
+  const tilt = 14 * n.spin;
+  const edgeTurn = n.spin * (360 * Math.floor(T.turns) + 22);
+  if (t < S.nudgeAt) return { out: 0, up: 0, turn: 0, moving: false };
+  if (t < S.fireAt) return { out: n.shove * ease((t - S.nudgeAt) / S.nudgeMs), up: 0, turn: 0, moving: false };
+  if (t < S.iceAt) {
+    const u = (t - S.fireAt) / T.knockMs;
+    return { out: n.shove + n.knock * backOut(u), up: u < 1 ? Math.sin(Math.PI * clamp01(u)) * 2.5 : 0, turn: tilt * backOut(u), moving: u < 1 };
+  }
+  const start = n.shove + n.knock;
+  if (t < S.healAt) {
+    const u = clamp01((t - S.iceAt) / T.blastMs);
+    // (Out fast, off the edge a little and back: a bounce.)
+    const fly = 1 - (1 - Math.min(1, u / 0.72)) ** 2.4;
+    const bounce = u > 0.72 ? Math.sin(((u - 0.72) / 0.28) * Math.PI) * 3 : 0;
+    return { out: start + (n.far - start) * fly - bounce, up: Math.sin(Math.PI * Math.min(1, u / 0.72)) * T.hop * (u < 0.72 ? 1 : 0), turn: tilt + (edgeTurn - tilt) * (1 - (1 - u) ** 2), moving: u < 1 };
+  }
+  const u = clamp01((t - S.healAt) / S.healMs);
+  const back = u * u * (3 - 2 * u);
+  if (u >= 1) return { out: 0, up: 0, turn: 0, moving: false };
+  return { out: n.far * (1 - back), up: Math.sin(Math.PI * u) * T.hop * 0.6, turn: n.spin * 22 * (1 - back), moving: true };
+}
+/** A thrown piece's style there: its square's place, moved out along its line and lifted, turned about its middle. */
+const thrownStyle = (n: Thrown, o: Orientation, t: number) => {
+  const c = centreOf(n.square, o);
+  const at = thrownAt(n, t);
+  return { left: `${r2(c.x - 6.25 + n.ux * at.out)}%`, top: `${r2(c.y - 6.25 + n.uy * at.out - at.up)}%`, ...(at.turn ? { rotate: `${r2(at.turn)}deg` } : {}) };
 };
 
 /**
@@ -809,16 +892,19 @@ function stormMoment({ boss, moment, t, orientation }: MomentProps) {
   // (The page's shade is on from the first sword: his figure dims into it as he comes home, where his own stands under it.)
   const light = figLight(t >= S.fireAt, going ? 1 - flown(S.leapAt) : 1);
   const airborne = (t >= STRANGER_HOP.upAt && t < STRANGER_HOP.landAt) || (t >= S.leapAt + STRANGER_HOP.upAt && t < S.leapAt + STRANGER_HOP.landAt);
-  const out = nudgeAt(t);
   const stage = t < S.landAt ? "leap" : t < S.fireAt ? "draw" : t < S.gripAt ? "swords" : t < S.pullAt ? "charge" : t < S.leapAt ? "pull" : t < S.homeAt ? "back" : "heal";
   return (
     <div class="power-moment pm-storm" data-stage={stage}>
       <div class="hb-pieces pg-layer" aria-hidden="true">
         <Ripples t={t} />
-        {nudged(boss.board.fen, orientation).map((n) => {
-          const c = centreOf(n.square, orientation);
-          return <piece key={n.square} class={`pg-piece sg-nudge ${n.code}`} data-square={n.square} style={{ left: `${r2(c.x - 6.25 + n.dx * out)}%`, top: `${r2(c.y - 6.25 + n.dy * out)}%` }} />;
-        })}
+        {/* (The thrown pieces, off the board's own drawing until they're home: strangerBoard. Each one's trail while it flies: two
+            fainter copies, where it was a moment ago.) */}
+        {t >= S.nudgeAt &&
+          t < S.healAt + S.healMs &&
+          nudged(boss.board.fen, orientation).flatMap((n) => [
+            ...(t >= S.fireAt && thrownAt(n, t).moving ? [2, 1].map((k) => <piece key={`${n.square}-trail${k}`} class={`pg-piece sg-nudge sg-trail ${n.code}`} style={{ ...thrownStyle(n, orientation, t - k * THROW.trailMs), opacity: String(0.14 * (3 - k)) }} />) : []),
+            <piece key={n.square} class={`pg-piece sg-nudge ${n.code}`} data-square={n.square} style={thrownStyle(n, orientation, t)} />,
+          ])}
         {airborne && !going && <span class="pg-shadow" style={{ left: `${r2(STORM_STAND.x)}%`, top: `${r2(STORM_STAND.y)}%`, width: "14%", height: "4%" }} />}
         <span class={`pg-pig sg-fig${t >= S.gripAt && t < S.pullAt ? " sg-charge" : ""}`} style={{ ...figBox(feet), ...light }} data-anim={anim.anim}>
           <BossMoment key={`${moment.key}:${anim.anim}:${anim.since}`} boss={boss.name} anim={anim.anim} since={waiting ? 0 : moment.at + anim.since} then={anim.anim === "stormCharge" || waiting ? undefined : "idle"} />

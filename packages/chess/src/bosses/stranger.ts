@@ -39,12 +39,13 @@ type StrangerSettings = BossPowerSettings["stranger"];
  * pieces there nudged aside from `nudgeAt`, drawn only); his swords out by `drawnAt`; the fire sword driven in at `fireAt`, the ice
  * sword at `iceAt`, the board cracking round each and pulsing its color; the storm gathering round the board from `fireAt`; his grip on
  * both hilts at `gripAt` (his red and blue aura, the charge building), the full swirl at `fullAt`; the swords out at `pullAt`; off the
- * board at `leapAt`, home at `homeAt`; the cracks heal and the pieces slide back over `healAt` to `healAt + healMs`; the end, `ms`.
+ * board at `leapAt`, home at `homeAt`; the pieces his swords threw fly back to their squares over `healAt` to `healAt + healMs`, from
+ * his leap away (Eric, Nov 28: "reset when he jumps away"); the end, `ms`.
  * Its banner is up before all of it (boss-timing.ts POWER_BANNERS: the whole banner is the moment's lead), so nothing he does on the
  * board is behind it (Eric, Nov 27: "look at the banner and look at every frame"); `leapAt` is his swords home again (the whole of
  * `stormPull`, 840 ms after `pullAt`), so his leap back never cuts the sheathing short.
  */
-export const STORM_SCENE = { upAt: 90, landAt: 480, nudgeAt: 400, nudgeMs: 240, drawnAt: 1240, fireAt: 1650, iceAt: 2450, gripAt: 4750, fullAt: 7350, pullAt: 7850, leapAt: 8690, homeAt: 9170, healAt: 9170, healMs: 700, ms: 10000 } as const;
+export const STORM_SCENE = { upAt: 90, landAt: 480, nudgeAt: 400, nudgeMs: 240, drawnAt: 1240, fireAt: 1650, iceAt: 2450, gripAt: 4750, fullAt: 7350, pullAt: 7850, leapAt: 8690, homeAt: 9170, healAt: 8780, healMs: 700, ms: 10000 } as const;
 
 /**
  * How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts): the strike (his banner, the swords' tips together,
