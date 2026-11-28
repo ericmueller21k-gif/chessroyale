@@ -128,8 +128,8 @@ describe("his oven timers (the review of Nov 11)", () => {
   const view = (startMove: number, z: Z, events: PowerEvent[] = [], turn = 3) =>
     ({ id: "zebra", name: "Don Dough", startMove, powers: { events, turn, zebra: { gold: [], ...z } } }) as unknown as BossView;
   /** The timers' slots as drawn: each slot's attributes and its timer's props. */
-  const slots = (b: BossView, moments: Moment[] = []) => {
-    const root = OvenTimers({ boss: b, moments: () => moments }) as VNode<{ children: VNode<Record<string, unknown>>[] }>;
+  const slots = (b: BossView, moments: Moment[] = [], crowdMoved = false) => {
+    const root = OvenTimers({ boss: b, moments: () => moments, crowdMoved }) as VNode<{ children: VNode<Record<string, unknown>>[] }>;
     return root.props.children.map((s) => ({ ...s.props, timer: (s.props.children as VNode<Record<string, unknown>> | undefined)?.props }));
   };
 
@@ -149,10 +149,28 @@ describe("his oven timers (the review of Nov 11)", () => {
     const first = slots(view(102, lump(3)))[0]!.timer;
     const again = slots(view(102, lump(3)))[0]!.timer;
     expect(again).toEqual(first);
-    // (The roll is chosen once per minute, in the timer's effect.)
-    expect(timerRun("t:102", "p", 4)).toBeNull();
-    expect(timerRun("t:102", "p", 3)).toBe("pRoll04");
-    expect(timerRun("t:102", "p", 3)).toBeNull();
+    // (The roll is chosen once per minute, in the timer's effect; a timer drawn afresh at that minute plays the same roll from its
+    // start, as the screen changes from your move's to his turn's (#1026: it had restarted at the still, the roll cut).)
+    expect(timerRun("t:102", "p", 4, 1000)).toBeNull();
+    expect(timerRun("t:102", "p", 3, 2000)).toEqual({ run: "pRoll04", at: 2000, again: false });
+    expect(timerRun("t:102", "p", 3, 2100)).toEqual({ run: "pRoll04", at: 2000, again: true });
+    expect(timerRun("t:102", "p", 4, 2200)).toBeNull();
+  });
+
+  it("a minute off on every turn (Eric, Nov 27: \"8 and then to 7 to 6\"): yours as your move goes in, his as he moves; the rules' count (when it rises) is the view's, untouched", () => {
+    const lump = (left: number) => ({ lumps: [{ n: 0, slot: 0, piece: "p", square: "h5", left, at: 1 }] });
+    const shown = (left: number, crowdMoved: boolean) => (slots(view(105, lump(left)), [], crowdMoved)[0]!.timer as { left: number }).left;
+    expect(shown(8, false), "your turn").toBe(8);
+    expect(shown(8, true), "your move in, being judged (the view hasn't counted it)").toBe(7);
+    expect(shown(7, true), "the view counts it while it's judged: no second drop").toBe(7);
+    expect(shown(7, false), "his turn, as he thinks").toBe(7);
+    expect(shown(6, false), "his move").toBe(6);
+    expect(shown(6, true), "your next move in").toBe(5);
+    expect(shown(5, false)).toBe(5);
+    // (Never under 00: at 01 your move shows 00, and it rises when the rules say, as his turn begins.)
+    expect(shown(1, false)).toBe(1);
+    expect(shown(1, true)).toBe(0);
+    expect(shown(0, true)).toBe(0);
   });
 
   it("two lumps rising on one move each have their own moment (their own line), after your move and after his", () => {
@@ -189,7 +207,8 @@ describe("his sounds", () => {
       expect(peak, name).toBeLessThan(MOVE_PEAK / 2);
       const db = 10 * Math.log10(sum / s.length);
       expect(db, name).toBeLessThan(MOVE_MEAN_DB - 2);
-      expect(db, name).toBeGreaterThan(MOVE_MEAN_DB - 7);
+      // (The timer's roll 30% under its old level, about 3 dB more: Eric, Nov 27, "drop it about 30%".)
+      expect(db, name).toBeGreaterThan(MOVE_MEAN_DB - (name === "roll" ? 10.2 : 7));
       expect(s, `${name} is the same every time`).toEqual(zebraSound(name, 44100));
     }
   });

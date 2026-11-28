@@ -340,8 +340,8 @@ const LEVEL: Record<ZebraSound, number> = {
   snap: 0.905,
   lob: 0.269,
   plop: 0.247,
-  // (Quieter than the rest: it plays on every move.)
-  roll: 0.145,
+  // (Quieter than the rest: it plays on every move. Eric, Nov 27: "drop it about 30%": 0.145 x 0.7.)
+  roll: 0.1015,
   ding: 0.161,
   rise: 0.186,
   ovenPop: 0.448,
