@@ -40,6 +40,8 @@ async function open(page: Page, sky: string) {
   await page.goto(`/town?sky=${sky}`);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
   await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
+  // (The bots held where they stand as it opens: one on a square a test walks to left you a step short; main 182e1fa0, desktop.)
+  await page.evaluate(() => (window as unknown as { __townStill: () => void }).__townStill());
 }
 
 /** Every figure drawn (a boss, a bot, you) whole inside the world's box (Eric, Nov 4), its foot on screen; a faded one may be off. */
