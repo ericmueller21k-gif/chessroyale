@@ -57,3 +57,7 @@ realize, organize, meter, canceled, traveled. Don't rename existing code identif
   The scripts in `scripts/` default to `E2E_PORT` too.
 - For stills or measurements that need a live server, run them as a Playwright spec or script under that same webServer.
 - If a port still won't free after one `fuser -k`, stop and tell the director the port. Don't retry in a loop or hold /tmp/claude-0/e2e.lock while waiting.
+
+**Hand-off files must be committed and pushed (Nov 28):** `.pr-body.md` and `.done` (and `.done2`, `.mockup`) are how the director knows
+you've finished: `git add -f` them, commit and push. A `.done` left in your working tree is never seen (Nov 28: a finished flake fix sat
+unseen for 90 minutes while main stayed red). Check with `git ls-remote` / `git show origin/<branch>:.done` before you stop.
