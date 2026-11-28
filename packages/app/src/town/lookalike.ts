@@ -13,10 +13,14 @@
  * Pixel scale and palette as the town's (37 px a square, town-kit.ts's keys). No words or brands on anything.
  */
 import type { LightSpot } from "./houses/kit.ts";
+import { GLYPHS as SIGN_GLYPHS, lineWidth } from "./sign-font.ts";
 import {
   awning, box, character, cornice, doorAt, flatRoof, flowerBox, gable, gableRoof, MAT, paletteOf, quadF, sideArt, SQ, vaultRoof, WARM, windowAt,
   type Colourway, type Face, type Mat, type Piece, type TownBox,
 } from "./town-kit.ts";
+
+/** MOCKUP ONLY (town-shop-mockup): the front that becomes the shop (South Street, between Folio's and Alfil's). */
+export const MOCK_SHOP_SEED = 880132934;
 
 /** A look-alike's recipe: its seed (every choice), its width (px), its height class and, at a corner, which side is a second front. */
 export interface LookSpec {
@@ -123,6 +127,7 @@ export function lookalikeWith(spec: LookSpec): { box: TownBox; parts: LookParts 
     extra: r() < 0.3 ? { g: WALLS[wallI]![2], G: WALLS[wallI]![1] } : undefined,
   };
   const pal = paletteOf(cw);
+  if (spec.seed === MOCK_SHOP_SEED) Object.assign(pal, { z: "#1e3d33", Z: "#b58863", "1": "#f0d9b5" });
   const floors = spec.floors ?? FLOORS[spec.tall] + (spec.tall < 3 && W >= 90 && r() < 0.25 ? 1 : 0);
   // A narrow front (under a square and a half) keeps to a slim cap; a landmark takes the tallest.
   let cap: Cap = pick(r, CAPS);
@@ -208,7 +213,68 @@ export function lookalikeWith(spec: LookSpec): { box: TownBox; parts: LookParts 
     if (balcony && f === 1 && cols >= 2) P.push(box(colX(0) - 4, fy + wh, colX(cols - 1) + ww - colX(0) + 8, 7, (i, j) => (j === 0 || j === 6 ? "X" : i % 3 === 0 ? "X" : null)));
   }
   // The ground floor: a shop (an awning over a big window and a glazed door) or a house's (a door and a window or two).
-  if (shop) {
+  if (spec.seed === MOCK_SHOP_SEED) {
+    // MOCKUP ONLY (town-shop-mockup): the shop's own ground floor: a signboard, a double door, a board in each window.
+    const sy = gTop - 2;
+    const sh = 14;
+    const text = "PAWN SHOP";
+    const tw = lineWidth(text) * 2;
+    const tx = Math.round((W - tw) / 2);
+    const lit = new Set<string>();
+    {
+      let x = 0;
+      for (const ch of text) {
+        if (ch === " ") { x += 2; continue; }
+        const g = SIGN_GLYPHS[ch]!;
+        g.forEach((row, j) => [...row].forEach((c, i) => c === "#" && lit.add(`${x + i},${j}`)));
+        x += g[0]!.length + 1;
+      }
+    }
+    P.push(box(2, sy, W - 4, sh, (i, j) => {
+      const w2 = W - 4;
+      if (i === 0 || j === 0 || i === w2 - 1 || j === sh - 1) return "y";
+      const lx = Math.floor((i + 2 - tx) / 2), ly = Math.floor((j - 2) / 2);
+      if (j >= 2 && j < 12 && lit.has(`${lx},${ly}`)) return "y";
+      // A little board at each end of the sign.
+      for (const bx of [5, w2 - 13]) if (i >= bx && i < bx + 8 && j >= 3 && j < 11) return ((i - bx) >> 1) % 2 === ((j - 3) >> 1) % 2 ? "1" : "Z";
+      return "z";
+    }));
+    const dw = 26;
+    const dx = Math.round(W / 2 - dw / 2);
+    const dy = gTop + 13;
+    const dh = F - 3 - dy;
+    // The double door: two glazed leaves in a brass frame, lit from inside.
+    P.push(box(dx - 2, dy - 2, dw + 4, dh + 2, (i, j) => (i < 2 || i >= dw + 2 || j < 2 ? (i === 0 || j === 0 ? "y" : "Y") : null)));
+    for (const k of [0, 1]) {
+      const x0 = dx + k * (dw / 2);
+      P.push(box(x0, dy, dw / 2, dh, (i, j) => {
+        const w1 = dw / 2;
+        if (i === 0 || i === w1 - 1 || j === 0 || j === dh - 1) return "m";
+        if (j > 1 && j < dh - 7 && i > 1 && i < w1 - 2) return i + j < 9 ? "I" : i + j < 16 ? "j" : "i";
+        if (j === Math.floor(dh * 0.62) && i === (k ? 2 : w1 - 3)) return "y";
+        return "l";
+      }, false));
+    }
+    L.push({ x: dx + 2, y: dy + 2, w: dw - 4, h: dh - 9, keys: "ijI", color: WARM, strength: 1 });
+    P.push(box(dx - 4, F - 3, dw + 8, 3, (_i, j) => (j === 0 ? "g" : "x")));
+    // The two windows: an awning each, a chessboard on show.
+    for (const [x0, x1] of [[4, dx - 5], [dx + dw + 5, W - 4]] as const) {
+      const ww2 = x1 - x0;
+      const wy = gTop + 16;
+      const hh = F - 4 - wy;
+      P.push(box(x0, wy, ww2, hh, (i, j) => {
+        if (i === 0 || j === 0 || i === ww2 - 1 || j === hh - 1) return "g";
+        const bx = Math.round(ww2 / 2) - 8, by = 2;
+        if (i >= bx - 1 && i < bx + 17 && j >= by - 1 && j < by + 17) {
+          if (i < bx || i >= bx + 16 || j < by || j >= by + 16) return "Y";
+          return ((i - bx) >> 1) % 2 === ((j - by) >> 1) % 2 ? "1" : "Z";
+        }
+        return i + j < 10 ? "j" : "i";
+      }));
+      L.push({ x: x0 + 1, y: wy + 1, w: ww2 - 2, h: hh - 2, keys: "ijI", color: WARM, strength: 1 });
+      P.push(awning(x0 - 2, gTop + 12, ww2 + 4, 3, true));
+    }
+  } else if (shop) {
     const dw = 14;
     const winW = W - dw - 14;
     const wy = gTop + 12;

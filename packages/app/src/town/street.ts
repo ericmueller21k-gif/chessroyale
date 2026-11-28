@@ -206,7 +206,7 @@ export interface StreetProp {
   y: number;
   v: number;
 }
-export const STREET_PROPS: readonly StreetProp[] = (PLAN.props as StreetProp[]).filter((p) => !(p.kind !== "lamp" && inRow(Math.round(p.x), Math.round(p.y))));
+export const STREET_PROPS: readonly StreetProp[] = (PLAN.props as StreetProp[]).filter((p) => !(p.kind !== "lamp" && inRow(Math.round(p.x), Math.round(p.y)))).map((p) => (p.kind === "lamp" && p.x === 31 && p.y === 16 ? { ...p, x: 32.6 } : p)); // MOCKUP ONLY: the lamp before the shop's door stands aside
 
 /** The park (the plus): its first column, its north row, its size. Its 12 tables (stools west and east of each) and the fountain's four squares. */
 export const STREET_PARK = { c0: PLAN.park.c0, r1: PLAN.park.r1, w: PLAN.park.w, d: PLAN.park.d } as const;

@@ -7,7 +7,7 @@ import { art2d } from "./paint.ts";
 
 
 /** Each glyph's rows ('#' lit). */
-const GLYPHS: Record<string, readonly string[]> = {
+export const GLYPHS: Record<string, readonly string[]> = {
   A: [".#.", "#.#", "###", "#.#", "#.#"],
   B: ["##.", "#.#", "##.", "#.#", "##."],
   C: [".##", "#..", "#..", "#..", ".##"],
