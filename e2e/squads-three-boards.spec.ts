@@ -59,9 +59,13 @@ async function play(page: Page, uci: string) {
   await expect.poll(async () => (await seen(page)).mine, { timeout: 5_000 }).toBe(uci);
 }
 
+// (A quiet move if there is one, else any but a promotion: the bots' positions are random, and now and then every legal move is a
+// capture, Nov 28; a capture taps the same two squares.)
 const quiet = (fen: string) => {
-  const m = new Chess(fen).moves({ verbose: true }).find((x) => !x.captured && !x.promotion)!;
-  return m.from + m.to;
+  const legal = new Chess(fen).moves({ verbose: true }).filter((x) => !x.promotion);
+  const m = legal.find((x) => !x.captured) ?? legal[0];
+  expect(m, `a move to make in ${fen}`).toBeTruthy();
+  return m!.from + m!.to;
 };
 
 /** A Relay test lobby (Classic, White on your first board), past the votes. */
