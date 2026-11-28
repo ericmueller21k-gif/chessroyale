@@ -47,14 +47,15 @@ const chunk = (type: string, body: Uint8Array) => {
   out.writeUInt32BE(crc32(out.subarray(4, 8 + body.length)), 8 + body.length);
   return out;
 };
-export function png(w: number, h: number, data: Uint8Array): Buffer {
+/** RGBA pixels as a PNG (8 bits a channel, no filter; `level`: zlib's, 9 the smallest). */
+export function png(w: number, h: number, data: Uint8Array, level = 9): Buffer {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(w, 0);
   ihdr.writeUInt32BE(h, 4);
   ihdr.set([8, 6, 0, 0, 0], 8);
   const raw = Buffer.alloc((w * 4 + 1) * h);
   for (let y = 0; y < h; y++) Buffer.from(data.buffer, data.byteOffset + y * w * 4, w * 4).copy(raw, y * (w * 4 + 1) + 1);
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw, { level: 9 })), chunk("IEND", new Uint8Array())]);
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw, { level })), chunk("IEND", new Uint8Array())]);
 }
 
 /** The first row with a drawn pixel. */

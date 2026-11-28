@@ -37,7 +37,7 @@ import type { LightPool, LightSpot } from "./houses/kit.ts";
 import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES } from "./houses/park.ts";
 import { statueArt } from "./houses/statues.ts";
 import type { PaintSpec } from "./paint-jobs.ts";
-import type { SidekickSheet } from "./sidekick-sheets.ts";
+import { SIDEKICK_SHEETS, type SidekickSheet } from "./sidekick-sheets.ts";
 import { STREET_BUILDINGS, STREET_LOTS, type StreetLot } from "./street.ts";
 import { COLISEUM_PLACE, HOMES, PROPS, STATUES, TOWN_BOTS, hasFigure, isSprite, type Home, type HomeId, type IndoorId, type NoFigureId, type Place, type TownBossId } from "./world.ts";
 
@@ -279,9 +279,16 @@ export function townWants(art: TownArt): Want[] {
   return out;
 }
 
-/** The sidekicks' sheets this town shows (scripts/bake-sidekicks.ts made each: a picture file as it is), each once: a group of its own. */
-export function townSheets(): SidekickSheet[] {
-  const out = new Set<SidekickSheet>();
-  for (const b of TOWN_BOTS) if (isSprite(b.look)) out.add(b.look.sprite);
+/**
+ * The sidekicks' sheets this town shows, each once, by its name in SIDEKICK_SHEETS: its picture file's name too (sidekicks/<name>.png,
+ * made by scripts/bake-sidekicks.ts). Each is a group of its own, a file as it is.
+ */
+export function townSheets(): string[] {
+  const out = new Set<string>();
+  for (const b of TOWN_BOTS) {
+    if (!isSprite(b.look)) continue;
+    const sheet = b.look.sprite;
+    out.add(Object.keys(SIDEKICK_SHEETS).find((k) => (SIDEKICK_SHEETS as Record<string, SidekickSheet>)[k] === sheet)!);
+  }
   return [...out];
 }

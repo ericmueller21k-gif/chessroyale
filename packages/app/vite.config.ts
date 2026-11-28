@@ -8,6 +8,7 @@ import { defineConfig, type Plugin } from "vite";
 import preact from "@preact/preset-vite";
 import { APP_CACHE } from "../core/src/settings.ts";
 import { townArt } from "./town-art.ts";
+import { TOWN_PICTURES_DIR, bakeTown, report } from "../../scripts/bake-town.ts";
 
 const require = createRequire(import.meta.url);
 /** This config's own folder (packages/app): its files resolve from here, whichever folder Vite was started from. */
@@ -59,6 +60,23 @@ function maiaBox(): Plugin {
   };
 }
 
+/**
+ * Bakes Chess Town's pictures (scripts/bake-town.ts; Nov 28, the town's structure, phase 1a): the build paints every picture the town
+ * draws that is the same for every player and writes them, with their manifest, into public/town-pictures/ (not committed), so they're
+ * served at /town-pictures/. It prints what each group cost (pictures, pixels, bytes) and the totals. Nothing reads them yet: the town
+ * still paints on the device until phase 1b, so the service worker doesn't precache them (`serviceWorker` below) and the dev server
+ * doesn't bake. docs/decisions/2026-11-28-town-bake.md.
+ */
+function townPictures(): Plugin {
+  return {
+    name: "bake-town",
+    apply: "build",
+    async buildStart() {
+      console.log(report(await bakeTown(join(APP, "public", TOWN_PICTURES_DIR))));
+    },
+  };
+}
+
 function listFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -93,6 +111,8 @@ function serviceWorker(): Plugin {
         // Nor the bosses' music (Nov 11, 1 to 2 MB a piece): fetched after the town's first frame or when its battle needs it
         // (music.ts), then kept in a cache of its own, piece by piece (MUSIC_HASHES below, MUSIC in sw-template.js).
         .filter((f) => !f.startsWith("/music/"))
+        // Nor the baked town (Nov 28, phase 1a: nothing reads it yet; phase 1b decides how the worker keeps its files).
+        .filter((f) => !f.startsWith(`/${TOWN_PICTURES_DIR}/`))
         // Hosts redirect /index.html to /, and a cached redirect can't answer a page load.
         .map((f) => (f === "/index.html" ? "/" : f))
         .sort();
@@ -176,7 +196,7 @@ function maiaFileBytes(): Record<string, number> {
 // change the art keeps them: town-art.ts. The dev server keeps no pictures, so it takes none.)
 export default defineConfig(async ({ command }) => ({
   define: { __MAIA_FILE_BYTES__: JSON.stringify(maiaFileBytes()), __APP_VERSION__: JSON.stringify(VERSION), __TOWN_ART__: JSON.stringify(command === "build" ? await townArt() : "dev") },
-  plugins: [stockfish(), maiaBox(), preact(), serviceWorker(), versionFile()],
+  plugins: [stockfish(), maiaBox(), townPictures(), preact(), serviceWorker(), versionFile()],
   server: { host: true },
   build: { target: "es2020", chunkSizeWarningLimit: 1000 },
 }));
