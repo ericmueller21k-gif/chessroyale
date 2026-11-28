@@ -38,6 +38,11 @@ async function tapSquare(page: Page, sq: string) {
 
 const arrows = (page: Page) => page.locator(`.board-area ${BOARD_SEL.arrowLine}`);
 const labels = (page: Page) => page.locator(".board-area svg.hb-labels text");
+/**
+ * How many cheat lines a position has: the engine's top 3, or every legal move when there are fewer (in check with two
+ * replies, the engine gives two lines). The bots' moves differ every run, so the Relay position sometimes has fewer.
+ */
+const linesIn = (fen: string) => Math.min(3, new Chess(fen).moves().length);
 
 test("the start link seats you with bots at once at the first vote; Skip votes; Cheat lines draws the top 3 on your Relay move and stays on", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
@@ -62,11 +67,11 @@ test("the start link seats you with bots at once at the first vote; Skip votes; 
   await expect(arrows(page)).toHaveCount(0);
   await cheat.click();
   await expect(cheat).toHaveAttribute("aria-pressed", "true");
-  await expect(arrows(page)).toHaveCount(3, { timeout: 30_000 });
-  await expect(labels(page)).toHaveCount(3);
+  await expect(arrows(page), first.fen).toHaveCount(linesIn(first.fen), { timeout: 30_000 });
+  await expect(labels(page)).toHaveCount(linesIn(first.fen));
   for (const t of await labels(page).allTextContents()) expect(t).toMatch(/^([+−]\d\.\d|0\.0|#-?\d+)$/);
   if (!phone) {
-    await expect(page.locator(".sq-cheat-lines li")).toHaveCount(3);
+    await expect(page.locator(".sq-cheat-lines li")).toHaveCount(linesIn(first.fen));
     await expect(page.locator(".sq-cheat-lines li").first()).toContainText(/^1 · /);
   }
   // Your move made: nothing left to choose here, so the arrows go until your next choice (and the switch: grayed on a
@@ -81,7 +86,7 @@ test("the start link seats you with bots at once at the first vote; Skip votes; 
   const second = await nextDuty(page, first.at);
   expect(second.fen).not.toBe(first.fen);
   await expect(page.getByRole("button", { name: "Cheat lines" })).toHaveAttribute("aria-pressed", "true");
-  await expect(arrows(page)).toHaveCount(3, { timeout: 30_000 });
+  await expect(arrows(page), second.fen).toHaveCount(linesIn(second.fen), { timeout: 30_000 });
   // Off again: the arrows go.
   await page.getByRole("button", { name: "Cheat lines" }).click();
   await expect(arrows(page)).toHaveCount(0);
