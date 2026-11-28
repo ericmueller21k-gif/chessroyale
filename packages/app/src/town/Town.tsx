@@ -103,6 +103,9 @@ import "./town.css";
 import { chunk, setPlace, takePlace } from "../stale.ts";
 
 const CHIPS = TOWN_FEEL.maxChips;
+/** The town's art's fingerprint (vite.config.ts's `__TOWN_ART__`, made by packages/app/town-art.ts): the kept pictures' key (`loadTown`). */
+declare const __TOWN_ART__: string | undefined;
+const TOWN_ART = typeof __TOWN_ART__ === "string" ? __TOWN_ART__ : "dev";
 /** A chip's face's canvas, in pixels a side (twice its size on the page). */
 const CHIP_FACE_PX = 92;
 
@@ -1568,9 +1571,6 @@ export const GATE_YOUNG = "Accounts are for players 13 and older.";
  * sidekicks' sheets downloaded (`TOWN_FEEL.loadPaintShare` of the bar); "building": the pictures put on the GPU for good. (The music
  * is no step since Nov 14: it comes after the first frame.)
  */
-/** The town's art's fingerprint (vite.config.ts's `__TOWN_ART__`, made by packages/app/town-art.ts): the kept pictures' key (`loadTown`). */
-declare const __TOWN_ART__: string | undefined;
-const TOWN_ART = typeof __TOWN_ART__ === "string" ? __TOWN_ART__ : "dev";
 const LOAD_STEPS = { pictures: "Loading the town's pictures…", building: "Building the town…" } as const;
 type LoadStep = keyof typeof LOAD_STEPS;
 
@@ -2044,7 +2044,7 @@ function startTown(
   const chipPlace: (Place | null)[] = chipEls.map(() => null);
   const chipDrawn: (Place | null)[] = chipEls.map(() => null);
   const chipFrom: number[] = chipEls.map(() => -1);
-  /** (Tests, `hookPaint`) How many chips' faces have been drawn: one a place, at most (`chipFaceFor`). */
+  /** (Tests, `hookChips`) How many chips' faces have been drawn: one a place, at most (`chipFaceFor`). */
   let chipFaces = 0;
   // ---- The close-up on a statue: which (its index in STATUES; -1: none, also once the glide out ends), whether the
   // camera is gliding in (or out), how far (0 to 1, linear in time), and a tap on a statue that sent you walking (the
@@ -3016,7 +3016,7 @@ function startTown(
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0, art: TOWN_ART }, tagsQueued: r.tagsQueued, chipFaces };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 }, tagsQueued: r.tagsQueued };
   };
   /** (Tests) A hash of every picture the loading screen kept, their pixels in order: a later visit's must be the first's. */
   const hookPictureSum = (each = false) => {
@@ -3042,7 +3042,9 @@ function startTown(
     const p = plan(pickTap(x, y));
     return p ? { key: p.key, dest: p.dest, card: p.card?.kind ?? null } : null;
   };
-  const offHooks = setHooks({ __townAt: hookAt, __townPick: hookPick, __townGlide: hookGlide, __townGather: hookGather, __townCam: hookCam, __townSeat: hookSeat, __townTables: hookTables, __townCall: hookCall, __townBots: hookBots, __townTurns: hookTurns, __townPlayer: hookPlayer, __townFull: hookFull, __townBossBack: hookBossBack, __townTags: hookTags, __townHold: hookHold, __townPaint: hookPaint, __townBench: hookBench, __townWalk: hookWalk, __townPace: hookPace, __townHeading: hookHeading, __townHush: hookHush, __townStill: hookStill, __townRide: hookRide, __townYou: hookYou, __townHere: hookHere, __townReport: hookReport, __townPictureSum: hookPictureSum });
+  /** (Tests) The chips: how many faces have been drawn (one a place at most, `chipFaceFor`). */
+  const hookChips = () => (testSwitchesAllowed() ? { faces: chipFaces } : null);
+  const offHooks = setHooks({ __townChips: hookChips, __townAt: hookAt, __townPick: hookPick, __townGlide: hookGlide, __townGather: hookGather, __townCam: hookCam, __townSeat: hookSeat, __townTables: hookTables, __townCall: hookCall, __townBots: hookBots, __townTurns: hookTurns, __townPlayer: hookPlayer, __townFull: hookFull, __townBossBack: hookBossBack, __townTags: hookTags, __townHold: hookHold, __townPaint: hookPaint, __townBench: hookBench, __townWalk: hookWalk, __townPace: hookPace, __townHeading: hookHeading, __townHush: hookHush, __townStill: hookStill, __townRide: hookRide, __townYou: hookYou, __townHere: hookHere, __townReport: hookReport, __townPictureSum: hookPictureSum });
 
   /**
    * The loading screen (Nov 11, Eric: "loads it all in at once and then it stays there if you go in and out of buildings"): every
@@ -3147,8 +3149,8 @@ function startTown(
   /** (`loadTown`) The last visit's pictures, if they were kept: their pages let go as the town closes. */
   let kept: Restored | null = null;
   /** (Tests, `hookPaint`) The kept pictures: loaded from the last visit; how long reading them took (ms); what this visit kept (bytes;
-   * null: nothing; undefined: not yet) and how long that took. */
-  const pictures: { kept: boolean; restoreMs: number; saved: number | null | undefined; saveMs: number; workers: number; byWorkers: number; whileWaiting: number } = { kept: false, restoreMs: 0, saved: undefined, saveMs: 0, workers: 0, byWorkers: 0, whileWaiting: 0 };
+   * null: nothing; undefined: not yet) and how long that took; the art's fingerprint they're keyed by. */
+  const pictures: { kept: boolean; restoreMs: number; saved: number | null | undefined; saveMs: number; workers: number; byWorkers: number; whileWaiting: number; art: string } = { kept: false, restoreMs: 0, saved: undefined, saveMs: 0, workers: 0, byWorkers: 0, whileWaiting: 0, art: TOWN_ART };
   /** (`loadTown`) The first visit's paint workers while its loading screen runs. */
   let pool: PaintPool | null = null;
   let keepLater: (() => void) | null = null;
