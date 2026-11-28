@@ -1,0 +1,11 @@
+Town phase 2: the text-size stills are up, for the director (branch stills/town-phase2, 5 images and a README).
+
+Before (a picture for every size), new with one size (a tag made at 12 px, a home's name at 20, scaled by the GPU), new with two sizes
+(9 and 12; 14 and 20): the names and tags at every zoom step, a phone and a computer.
+- Phone (the canvas at 2x): the three can't be told apart.
+- Computer at 1x: the smallest tags (8 px) are a touch softer with one size; two sizes doesn't improve them (9 scaled to 8 is as soft
+  as 12 scaled to 8). The names read the same. `text-smallest-tags-computer-7x.png` is that hardest case, 7 times over.
+
+So the branch is built with one size (the brief's default) and I'm going on with the rest. If you'd rather have two sizes it's one line
+each in packages/app/src/town/feel.ts (`tagPicSizes: [9, 12]`, `namePicSizes: [14, 20]`): nothing else changes. Text pixels on the
+phone: 8.67 M before, 1.29 M with one size.

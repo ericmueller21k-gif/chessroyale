@@ -2926,6 +2926,8 @@ function startTown(
   // ... `__townTags()`: the name tags drawn in the last frame: name, kind ("you", "bot", "sidekick"), alpha, pill and ink colors, and
   // where the pill is on the screen (Oct 28: they show only near you unless Town settings says "Everyone"; a sidekick's is blue).
   const hookTags = () => (testSwitchesAllowed() ? r.tagList() : null);
+  // ... `__townNames()`: the homes' floating names drawn in the last frame (render.ts namesList).
+  const hookNames = () => (testSwitchesAllowed() ? r.namesList() : null);
   // ... `__townTurns(ms)`: the bots' turns every `ms` instead of a minute, the next one now (to watch one go home and another come out).
   const hookTurns = (ms: number) => {
     if (!testSwitchesAllowed()) return;
@@ -3090,7 +3092,7 @@ function startTown(
   };
   /** (Tests) The chips: how many faces have been drawn (one a place at most, `chipFaceFor`). */
   const hookChips = () => (testSwitchesAllowed() ? { faces: chipFaces } : null);
-  const offHooks = setHooks({ __townChips: hookChips, __townAt: hookAt, __townPick: hookPick, __townGlide: hookGlide, __townGather: hookGather, __townCam: hookCam, __townSeat: hookSeat, __townTables: hookTables, __townCall: hookCall, __townBots: hookBots, __townTurns: hookTurns, __townPlayer: hookPlayer, __townFull: hookFull, __townBossBack: hookBossBack, __townTags: hookTags, __townHold: hookHold, __townPaint: hookPaint, __townBench: hookBench, __townWalk: hookWalk, __townPace: hookPace, __townHeading: hookHeading, __townHush: hookHush, __townStill: hookStill, __townRide: hookRide, __townYou: hookYou, __townHere: hookHere, __townReport: hookReport, __townPictureSum: hookPictureSum });
+  const offHooks = setHooks({ __townChips: hookChips, __townAt: hookAt, __townPick: hookPick, __townGlide: hookGlide, __townGather: hookGather, __townCam: hookCam, __townSeat: hookSeat, __townTables: hookTables, __townCall: hookCall, __townBots: hookBots, __townTurns: hookTurns, __townPlayer: hookPlayer, __townFull: hookFull, __townBossBack: hookBossBack, __townTags: hookTags, __townNames: hookNames, __townHold: hookHold, __townPaint: hookPaint, __townBench: hookBench, __townWalk: hookWalk, __townPace: hookPace, __townHeading: hookHeading, __townHush: hookHush, __townStill: hookStill, __townRide: hookRide, __townYou: hookYou, __townHere: hookHere, __townReport: hookReport, __townPictureSum: hookPictureSum });
 
   /**
    * The loading screen (Nov 11, Eric: "loads it all in at once and then it stays there if you go in and out of buildings"): every

@@ -1123,6 +1123,7 @@ export class Renderer {
     this.drawHorizonHaze(); // on the ground, behind every home, boss and pawn
     if (TOWN_FEEL.rimLine) this.drawRimLine();
     this.nTags = 0;
+    this.nNames = 0;
     this.nZzz = 0;
     this.nClear = 0;
     this.bubble.on = false;
@@ -1415,10 +1416,11 @@ export class Renderer {
   }
 
   /**
-   * (Tests, `__townTags`) The name tags drawn in the last frame: each one's name, kind, alpha, pill and ink (`TAG_STYLE`) and where its
-   * pill is on the screen (CSS pixels in the world's box). Allocates its answer, so it's asked only by a test, never in the frame.
+   * (Tests, `__townTags`) The name tags drawn in the last frame: each one's name, kind, alpha, pill and ink (`TAG_STYLE`), where its
+   * pill is on the screen (CSS pixels in the world's box), the size it's drawn at and the size its picture was made at (0: not made
+   * yet, left out). Allocates its answer, so it's asked only by a test, never in the frame.
    */
-  tagList(): { text: string; kind: TagKind; alpha: number; pill: string; ink: string; x: number; y: number; w: number; h: number; who: number }[] {
+  tagList(): { text: string; kind: TagKind; alpha: number; pill: string; ink: string; x: number; y: number; w: number; h: number; who: number; size: number; made: number }[] {
     const out = [];
     for (let i = 0; i < this.nTags; i++) {
       const t = this.tags[i]!;
@@ -1426,7 +1428,7 @@ export class Renderer {
       const a = this.tagPic(t.text, t.kind, s);
       const w = a ? (a.w * s) / a.s : 0;
       const h = a ? (a.h * s) / a.s : 0;
-      out.push({ text: t.text, kind: t.kind, alpha: t.alpha, ...TAG_STYLE[t.kind], x: t.x - w / 2, y: t.y - h, w, h, who: t.who });
+      out.push({ text: t.text, kind: t.kind, alpha: t.alpha, ...TAG_STYLE[t.kind], x: t.x - w / 2, y: t.y - h, w, h, who: t.who, size: s, made: a?.s ?? 0 });
     }
     return out;
   }
@@ -3083,8 +3085,28 @@ export class Renderer {
       y += (1 - a) * f.nameRise;
       this.keepFree(nm.x - tw / 2 - 2, y - size - 2, tw + 4, size + 4);
       this.drawName(i, size, nm.x, y);
+      // (For the test hook, `namesList`: kept in place, nothing made.)
+      const nd = (this.namesDrawn[this.nNames++] ??= { i: 0, x: 0, y: 0, w: 0, size: 0, alpha: 0 });
+      nd.i = i;
+      nd.x = nm.x - tw / 2;
+      nd.y = y - size;
+      nd.w = tw;
+      nd.size = size;
+      nd.alpha = a;
     }
     ctx.globalAlpha = 1;
+  }
+  private readonly namesDrawn: { i: number; x: number; y: number; w: number; size: number; alpha: number }[] = [];
+  private nNames = 0;
+  /**
+   * (Tests, `__townNames`) The homes' names drawn in the last frame: each one's text, its size (px), its alpha, where it is on the screen
+   * (CSS pixels in the world's box) and whether its picture was there to draw. Allocates: a test asks, never the frame.
+   */
+  namesList(): { text: string; size: number; alpha: number; x: number; y: number; w: number; h: number; drawn: boolean; made: number }[] {
+    return this.namesDrawn.slice(0, this.nNames).map((d) => {
+      const a = this.namePic(d.i, d.size);
+      return { text: this.places[d.i]!.name, size: d.size, alpha: d.alpha, x: d.x, y: d.y, w: d.w, h: d.size, drawn: !!a, made: a?.s ?? 0 };
+    });
   }
 
   /**
