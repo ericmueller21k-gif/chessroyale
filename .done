@@ -1,1 +1,0 @@
-ledger-mismatch done: FINDINGS.md (cause: pre-ledger rows never backfilled; check failing daily since Nov 7, unseen), fix pushed (health view cron + ops:report + guard), one-off proposed not run.
