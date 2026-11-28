@@ -36,3 +36,7 @@ move list; the rift's opacity; the unlock pop-up once). Show Eric: a GIF of the 
 on orphan `stills/stranger-polish`, then write `.mockup` and wait for the director's `.go` before the PR (`timeout 590 bash -c 'until git
 fetch -q origin claude/stranger-polish && git cat-file -e FETCH_HEAD:.go; do sleep 30; done'`). `.pr-body.md` (at most 40 lines),
 decision note, area pages, `.done`. Commits end only with your Claude-Session line.
+
+**Eric, Nov 28 ~00:50: approved ("perfect"), plus:** the pieces in the center 5x5 fly back hard a little on the first stab, are blasted
+to the board's edge on the second, reset when he jumps away (looks cool: knock-back, tumble, trail, bounce; display only); each stab adds
+two more big ripples to the board's edge; a proof video with a crowded center, as MP4. His 3 calls approved as proposed.
