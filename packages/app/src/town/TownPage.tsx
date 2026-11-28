@@ -53,6 +53,8 @@ type Props = {
   stand: Stand | null;
   /** Back from a Battle Tower floor's match (PR 11b): the town opens in the tower (Town.tsx TowerBack). */
   tower: TowerBack | null;
+  /** Back from a table's Spectate, read once as the town opens (Town.tsx's `fromWatch`). */
+  fromWatch?: () => boolean;
   /** A phone's bar's Quests, Shop & crates and Friends (Nov 22): each opens over the town (App.tsx's town layer). */
   pages?: TownPages;
 };

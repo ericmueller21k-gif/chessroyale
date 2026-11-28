@@ -7,8 +7,9 @@ import { asSignedIn, localSql, tapInTown, test, townReady, townTap } from "./hel
  * could actually click and spectate those games"; docs/areas/town-square.md, "Ranked at the tables"). A table's Ranked opens the 1 v 1
  * search over the town, you seated; Cancel closes it, still seated. Two players found from two tables are seated at the first's for
  * everyone in the town (server town-tables.ts), the other's seat cleared; a third visitor's tap on that table offers Spectate, its
- * spectator view shows the game, and the game's end frees the table. Each test in a town and a queue of its own (`?townroom=`,
- * `?pool=`). Number checks through `__townHere()` (who's where, seated at which table, in which game) and the canvas's `data-you`.
+ * spectator view shows the game (a guest's Spectate greyed: watching needs an account), and the game's end frees the table. Each test in a
+ * town and a queue of its own (`?townroom=`, `?pool=`). Number checks through `__townHere()` (who's where, seated at which table, in
+ * which game) and the canvas's `data-you`.
  */
 test.use({ actionTimeout: 15_000 });
 // (Three towns open at once in the second test: the two never run side by side.)
@@ -101,15 +102,21 @@ test("a table's Ranked opens the 1 v 1 search over the town, you seated; Cancel 
   expect(errors).toEqual([]);
 });
 
-test("two players found from two tables sit at the first's for a third visitor, who opens the game's spectator view; its end frees the table and its player's Back to town seats her there", async ({ page, browser }) => {
-  test.setTimeout(240_000);
+test("two players found from two tables sit at the first's for a third visitor, who opens the game's spectator view (a guest's Spectate greyed); its end frees the table and its player's Back to town seats her there", async ({ page, browser }) => {
+  test.setTimeout(300_000);
   const room = `tr${tag()}`;
   const pool = `p${tag()}`;
   const bo = await another(browser);
   const cy = await another(browser);
+  const gus = await another(browser);
   const annId = await into(page, "Ann", room, pool);
   const boId = await into(bo, "Bo", room, pool);
   await into(cy, "Cy", room, pool);
+  // Gus, a guest (no sign-in, his town time off), in the same town: he waits by table 3.
+  await gus.goto(`/town?sky=day&debug&townroom=${room}&pool=${pool}&townguest=off`);
+  await expect(canvas(gus)).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
+  await gus.waitForFunction(() => typeof (window as unknown as { __townHere?: unknown }).__townHere === "function");
+  await walkUpTo(gus, 3);
   // Ann searches first, from table 3; Bo from table 4: they meet.
   await rankedAt(page, 3);
   const annStool = await youAt(page);
@@ -129,6 +136,11 @@ test("two players found from two tables sit at the first's for a third visitor, 
     .toEqual(["ann@3:game", "bo@3:game"]);
   const code = (await hereOf(cy)).find((h) => h.match)!.match!;
   await still(cy, "seated-pair-far");
+  // Gus's tap on Ann: Spectate greyed, with why (watching needs an account: the director's call on #1027's review, S6).
+  await tapInTown(gus, "player", annId, card(gus), { glide: [19, 29] });
+  await expect(card(gus).getByRole("button", { name: "Spectate", exact: true })).toBeDisabled();
+  await expect(card(gus)).toContainText("Make a free account to watch.");
+  await still(gus, "guest-spectate");
   // Cy walks up (two squares before it) and taps Ann, seated there: her table's card offers Spectate (who's playing), not a seat.
   await walkUpTo(cy, 3);
   await still(cy, "seated-pair");
@@ -149,7 +161,10 @@ test("two players found from two tables sit at the first's for a third visitor, 
   await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /Leave/ }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Leave" }).click();
   await expect(watch.locator(".dv-result-title")).toHaveText("Game called off", { timeout: 15_000 });
+  // (Back from watching is the same visit (#1027's review, N9): the town's beats say so until one is answered, so no second "entered".)
+  const beatBack = cy.waitForRequest((r) => r.url().endsWith("/api/town/here") && r.method() === "POST" && typeof r.postDataJSON()?.c === "number");
   await cy.getByRole("button", { name: "Back to town", exact: true }).click();
+  expect((await beatBack).postDataJSON()).toMatchObject({ floor: true });
   await townReady(cy);
   await expect.poll(async () => (await hereOf(cy)).some((h) => h.match === code), { timeout: 20_000, message: "the table is free" }).toBe(false);
   // Ann's end: Back to town puts her back on her stool at table 3, nobody across.

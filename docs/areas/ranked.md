@@ -31,8 +31,10 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   settings. Online needs an account wherever sign-in is set up (`mayPlay`, as every mode), so guests and under-13
   devices can't queue there; banned players can't either.
 - **From a town table** (Nov 27; [town-square.md](town-square.md), "Ranked at the tables"): the same queue with `town=1` on the first ask;
-  paired, the matchmaker tells the hub before the code goes out (`townMatch`, at most `TOWN_TABLES.seatWaitMs`), the game is made with
-  `town` and tells the hub when it ends; only such a game takes watchers (`/ws?watch=1`: the game's messages, never chat or outcomes).
+  paired, the matchmaker tells the hub before the code goes out (`townMatch`, until the batch's deadline: `seatWaitMs` from its start), the
+  game is made with `town` and tells the hub when it ends (its close's last try after the close, never awaited); only such a game takes
+  watchers, signed in (`/ws?watch=1`: the game's messages, never chat or outcomes; one hello, refusals as close codes, `WATCH_REFUSED`).
+  Cancel while the pair is being seated waits for it and answers the game, so the Worker calls it off (never a dodge).
 - **Its kill switch:** `PAUSE_RANKED1V1` ([ops.md](ops.md) "Kill switches"): the queue answers 503 with "1 v 1 is resting
   for a bit. Back soon."; games already running finish.
 - **The queue** (`matchmaker.ts`'s duel mode, `queue.ts` `PAIR_BY_RATING`, core's `pairUp`): the Matchmaker object for
