@@ -586,6 +586,9 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
   }
   const m = url.pathname.match(/^\/api\/1v1\/game\/([A-Z2-9]{5})(\/ws)?$/i);
   if (!m) return json({ message: "Not found" }, 404);
+  // (A socket's address asked without an upgrade: refused here, before any refusal below answers with a socket, which the runtime throws
+  // on: the re-review's R2.)
+  if (m[2] && request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 });
   // (Watching needs an account, the director's call on #1027's review, S6: a guest's socket is opened and closed at once with why.)
   if (m[2] && url.searchParams.get("watch") === "1" && !isSignedIn(await accountOf(request, env, waitUntil).catch(() => null))) return refusedSocket(WATCH_REFUSED.notAllowed, WATCH_GUEST);
   const stub = env.DUELS.get(env.DUELS.idFromName(m[1]!.toUpperCase()));

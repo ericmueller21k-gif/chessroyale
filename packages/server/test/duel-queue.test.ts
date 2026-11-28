@@ -571,6 +571,26 @@ describe("the town's tables in the 1 v 1 queue (#1027's review: S2, S4, N1)", ()
     expect(games).toEqual(["bob,cy"]);
   });
 
+  it("S4 (re-review R1): Cancel answers once its own pair is placed, not after the matchmaker's whole run (town pairs batch after batch)", async () => {
+    const { made, mm } = townQueue(hung);
+    const first = await mm.duelNext(null, { ...info("ann", 1500), town: true });
+    mm.hold(30_000);
+    const annAsk = mm.duelNext(ticketOf(first));
+    const bobAsk = mm.duelNext(null, info("bob", 1500));
+    await sleep(200);
+    let cancelAt = 0;
+    const cancelled = mm.cancel(ticketOf(first)).then((a) => ((cancelAt = Date.now()), a));
+    // (A town pair arrives during each batch, so the run goes on: before, Cancel waited for all of it, past the game's join window.)
+    for (let i = 0; i < 4 && !cancelAt; i++) {
+      void mm.duelNext(null, { ...info(`x${i}`, 3000 + i * 500), town: true });
+      void mm.duelNext(null, info(`y${i}`, 3000 + i * 500));
+      await sleep(TOWN_TABLES.seatWaitMs - 100);
+    }
+    expect((await cancelled).code).toBeTruthy();
+    await Promise.all([annAsk, bobAsk]);
+    expect(cancelAt - made[0]!).toBeLessThan(TOWN_TABLES.seatWaitMs + 300);
+  }, 20_000);
+
   it("N1: the town seats a pair at the table of the one who searched from it first, whoever searched longer", async () => {
     const told: string[][] = [];
     const { mm } = townQueue(async (_code, order) => (told.push(order.map((s) => s.uid)), true));

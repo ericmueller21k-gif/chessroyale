@@ -4490,6 +4490,8 @@ export const TOWN_TABLES = {
   parkTables: 12,
   /** The longest a pair found from a table waits for the town to seat them before they hear their game's code (ms; matchmaker.ts). */
   seatWaitMs: 1500,
+  /** How often a Cancel pressed while its pair is being seated looks again whether the seating is done (ms; matchmaker.ts, R1). */
+  cancelPollMs: 25,
 } as const;
 
 /**

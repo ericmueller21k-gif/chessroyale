@@ -604,5 +604,9 @@ describe("a game found from a town's table (#1027's review: S1, S3, S5, S6, S7)"
     expect([pair[1]!.closed, pair[1]!.reason, asked]).toEqual([4003, WATCH_GUEST, []]);
     await watch(`hc_session=${await createSession(sql, ann.id, Date.now())}`);
     expect(asked).toEqual(["exists", "fetch"]);
+    // (The re-review's R2: a guest asking without an upgrade gets a plain 426, never a refusal answered with a socket, which throws.)
+    const plain = await worker.fetch(new Request("https://hunchess.test/api/1v1/game/ABCDE/ws?watch=1", { headers: { cookie: `hc_session=${guest.token}`, "cf-connecting-ip": "10.3.1.1" } }), { DB: d1, DUELS } as never, ctx);
+    expect(plain.status).toBe(426);
+    expect(asked).toEqual(["exists", "fetch"]);
   });
 });

@@ -162,10 +162,12 @@ export class Matchmaker extends DurableObject<Env> {
    * Ranked 1 v 1's Cancel: the ticket leaves the line. Answers its game if it was paired already (the app then leaves it). A ticket being
    * seated this moment (its game being opened, the town seating it) waits for its batch first (#1027's review, S4): placed, its game is
    * answered and the Worker calls it off for them (never connected: excused, nobody's dodge); put back, it leaves the line. Before, it
-   * answered nothing, and the held ask was still handed the game: a no-show charged as a dodge for pressing Cancel.
+   * answered nothing, and the held ask was still handed the game: a no-show charged as a dodge for pressing Cancel. It waits for this
+   * ticket's seating only, never the whole run (`forming` lasts while batches keep finding pairs: under load the answer came after the
+   * game's join window, and the dodge was back; the re-review's R1), so it looks again every TOWN_TABLES.cancelPollMs.
    */
   async cancel(ticketId: string): Promise<{ code?: string }> {
-    while (this.forming && this.q.seatingNow(ticketId)) await this.forming;
+    while (this.forming && this.q.seatingNow(ticketId)) await Promise.race([this.forming, new Promise((r) => setTimeout(r, TOWN_TABLES.cancelPollMs))]);
     const code = this.q.cancel(ticketId);
     return code ? { code } : {};
   }
