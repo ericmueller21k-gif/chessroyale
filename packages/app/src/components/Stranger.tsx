@@ -562,10 +562,12 @@ function paintRing(g: CanvasRenderingContext2D, img: CanvasImageSource, now: num
 
 /**
  * What the storm's canvases last drew (the tests' read: the ring's frame, the rift's sheet frame, -1 nothing yet; `strength`, how much
- * of the ring has gathered, 0 to 1). `by`: which canvas wrote each, so one taken away as its screen is drawn again never clears what
- * the new one drew.
+ * of the ring has gathered, 0 to 1; `sceneT`, the opening scene's time they last drew at, null outside it). `by`: which canvas wrote
+ * each, so one taken away as its screen is drawn again never clears what the new one drew. (`sceneT`: they and his sprite draw on the
+ * frame loop's clock, read after the screen's own each frame, so on a busy phone the rift opens with his slam a frame before the
+ * scene's `data-stage` turns to "swords".)
  */
-const drawn = { ring: -1, rift: -1, strength: 0, by: { ring: null as object | null, rift: null as object | null } };
+const drawn = { ring: -1, rift: -1, strength: 0, sceneT: null as number | null, by: { ring: null as object | null, rift: null as object | null } };
 if (typeof window !== "undefined") (window as unknown as { __stormArt?: typeof drawn }).__stormArt = drawn;
 
 /**
@@ -637,6 +639,7 @@ function StormRing({ scene, lead }: { scene: number | null; lead: "fire" | "ice"
     const draw = () => {
       const now = Date.now();
       const { scene, lead } = at.current;
+      drawn.sceneT = scene === null ? null : now - scene;
       // (The page's shade with it: from the first sword in its opening scene, and through its turns.)
       if (scene === null || now >= scene + STORM_SCENE.fireAt) keepShade(now);
       const sheet = sheetOf("storm");
@@ -658,6 +661,7 @@ function StormRing({ scene, lead }: { scene: number | null; lead: "fire" | "ice"
       if (drawn.by.ring !== me) return;
       drawn.ring = -1;
       drawn.strength = 0;
+      drawn.sceneT = null;
     };
   }, []);
   return <canvas ref={cv} class="sg-storm" width={STORM_ART.px} height={STORM_ART.px} aria-hidden="true" data-storm={scene === null ? "on" : "scene"} />;
@@ -702,7 +706,10 @@ function StormRift({ scene, stage }: { scene: number | null; stage: number }) {
     const draw = () => {
       const sheet = sheetOf("rift");
       if (!sheet.src) return;
-      const f = riftFrame(at.current.scene, at.current.stage, Date.now());
+      const now = Date.now();
+      const { scene } = at.current;
+      drawn.sceneT = scene === null ? null : now - scene;
+      const f = riftFrame(scene, at.current.stage, now);
       if (f === shown) return;
       shown = f;
       drawn.by.rift = me;
@@ -714,7 +721,9 @@ function StormRift({ scene, stage }: { scene: number | null; stage: number }) {
     const stop = onEachFrame(draw);
     return () => {
       stop();
-      if (drawn.by.rift === me) drawn.rift = -1;
+      if (drawn.by.rift !== me) return;
+      drawn.rift = -1;
+      drawn.sceneT = null;
     };
   }, []);
   return <canvas ref={cv} class="sg-rift" width={RIFT_ART.px} height={RIFT_ART.px} aria-hidden="true" data-stage={stage} />;

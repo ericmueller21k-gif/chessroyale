@@ -230,7 +230,11 @@ test("Relay: the replay button steps off, the last 2, all; your move on a board,
   expect(third.duty!.replay).toBeGreaterThan(1);
   await expect(page.locator(".rp-over")).toBeVisible();
   await expect(page.locator(".sq-status")).toContainText(/replay \d of 2$/);
-  const mv = new Chess(third.fen!).moves({ verbose: true }).find((m) => !m.captured && !m.promotion)!;
+  // (A quiet move if there is one, else any but a promotion: the bots' positions are random, and now and then every legal move is a
+  // capture (main 5eeba04d, desktop: no quiet move, so undefined). A capture taps the same two squares.)
+  const legal = new Chess(third.fen!).moves({ verbose: true }).filter((m) => !m.promotion);
+  const mv = legal.find((m) => !m.captured) ?? legal[0]!;
+  expect(mv, `a move to make in ${third.fen}`).toBeTruthy();
   await tapSquare(page, mv.from);
   await expect(page.locator(".rp-over")).toHaveCount(0, { timeout: 300 });
   await tapSquare(page, mv.to);
