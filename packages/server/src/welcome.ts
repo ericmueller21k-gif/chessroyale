@@ -151,7 +151,7 @@ const randomHex = (bytes: number) => [...crypto.getRandomValues(new Uint8Array(b
 export const NO_WELCOME_CRATE = "You have no Welcome Crate to open.";
 
 /**
- * Opens your next Welcome Crate (the earliest earned and unopened): one ride from every ride's HunChess colorway, each as likely, never
+ * Opens your next Welcome Crate (the earliest earned and unopened): one ride from every boss ride's HunChess colorway (not the crate riders'), each as likely, never
  * one an earlier Welcome Crate gave while another is left (rollWelcome), with the server's own randomness (never a test switch), into
  * your locker. One ledger op per crate (`welcome-open:<ledger id>:<n>`), one transaction: it applies only while that crate is unopened
  * and (while another is left) no Welcome Crate of yours gave that ride; then the ride goes in and the crate is marked opened with it.

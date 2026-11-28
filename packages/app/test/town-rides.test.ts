@@ -32,7 +32,7 @@ describe("the rides", () => {
     // (Nov 6: each ride's HunChess colorway is drawn from its ride's drawing and cells: "the HunChess colorway" below.)
     const rides = ITEM_DEFS.filter((d) => d.slot === "ride" && !d.hunchess);
     expect(rides.map((d) => d.id).sort()).toEqual(
-      ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller", "pen-pony", "birdie-train"].sort(),
+      ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller", "pen-pony", "birdie-train", "shopping-cart", "robot-vacuum", "magic-carpet", "skateboard", "rocket"].sort(),
     );
     // (Nov 10: an outfit is drawn with the rides' kit too, so it's among the drawings: the Banana Suit.)
     const outfits = ITEM_DEFS.filter((d) => d.slot === "outfit");

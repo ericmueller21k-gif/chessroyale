@@ -206,10 +206,24 @@ const BASE_ITEM_DEFS: readonly ItemDef[] = [
   // (Nov 23: Birdie's, his little yellow diesel, long and low, its body the item's color (Yellow is his train's); in his crate from the
   // start. Its line is the drawing's.)
   { id: "birdie-train", name: "Birdie's Train", tier: "mythic", slot: "ride", description: "A little yellow diesel that always runs on time. The tracks are imaginary; the punctuality is not." },
+  // Crate riders (Nov 27; Eric, Nov 9-10: "a few riders that have nothing to do with the bosses ... in the regular crates"; "I want 5
+  // riders... crate exclusives"; he liked the shopping cart): in the Beta Crate's Fischer Random (CRATES: each item in one crate), no
+  // boss's, no HunChess colorway (CRATE_RIDES). docs/decisions/2026-11-27-crate-riders.md. Their names and lines are the drawings'.
+  { id: "shopping-cart", name: "Shopping Cart", tier: "mythic", slot: "ride", description: "One wheel has a mind of its own. The other three have given up arguing." },
+  { id: "robot-vacuum", name: "Robo Vac", tier: "mythic", slot: "ride", description: "Cleans the board as it goes. Has mapped every square and still bumps into the king." },
+  { id: "magic-carpet", name: "Magic Carpet", tier: "mythic", slot: "ride", colors: 2, description: "Hand-woven, tassels and all, in two colors. Flies anywhere; still won't let you skip a square." },
+  { id: "skateboard", name: "Skateboard", tier: "mythic", slot: "ride", description: "Kickflips not included. The pawn insists it can ollie a bishop." },
+  { id: "rocket", name: "Rocket", tier: "mythic", slot: "ride", colors: 2, description: "Body in one color, fins and nose in another. Goes to the moon, one square at a time." },
   // Outfits (Nov 10): worn over everything else, a secret slot (the locker shows it only to someone who owns one). The Banana
   // Suit is the Mythic Crate's secret item (MYTHIC_CRATE_ITEMS); no crate rolls it yet.
   { id: "banana-suit", name: "Banana Suit", tier: "mythic", slot: "outfit", description: "Fully committed to the bit. Opponents keep slipping up." },
 ];
+
+/**
+ * The crate riders (Nov 27; Eric, Nov 10: "crate exclusives"): rides with no boss, only in the Beta Crate (its Fischer Random's Mythic).
+ * No HunChess colorway (so the Welcome Crate's odds stay as they are, and they stay the crates' own).
+ */
+export const CRATE_RIDES: readonly string[] = ["shopping-cart", "robot-vacuum", "magic-carpet", "skateboard", "rocket"];
 
 /** A HunChess colorway's id: its ride's id and this ("balloon-pup-hunchess"), so it never collides with or stacks on the ride. */
 export const HUNCHESS_SUFFIX = "-hunchess";
@@ -217,9 +231,10 @@ export const HUNCHESS_SUFFIX = "-hunchess";
 /**
  * The HunChess colorway of every ride (Eric, Nov 6: "a special HunChess-colored random rider"; docs/decisions/2026-11-06-welcome-crate.md):
  * an item of its own (`<ride>-hunchess`), drawn from its ride's drawing in gold and black (the app's `components/rides/hunchess.tsx`),
- * only ever from the Welcome Crate (welcome.ts), in no other crate. A new ride gets its colorway here with no change.
+ * only ever from the Welcome Crate (welcome.ts), in no other crate. A new boss ride gets its colorway here with no change; the crate riders
+ * (`CRATE_RIDES`, Nov 27) have none.
  */
-export const HUNCHESS_RIDES: readonly ItemDef[] = BASE_ITEM_DEFS.filter((d) => d.slot === "ride").map((d) => ({
+export const HUNCHESS_RIDES: readonly ItemDef[] = BASE_ITEM_DEFS.filter((d) => d.slot === "ride" && !CRATE_RIDES.includes(d.id)).map((d) => ({
   id: d.id + HUNCHESS_SUFFIX,
   name: `HunChess ${d.name}`,
   tier: d.tier,
@@ -321,6 +336,8 @@ export const CRATES: readonly CrateDef[] = [
       "ninja-gi",
       // A one-off.
       "smiley-face",
+      // The crate riders (Nov 27): behind Fischer Random's Mythic, its 20 shared evenly (tier odds as before).
+      ...CRATE_RIDES,
     ],
     fischer: [
       { tier: "legendary", weight: 80 },

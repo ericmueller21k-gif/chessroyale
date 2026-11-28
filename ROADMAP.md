@@ -432,6 +432,8 @@ what the game looks like with friends playing. Both are admins-first while we te
 
 A few rides that have nothing to do with the bosses, put in the regular crates (HunChess, Gift, Beta) to make them worth buying,
 since rides are the most wanted items. item-builder for the rides' art and the crates' odds.
+**Built Nov 27:** five (Shopping Cart, Robo Vac, Magic Carpet, Skateboard, Rocket) in the Beta Crate's Mythic
+([2026-11-27-crate-riders.md](docs/decisions/2026-11-27-crate-riders.md)).
 
 ## Rare items: a special border, and a tap-to-preview on a pawn (Eric, Nov 12, 2026: queued, not started; low weekly usage)
 

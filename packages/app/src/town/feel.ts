@@ -547,6 +547,12 @@ export const TOWN_FEEL = {
     "pen-pony": { foot: 98.5, shadow: 1.3 },
     // (Nov 23: Birdie's Train stands on its own ground shadow, under its wheels, in every view.)
     "birdie-train": { foot: 96, shadow: 0 },
+    // (The crate riders, Nov 27: the cart's and the board's wheels, the vacuum's base; the carpet and the rocket float, their own shadow.)
+    "shopping-cart": { foot: 97, shadow: 1.2 },
+    "robot-vacuum": { foot: 96, shadow: 1.1 },
+    "magic-carpet": { foot: 97, shadow: 0 },
+    "skateboard": { foot: 97, shadow: 1.1 },
+    "rocket": { foot: 98, shadow: 0 },
     // (An outfit, Nov 10: drawn with the rides' kit; its shoes' soles.)
     "banana-suit": { foot: 98, shadow: 1.1 },
   } as Readonly<Record<string, { foot: number; shadow: number }>>,

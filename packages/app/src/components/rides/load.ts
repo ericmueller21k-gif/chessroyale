@@ -34,6 +34,12 @@ const DRAWINGS: Readonly<Record<string, () => Promise<RiderDraft>>> = {
   "log-roller": () => chunk(import("./log-roller.tsx")).then((m) => m.logRoller),
   "pen-pony": () => chunk(import("./pen-pony.tsx")).then((m) => m.penPony),
   "birdie-train": () => chunk(import("./birdie-train.tsx")).then((m) => m.birdieTrainRide),
+  // (The crate riders, Nov 27: no boss's; docs/decisions/2026-11-27-crate-riders.md.)
+  "shopping-cart": () => chunk(import("./shopping-cart.tsx")).then((m) => m.shoppingCart),
+  "robot-vacuum": () => chunk(import("./robot-vacuum.tsx")).then((m) => m.robotVacuum),
+  "magic-carpet": () => chunk(import("./magic-carpet.tsx")).then((m) => m.magicCarpet),
+  "skateboard": () => chunk(import("./skateboard.tsx")).then((m) => m.skateboard),
+  "rocket": () => chunk(import("./rocket.tsx")).then((m) => m.rocket),
   // (An outfit, Nov 10: drawn with the rides' kit, the pawn's head in its face hole.)
   "banana-suit": () => chunk(import("./banana-suit.tsx")).then((m) => m.bananaSuit),
 };
