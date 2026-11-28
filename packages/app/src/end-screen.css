@@ -109,6 +109,11 @@
   font-weight: 700;
   color: var(--muted);
 }
+/* (The why line alone, in the number's place: its parts line's room kept under it, so the box keeps its height from "Counting your XP…" to
+   "No XP: …" and nothing under it moves up as the XP comes. Nov 28: it shrank 21 px and the row under it jumped, a flake on #1030.) */
+.es-earned.es-why {
+  padding-bottom: calc(var(--es-gap-in, 6px) + 15px);
+}
 /* What made it ("Win +50 · Daily reward +200"): one small line, always there. */
 .es-parts {
   height: 15px;
@@ -994,6 +999,10 @@
   .dv-end-col .es-earned-why {
     height: calc(38 * var(--es-u));
     font-size: calc(15 * var(--es-u));
+  }
+  /* (The number's line is 42, the why's 38: the 4 and the parts line's room under it.) */
+  .dv-end-col .es-earned.es-why {
+    padding-bottom: calc(19 * var(--es-u) + var(--es-gap-in));
   }
   .dv-end-col .es-parts {
     height: calc(15 * var(--es-u));
