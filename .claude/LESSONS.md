@@ -496,3 +496,7 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A position the bots reached at random may have any number and kind of legal moves (in check: two replies; every move a capture). A
     test that needs a move prefers the kind it wants and falls back to any legal one, and names the position if none fits; a count of
     lines or arrows is `min(n, legal moves)`. A fixed, scripted position is the only place to rely on a move's kind.
+
+- **The town's wandering bots in tests** (Nov 28: town-ranked twice, town-rows): each device's bots walk and sit where they like, so a
+  test that taps a table, a player or a square, or walks to a fixed square, holds them as the town opens (`__townStill`). A test
+  about the bots themselves is the only one that leaves them free.
