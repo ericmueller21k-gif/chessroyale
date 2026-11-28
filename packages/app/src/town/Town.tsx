@@ -2279,22 +2279,21 @@ function startTown(
     if (r.svc.busy) pumpSoon();
   };
   /**
-   * The picture service's slice between frames (Nov 28, the town's structure, phase 2; picture-service.ts): when the browser is idle
-   * after a frame (within a quarter of a second at the latest; where it can't say, in the next task), up to `picSliceMs` of making
-   * and uploading what the frames asked for, and again while there's more. Not under the loading card, whose own loop does it.
+   * The picture service's slice between frames (Nov 28, the town's structure, phase 2; picture-service.ts): after each frame that
+   * leaves it work, in a task of its own once the frame is on its way to the screen, up to `picSliceMs` of making and uploading what
+   * the frames asked for. Every frame, whatever the device has to spare: waiting for the browser to be idle, a busy phone (which
+   * never is) took a ride half a minute to put on. With no frame coming (the town held, behind a room, the tab hidden) the slices
+   * go on by a timer while there's more. Not under the loading card, whose own loop does it.
    */
   let pumping = false;
   const pumpSoon = () => {
     if (pumping || !alive) return;
     pumping = true;
-    const slice = (ms: number) => {
+    setTimeout(() => {
       pumping = false;
       if (!alive || failed || loading || dark()) return;
-      if (r.svc.pump(Math.min(f.picSliceMs, ms))) pumpSoon();
-    };
-    const ric = (globalThis as { requestIdleCallback?: (run: (d: { timeRemaining(): number; didTimeout: boolean }) => void, o?: { timeout: number }) => number }).requestIdleCallback;
-    if (ric) ric((d) => slice(d.didTimeout ? f.picSliceMs : Math.max(1, d.timeRemaining())), { timeout: 250 });
-    else setTimeout(() => slice(f.picSliceMs), 0);
+      if (r.svc.pump(f.picSliceMs) && !raf) setTimeout(pumpSoon, 50);
+    }, 0);
   };
   /** The frames start again. `gap`: after a pause (a hidden tab, a test's hold): the recorder and the pill start afresh. Back from a
    * room (`resume`) they don't: the room's frames led up to this one, and its time is seen. */
@@ -3120,7 +3119,7 @@ function startTown(
     // (Your name now, as each frame sets it: the loading screen makes your tag's pictures, render.ts `makeLabels`.)
     town.you.name = playerName();
     // (The room the picture service's groups have on the GPU beyond what this screen puts there: feel.ts `picRoom`, paint-gl.ts.)
-    painter.reserve?.(PIC_GROUP.text, f.picRoom.text * r.DPR * r.DPR);
+    painter.reserve?.(PIC_GROUP.text, f.picRoom.text);
     painter.reserve?.(PIC_GROUP.looks, f.picRoom.looks);
     try {
       // The town's pictures as the build baked them (Nov 28, the town's structure, phase 1: baked.ts): the manifest and this town's files

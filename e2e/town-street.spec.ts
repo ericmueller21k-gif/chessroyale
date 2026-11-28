@@ -586,11 +586,14 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   // this crowd's tags.
   expect(paint.atlas.groups[1]!.pictures, "the labels' pictures, on their own pages").toBeGreaterThan(40);
   expect(paint.atlas.groups[2]!.pictures, "the pawns', outfits' and sky's pictures, on theirs").toBeGreaterThan(10);
-  expect(paint.atlas.groups[1]!.px, "the text's pixels").toBeLessThan(2_500_000);
+  // (A 1x screen keeps a picture for every size a label shows at, `picOneSizeFrom`: scaled down there, small text goes dim.)
+  const oneSize = test.info().project.name === "phone";
+  expect(paint.atlas.groups[1]!.px, "the text's pixels").toBeLessThan(oneSize ? 2_500_000 : 4_500_000);
   expect({ stuck: paint.service.stuck, evicted: paint.service.evicted }, "none waited for room, none was let go to make any").toEqual({ stuck: 0, evicted: 0 });
   const tags = (await page.evaluate(() => (window as unknown as R).__townTags())).filter((t) => t.made);
   expect(tags.length, "tags drawn in the first frame").toBeGreaterThan(0);
-  expect([...new Set(tags.map((t) => t.made))], `every tag from its one picture, made at 12 px, drawn at ${[...new Set(tags.map((t) => t.size))].sort().join(", ")}`).toEqual([12]);
+  if (oneSize) expect([...new Set(tags.map((t) => t.made))], `every tag from its one picture, made at 12 px, drawn at ${[...new Set(tags.map((t) => t.size))].sort().join(", ")}`).toEqual([12]);
+  else expect(tags.filter((t) => t.made !== t.size), "on a 1x screen every tag from a picture made at the size it's drawn at").toEqual([]);
   // (Nov 28, phase 1) None of them painted here: the build's baked files, fetched and uploaded whole (town/baked.ts), then their decoded
   // copies let go: the GPU holds them (phase 1c).
   expect({ baked: paint.pictures.baked, open: paint.pictures.open }, "the first visit loads the build's baked pictures, and lets their decoded files go once uploaded").toEqual({ baked: true, open: false });

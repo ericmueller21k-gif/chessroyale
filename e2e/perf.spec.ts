@@ -792,7 +792,8 @@ async function busyTown(page: Page, wearing: boolean) {
     const ride = await page.evaluate(() => (window as unknown as { __townRide: () => { you: { ride: string | null; ready: boolean } } }).__townRide().you);
     expect(ride, "on the Chirp, its frames ready").toMatchObject({ ride: "riding-chirp", ready: true });
     expect(empty.uploads, "the first walk after the loading screen uploads nothing (its ride's frames and marks kept there)").toMatch(/^0 uploads/);
-    expect(empty.between.ups, "nor between its frames: everything the walk shows was on the GPU before the first frame").toBe(0);
+    // (Between its frames: only the two statues' close-up drawings, made ahead from a moment after the town shows.)
+    expect(empty.between.ups, "pictures uploaded between its frames: everything the walk shows was on the GPU before the first frame").toBeLessThanOrEqual(2);
   }
   busy = true;
   await expect.poll(() => page.evaluate(() => (window as unknown as W).__townHere().filter((h) => !h.you && h.here).length), { timeout: 30_000, message: "the other players in the town" }).toBeGreaterThanOrEqual(50);
@@ -825,7 +826,7 @@ async function busyTown(page: Page, wearing: boolean) {
   console.log(`Chess Town busy: the atlas ${end.atlas.pages} pages; the text ${end.atlas.groups[1]!.pictures} pictures, ${(end.atlas.groups[1]!.px / 1e6).toFixed(2)} M pixels on ${end.atlas.groups[1]!.pages} pages; the looks ${end.atlas.groups[2]!.pictures} pictures, ${(end.atlas.groups[2]!.px / 1e6).toFixed(2)} M pixels on ${end.atlas.groups[2]!.pages}`);
   if (again) {
     // (The second walk: every look that plays was on the GPU by the first's end, so nothing more is made or uploaded for it.)
-    expect(again.between.ups, "pictures uploaded between the second walk's frames").toBeLessThanOrEqual(2);
+    expect(again.between.ups, "pictures uploaded between the second walk's frames (a statue's close-up, made ahead, at most)").toBeLessThanOrEqual(2);
     expect(again.ours, "our parts a frame, busy and playing, the second walk, against the empty town's").toBeLessThan(empty.ours * 1.25);
   }
   expect(beat - beats, "the server's answers while the busy town walked (each moving everyone)").toBeGreaterThan(0);

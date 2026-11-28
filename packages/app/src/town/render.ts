@@ -192,10 +192,13 @@ interface NameArt {
 const NAME_LINE = 3.5;
 /**
  * The sizes a home's name shows at (drawNames' clamp) and a tag (`tag`'s). Each is one picture, made at `TOWN_FEEL.namePicSizes` /
- * `tagPicSizes` (the biggest it shows at: never stretched) and scaled by the GPU (`picSize`).
+ * `tagPicSizes` (the biggest it shows at: never stretched) and scaled by the GPU (`picSize`); on a 1x screen, a picture for every
+ * size (`Renderer.tagSizes`, `nameSizes`: `TOWN_FEEL.picOneSizeFrom`).
  */
 const NAME_SIZES = [12, 20] as const;
 const TAG_SIZES = [8, 12] as const;
+const NAME_EVERY: readonly number[] = Array.from({ length: NAME_SIZES[1] - NAME_SIZES[0] + 1 }, (_, i) => NAME_SIZES[0] + i);
+const TAG_EVERY: readonly number[] = Array.from({ length: TAG_SIZES[1] - TAG_SIZES[0] + 1 }, (_, i) => TAG_SIZES[0] + i);
 /** The size a label's picture is made at to be drawn at `want`: the smallest of `sizes` (rising) that's at least as big, else the biggest. */
 const picSize = (sizes: readonly number[], want: number): number => sizes.find((s) => s >= want) ?? sizes[sizes.length - 1]!;
 /** Device pixels round the speech bubble's pictures for their shadow. */
@@ -561,6 +564,17 @@ interface QuoteArt {
   lineH: number;
 }
 
+/** A quote's lettering laid out at one size (`Renderer.quoteFor`): its picture's key, its lines, its size in device pixels, its edge, `s` device pixels a font pixel, its leading. */
+interface QuoteLay {
+  key: string;
+  lines: string[];
+  w: number;
+  h: number;
+  e: number;
+  s: number;
+  lead: number;
+}
+
 /** A quote wrapped into lines no wider than `maxW` font pixels (null: a word alone is wider). */
 function wrapQuote(text: string, maxW: number): string[] | null {
   const lines: string[] = [];
@@ -756,7 +770,7 @@ export class Renderer {
   private readonly closeKeys = STATUES.map((_, i) => `close|${i}`);
   private buildFrom = NaN;
   /** The quotes' lettering laid out, by statue, size (device pixels a font pixel) and leading: its lines and its picture's size and key. */
-  private readonly quoteLay = new Map<string, { key: string; lines: string[]; w: number; h: number; e: number } | null>();
+  private readonly quoteLay = new Map<string, QuoteLay>();
   /** How deep (squares ahead of the camera) the statue in close-up stands: the people nearer than it fade. */
   private statueDz = Infinity;
   /** This sprite's fade (the people in front of a statue in close-up), multiplied into its alpha. */
@@ -1325,15 +1339,20 @@ export class Renderer {
     const fw = face.w * px;
     const fh = face.h * px;
     const m = f.quoteInset * px;
-    const q = this.quoteFor(i, (fw - 2 * m) * DPR, (fh - 2 * m) * DPR);
-    if (!q) return;
-    this.quoteCap = (q.s / DPR) * CAP;
+    const lay = this.quoteFor(i, (fw - 2 * m) * DPR, (fh - 2 * m) * DPR);
+    if (!lay) return;
+    this.quoteCap = (lay.s / DPR) * CAP;
+    // (Its lettering asked of the picture service as the camera arrives, while its first line is still to fade in: made between
+    // frames, and left out of a frame it isn't ready for.)
+    const { lines, s, e: edge, lead } = lay;
+    const q = this.svc.ask(PIC_GROUP.text, lay.key, 0, () => quoteArt(id, lines, s, edge, lead));
     const a0 = clamp(c.quoteMs / f.quoteFadeMs, 0, 1) * c.quoteLeft;
     if (a0 <= 0) return;
     ctx.globalAlpha = alpha * a0;
     ctx.fillStyle = QUOTE_INK[id].field;
     const e = 0.25 * px; // (inside the field: its rim stays as drawn)
     ctx.fillRect(fx + e, fy + e, fw - 2 * e, fh - 2 * e);
+    if (!q) return;
     const w = q.cv.width / DPR;
     const h = q.cv.height / DPR;
     const ox = Math.round((fx + (fw - w) / 2) * DPR) / DPR;
@@ -1349,27 +1368,24 @@ export class Renderer {
   }
 
   /**
-   * The quote's lettering for a panel fw x fh device pixels: the biggest whole size whose wrapped lines fit (with the
-   * signs' leading, or a pixel less where that lets it be bigger), laid out once a size; its picture is the picture service's (asked
-   * for as the camera arrives, as its first line starts to fade in: null until it's made).
+   * The quote's lettering laid out for a panel fw x fh device pixels: the biggest whole size whose wrapped lines fit (with the signs'
+   * leading, or a pixel less where that lets it be bigger), laid out once a size. Its picture is the picture service's (`drawQuote`).
    */
-  private quoteFor(i: number, fw: number, fh: number): QuoteArt | null {
+  private quoteFor(i: number, fw: number, fh: number): QuoteLay | null {
     const st = STATUES[i]!;
     for (let s = Math.floor(fh / CAP); s >= 1; s--) {
       const e = Math.max(1, Math.round(s / 3)); // the lettering's lit (or shadowed) edge, down and right
       for (const lead of [LEADING, LEADING - 1]) {
         const key = `quote|${i}|${s}|${lead}`;
         let lay = this.quoteLay.get(key);
-        if (lay === undefined) {
+        if (!lay) {
           const lines = wrapQuote(st.quote, (fw - e) / s);
           const h = lines ? (lines.length * CAP + (lines.length - 1) * lead) * s + e : 0;
           // (Lines that don't fit this panel: asked again for the next, as before: only a layout that fit is kept.)
           if (!lines || h > fh) continue;
-          this.quoteLay.set(key, (lay = { key, lines, w: Math.max(...lines.map(lineWidth)) * s + e, h, e }));
+          this.quoteLay.set(key, (lay = { key, lines, w: Math.max(...lines.map(lineWidth)) * s + e, h, e, s, lead }));
         }
-        if (!lay || lay.w > fw || lay.h > fh) continue;
-        const { lines } = lay;
-        return this.svc.ask(PIC_GROUP.text, key, 0, () => quoteArt(st.id, lines, s, lay!.e, lead));
+        if (lay.w <= fw && lay.h <= fh) return lay;
       }
     }
     return null;
@@ -3135,9 +3151,20 @@ export class Renderer {
     return this.DPR * 4096 + (fontIn(font) ? 0 : 1 + (fontsLoaded % 4095));
   }
 
+  /**
+   * The font sizes a tag's and a home's name's pictures are made at on this device: one, the biggest, where the screen has the pixels
+   * for the GPU to scale it unseen (`picOneSizeFrom`); every size it shows at on a 1x screen, where small text scaled down goes dim.
+   */
+  private tagSizes(): readonly number[] {
+    return this.DPR < TOWN_FEEL.picOneSizeFrom ? TAG_EVERY : TOWN_FEEL.tagPicSizes;
+  }
+  private nameSizes(): readonly number[] {
+    return this.DPR < TOWN_FEEL.picOneSizeFrom ? NAME_EVERY : TOWN_FEEL.namePicSizes;
+  }
+
   /** Home `i`'s name's picture for drawing at `size`: the picture service's, made at `picSize` (null: not made yet). Never let go. */
   private namePic(i: number, size: number): NameArt | null {
-    const S = picSize(TOWN_FEEL.namePicSizes, size);
+    const S = picSize(this.nameSizes(), size);
     const keys = (this.nameKeys[i] ??= []);
     return this.svc.ask(PIC_GROUP.text, (keys[S] ??= `name|${i}|${S}`), this.labelStamp(NAME_FONT[S]!), () => this.paintName(i, S), true);
   }
@@ -3189,7 +3216,7 @@ export class Renderer {
    */
   private askAhead(): void {
     for (const sg of this.signs) this.signArt(sg);
-    for (let i = 0; i < this.places.length; i++) for (const S of TOWN_FEEL.namePicSizes) this.namePic(i, S);
+    for (let i = 0; i < this.places.length; i++) for (const S of this.nameSizes()) this.namePic(i, S);
     this.askTags(this.town.people);
     for (const p of this.town.people) if (!isSprite(p.look)) this.pawnPic(p.look.side, p.look.tint);
     this.pawnPic("light", null);
@@ -3533,14 +3560,14 @@ export class Renderer {
    * (Nov 27; Nov 28, phase 2) Newcomers' name tags (another player arriving: here-net.ts's answer, Town.tsx `others`; everyone, on the
    * loading screen) asked of the picture service ahead, so each is made and uploaded between frames, not in the frame it first shows:
    * 55 arriving at once cost the busy town's frames 3 ms of painting and 2 of uploads each (the busy town's perf check). One a name
-   * and kind since phase 2 (five before, one a size), on the text's own atlas pages: 55 players' fit with room to spare, and no page
-   * is ever started again.
+   * and kind since phase 2 (five before, one a size; still so on a 1x screen: `tagSizes`), on the text's own atlas pages: 55 players'
+   * fit with room to spare, and no page is ever started again.
    */
   askTags(people: readonly Person[]): void {
     for (const p of people) {
       if (!p.name || p.home) continue;
       const kind: TagKind = p.you ? "you" : isSprite(p.look) ? "sidekick" : "bot";
-      for (const S of TOWN_FEEL.tagPicSizes) this.tagPic(p.name, kind, S);
+      for (const S of this.tagSizes()) this.tagPic(p.name, kind, S);
     }
   }
 
@@ -3574,7 +3601,7 @@ export class Renderer {
    * least lately drawn makes room when the text's pages fill. Made again when the device's pixel ratio changes or its font comes.
    */
   private tagPic(text: string, kind: TagKind, s: number): TagArt | null {
-    const S = picSize(TOWN_FEEL.tagPicSizes, s);
+    const S = picSize(this.tagSizes(), s);
     let keys = this.tagKeys.get(text);
     if (!keys) {
       // (The keys of names long gone: let go together, rarely.)
