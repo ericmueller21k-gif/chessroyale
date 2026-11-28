@@ -10,6 +10,7 @@ import { packCuts } from "./kit/draw.ts";
 import { paintSpec, type GlowPixels, type Pixels } from "./paint-jobs.ts";
 import { makeTownArt, townSheets, townWants } from "./pictures.ts";
 
+export { SHEET_ANIMS, sidekickFrame } from "./pictures.ts";
 export { packPictures } from "./keep-pictures.ts";
 export { ATLAS } from "./paint.ts";
 
@@ -31,7 +32,7 @@ export interface TownBake {
   anims: Record<string, number[]>;
   /** Each box's solid top (boxes.ts `solidTop`), by its art's id. */
   tops: Record<string, number>;
-  /** The sidekicks' sheets this town shows, by name (pictures.ts `townSheets`: each a picture file as it is, sidekicks/<name>.png). */
+  /** The sidekicks' sheets this town shows, by name (pictures.ts `townSheets`): the script cuts each into its frames' pictures. */
   sheets: string[];
 }
 

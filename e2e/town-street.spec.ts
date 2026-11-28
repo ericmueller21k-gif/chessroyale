@@ -2,7 +2,9 @@ import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { expect, type Page, type Route } from "@playwright/test";
 import { RECLUSE_MUSIC, TOWN_BAKED_FALLBACK, TOWN_PICTURES } from "@chessroyale/core";
 import { asAdmin, leaveQueue, pickMode, tapInTown, test, townHeld, townTap } from "./helpers.ts";
+import type { TownManifest } from "../packages/app/src/town/manifest.ts";
 import { ALL_HOMES } from "../packages/app/src/town/world.ts";
+import { unpng } from "../scripts/png.ts";
 
 /**
  * The street town, round 2: the layout (Nov 5; docs/decisions/2026-11-05-street-town-layout.md), in an admin's town only
@@ -47,6 +49,34 @@ type Hooks = {
   __townCam?: () => { zoom: number; zoomTarget: number; focus: number[] };
   __townBossBack?: (id: string) => boolean;
 };
+
+/**
+ * What the GPU should hold for each picture a town's loading screen puts in place, in its order, worked out from the build's own
+ * files (dist/town-pictures: order.json's list for this town, the manifest's places, the pages' pixels): each picture's size and
+ * texels (its colors multiplied into its alpha, as the browser uploads them), hashed as the painter hashes what it holds
+ * (paint-gl.ts `texels`, behind `__townPictureSum(true)`).
+ */
+function bakedTexels(kind: "player" | "admin"): number[] {
+  const dir = "packages/app/dist/town-pictures";
+  const order = JSON.parse(readFileSync(`${dir}/order.json`, "utf8")) as Record<"player" | "admin", number[]> & { manifest: string };
+  const m = JSON.parse(readFileSync(`${dir}/${order.manifest}`, "utf8")) as TownManifest;
+  const names = Object.keys(m.pictures);
+  const pages = new Map<number, ReturnType<typeof unpng>>();
+  return order[kind].map((i) => {
+    const [f, x, y, w, h] = m.pictures[names[i]!]!;
+    let pg = pages.get(f);
+    if (!pg) pages.set(f, (pg = unpng(readFileSync(`${dir}/${m.files[f]!.name}`))));
+    const d = pg.data;
+    let k = Math.imul(Math.imul(0x811c9dc5 ^ w, 16777619) ^ h, 16777619);
+    for (let yy = 0; yy < h; yy++)
+      for (let xx = 0, o = ((y + yy) * pg.w + x) * 4; xx < w; xx++, o += 4) {
+        const a = d[o + 3]!;
+        const pre = (c: number) => Math.round((c * a) / 255);
+        k = Math.imul(k ^ (pre(d[o]!) | (pre(d[o + 1]!) << 8) | (pre(d[o + 2]!) << 16) | (a << 24)), 16777619);
+      }
+    return k >>> 0;
+  });
+}
 
 /** The street town, an admin's, open by day (drawn with WebGL: its only drawing, Nov 6). */
 async function openStreet(page: Page, query = "") {
@@ -362,6 +392,59 @@ test("the street town's WebGL context lost: nothing drawn until it's back, then 
   await expect(box).toHaveCount(0);
 });
 
+/**
+ * The context lost while the town is still loading (Nov 28, phase 1c): the load waits for it and goes on, and the town shows with
+ * everything the loading screen keeps on the GPU, as an undisturbed load has it: nothing left to upload in a frame as it first shows.
+ * (The files' decoded copies are let go once uploaded, so nothing could be uploaded later from them; and until phase 1c a picture
+ * handed to the painter during the loss, the labels', was dropped and uploaded as it first showed.)
+ */
+test("the WebGL context lost while the town loads, at either step of its loading screen: the load goes on once it's back, and everything it keeps is on the GPU as on an undisturbed load (Nov 28)", { tag: "@phone-only" }, async ({ page }) => {
+  type W = { __townPaint: () => { lost: boolean; pictures: { baked: boolean; open: boolean }; atlas: { pages: number; kept: number; unkept: number } }; __townPictureSum: (each: boolean) => { each: number[] }; __lostAt?: string };
+  const errors = watchErrors(page);
+  // (Loses the context the first frame the loading card names step `__loseAt`, its bar past 15% for the first; back 400 ms later.)
+  await page.addInitScript(() => {
+    const w = window as unknown as W;
+    const f = () => {
+      const note = document.querySelector(".town-loading .boss-loading-note")?.textContent ?? "";
+      const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas");
+      const share = Number(document.querySelector(".town-loading [role=progressbar]")?.getAttribute("aria-valuenow") ?? 0);
+      const want = sessionStorage.getItem("loseAt");
+      if (want && cv && note.startsWith(want) && (want === "Building" || share > 15)) {
+        const ext = (cv.getContext("webgl2") as WebGL2RenderingContext | null)?.getExtension("WEBGL_lose_context");
+        w.__lostAt = note;
+        ext?.loseContext();
+        setTimeout(() => ext?.restoreContext(), 400);
+        return;
+      }
+      requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  const load = async (loseAt: string | null) => {
+    await page.goto("/version.json");
+    await page.evaluate((at) => (at ? sessionStorage.setItem("loseAt", at) : sessionStorage.removeItem("loseAt")), loseAt);
+    await page.goto("/town?sky=day");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
+    await expect(page.locator(".town-loading")).toHaveCount(0);
+    const got = await page.evaluate(() => {
+      const w = window as unknown as W;
+      const p = w.__townPaint();
+      // (`off`: pictures of the loading screen's list not on the GPU. `atlas`: its pages, and the pictures kept on them for good.)
+      return { lostAt: w.__lostAt ?? null, lost: p.lost, pictures: { baked: p.pictures.baked, open: p.pictures.open }, atlas: { pages: p.atlas.pages, kept: p.atlas.kept, unkept: p.atlas.unkept }, off: w.__townPictureSum(true).each.filter((k) => !k).length };
+    });
+    return got;
+  };
+  const plain = await load(null);
+  expect(plain).toMatchObject({ lostAt: null, lost: false, off: 0, pictures: { baked: true, open: false } });
+  expect(plain.atlas.kept, "pictures kept on an undisturbed load").toBeGreaterThan(2500);
+  for (const step of ["Loading the town's pictures", "Building"]) {
+    const got = await load(step);
+    expect(got.lostAt, `the context was lost during "${step}…"`).toContain(step);
+    expect({ ...got, lostAt: null }, `lost during "${step}…": the town as an undisturbed load has it`).toEqual(plain);
+  }
+  expect(errors).toEqual([]);
+});
+
 test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of walking and turning, and Done shows one panel with the numbers, inside the box; without ?report there's no pill and no panel", { tag: "@phone-only" }, async ({ page }) => {
   type R = { __townReport: () => { state: string; frames: number; summary: { frames: number; p50: number; segs: { name: string; frames: number }[]; worst: unknown[] } | null } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean };
   const errors = watchErrors(page);
@@ -428,8 +511,8 @@ test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of 
   expect(errors).toEqual([]);
 });
 
-test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking across the town at night among the bots and a crowd's tags (Nov 26), a full turn and zooming in and out paint nothing new, upload nothing (Nov 25) and start no atlas page again, on a first visit and a second (both load the build's baked pictures, Nov 28)", { tag: "@phone-only" }, async ({ page }) => {
-  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number; uploadsBy: [string, number][] } | null } | null; __townYou: () => { moving: boolean } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townChips: () => { faces: number }; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number }; pictures: { baked: boolean; kept: boolean; workers: number; count: number } } };
+test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking across the town at night among the bots and a crowd's tags (Nov 26), a full turn and zooming in and out paint nothing new, upload nothing (Nov 25) and start no atlas page again, on a first visit and a second (both load the build's baked pictures, Nov 28); a lost context brings the card back until every picture is on the GPU again", { tag: "@phone-only" }, async ({ page }) => {
+  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number; uploadsBy: [string, number][] } | null } | null; __townYou: () => { moving: boolean } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townChips: () => { faces: number }; __townPaint: () => { loading: boolean; lost: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number }; pictures: { baked: boolean; open: boolean; count: number } } };
   const errors = watchErrors(page);
   const bar = page.locator(".town-loading").getByRole("progressbar", { name: "Loading Chess Town" });
   // The bar's share as it shows (sampled every frame until it goes): it only goes up. And the step named under it (Nov 14), each new one.
@@ -463,8 +546,9 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   expect(paint.loading).toBe(false);
   expect(paint.atlas.kept, "the town's pictures kept").toBeGreaterThan(1000);
   expect(paint.atlas.unkept, "all of them").toBe(0);
-  // (Nov 28, phase 1b) None of them painted here: the build's baked files, fetched and uploaded whole (town/baked.ts).
-  expect({ baked: paint.pictures.baked, workers: paint.pictures.workers }, "the first visit loads the build's baked pictures: no paint workers").toEqual({ baked: true, workers: 0 });
+  // (Nov 28, phase 1) None of them painted here: the build's baked files, fetched and uploaded whole (town/baked.ts), then their decoded
+  // copies let go: the GPU holds them (phase 1c).
+  expect({ baked: paint.pictures.baked, open: paint.pictures.open }, "the first visit loads the build's baked pictures, and lets their decoded files go once uploaded").toEqual({ baked: true, open: false });
   expect(paint.pictures.count, "pictures the loading screen put in place").toBeGreaterThan(2000);
   // Walking, then a full turn on the spot (360° in about 2 s), then zooming in and out: nothing painted, nothing uploaded (Eric's laptop,
   // Nov 25: "1063 uploads" in 15 s of walking, every worst frame one with uploads), no page started again. (The bosses hushed: a line
@@ -513,15 +597,16 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
     expect(faces, `${visit}: chips' faces drawn`).toBeGreaterThan(4);
     expect(faces, `${visit}: chips' faces drawn, one a place at most`).toBeLessThanOrEqual(ALL_HOMES.length + 1);
   };
-  // (Nov 25) The context lost and back: every picture on screen uploaded again (each cut from its baked file's page as it is): what the
-  // GPU holds for each the same as before.
+  // (Nov 25; Nov 28, phase 1c) The context lost and back: nothing is drawn until the town's pictures are on the GPU again. Its loading
+  // card comes back up while its files are fetched again (their decoded copies were let go once uploaded: the service worker has them)
+  // and everything is uploaded as on the loading screen. Then what the GPU holds for every picture is what it held before.
   const lossCheck = async (visit: string) => {
     type S = { __townPictureSum: (each: boolean) => { each: number[] | null } };
     const sums = () => page.evaluate(() => (window as unknown as S).__townPictureSum(true).each!);
     await page.evaluate(() => (window as unknown as { __townHold: (on: boolean) => void }).__townHold(true));
     const before = await sums();
     expect(before.every((k) => k !== 0), `${visit}: every kept picture on the GPU`).toBe(true);
-    await page.evaluate(async () => {
+    const card = await page.evaluate(async () => {
       const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas")!;
       const ext = (cv.getContext("webgl2") as WebGL2RenderingContext).getExtension("WEBGL_lose_context")!;
       const lost = new Promise((ok) => cv.addEventListener("webglcontextlost", ok, { once: true }));
@@ -531,14 +616,16 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
       const back = new Promise((ok) => cv.addEventListener("webglcontextrestored", ok, { once: true }));
       ext.restoreContext();
       await back;
-      // (A frame drawn: what's on screen uploaded again.)
-      cv.getContext("2d")!.getImageData(0, 0, 1, 1);
+      // (The card is up from the moment the context is back, and until then every picture is off the GPU.)
+      await new Promise((ok) => requestAnimationFrame(ok));
+      return { card: !!document.querySelector(".town-loading [role=progressbar]"), lost: (window as unknown as R).__townPaint().lost };
     });
-    const after = await sums();
+    expect(card, `${visit}: the context back, the loading card up again and nothing drawn yet`).toEqual({ card: true, lost: true });
+    await expect.poll(() => page.evaluate(() => (window as unknown as R).__townPaint().lost), { message: `${visit}: the pictures on the GPU again`, timeout: 30_000 }).toBe(false);
+    await expect(page.locator(".town-loading")).toHaveCount(0);
+    expect(await sums(), `${visit}: every picture on the GPU again, as before the context was lost`).toEqual(before);
+    expect((await page.evaluate(() => (window as unknown as R).__townPaint())).pictures.open, `${visit}: the files' decoded copies let go again`).toBe(false);
     await page.evaluate(() => (window as unknown as { __townHold: (on: boolean) => void }).__townHold(false));
-    const again = after.flatMap((k, i) => (k ? [[k, before[i]]] : []));
-    expect(again.length, `${visit}: pictures uploaded again after the context came back`).toBeGreaterThan(10);
-    expect(again.filter(([a, b]) => a !== b).length, `${visit}: pictures not as they were before the context was lost`).toBe(0);
   };
   await roam("the first visit");
   await lossCheck("the first visit");
@@ -578,13 +665,12 @@ test("home fetches Chess Town's baked pictures when idle and the service worker 
   expect(pngs, "fetched ahead while the queue showed").toEqual([]);
   await leaveQueue(page);
   await page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).first().waitFor({ timeout: 60_000 });
-  // The files this town draws from (the manifest, by the name order.json gives; not the sidekicks' sheets, which the town doesn't read from here).
+  // The files this town draws from (the manifest, by the name order.json gives; its sidekicks' frames among them since phase 1c).
   const kept = () =>
     page.evaluate(async () => {
       const order = (await (await fetch("/town-pictures/order.json")).json()) as { manifest: string };
-      const m = (await (await fetch(`/town-pictures/${order.manifest}`)).json()) as { files: { name: string; towns: string[] }[]; sheets: Record<string, number> };
-      const sheets = new Set(Object.values(m.sheets));
-      const want = [order.manifest, ...m.files.filter((f, i) => f.towns.includes("player") && !sheets.has(i)).map((f) => f.name)];
+      const m = (await (await fetch(`/town-pictures/${order.manifest}`)).json()) as { files: { name: string; towns: string[] }[] };
+      const want = [order.manifest, ...m.files.filter((f) => f.towns.includes("player")).map((f) => f.name)];
       let n = 0;
       for (const name of want) if (await caches.match(`/town-pictures/${name}`)) n++;
       return { want: want.length, kept: n, admins: (await Promise.all(m.files.filter((f) => !f.towns.includes("player")).map((f) => caches.match(`/town-pictures/${f.name}`)))).filter(Boolean).length };
@@ -592,7 +678,7 @@ test("home fetches Chess Town's baked pictures when idle and the service worker 
   // (Home's fetch starts TOWN_PICTURES.homeFetchAfterMs after it shows, a file at a time, each through the worker: all of them kept.)
   await expect.poll(async () => ((k) => k.want - k.kept)(await kept()), { message: "files of a player's town, and the manifest, not in the worker's cache yet", timeout: 60_000, intervals: [1000] }).toBe(0);
   const all = await kept();
-  expect(all.want).toBeGreaterThan(30);
+  expect(all.want).toBeGreaterThan(44);
   expect(all.admins, "none of an admin's town's own files").toBe(0);
   // (Each once at most: home never asks again for a file this page has read.)
   expect(new Set(pngs).size, "each page fetched ahead once").toBe(pngs.length);
@@ -608,17 +694,18 @@ test.describe(() => {
   test.use({ serviceWorkers: "block" });
 
   /**
-   * The build's baked town is the device's (Nov 28, the town's structure, phase 1: scripts/bake-town.ts, town/baked.ts;
-   * docs/decisions/2026-11-28-town-load-baked.md). The town loads the files the build painted; with one of them missing it paints every
-   * picture itself, as it did until phase 1b. The two are the same town by its own picture hash (`__townPictureSum`: every picture the
-   * loading screen put in place, its size and pixels, in order; and what the GPU holds for each).
+   * The town loads the build's baked pictures, and only those (Nov 28, the town's structure, phase 1: scripts/bake-town.ts, town/baked.ts;
+   * docs/decisions/2026-11-28-town-load-baked.md, 2026-11-28-town-no-device-painting.md). What the GPU holds for every picture the
+   * loading screen put in place is the build's own file's pixels (`bakedTexels`: worked out here from dist/town-pictures; that those
+   * are the painting code's, packages/app/test/town-bake.test.ts). Nothing is painted on the device since phase 1c: a file that fails
+   * once is asked for again and the town loads; one that keeps failing, and the card says the town didn't load, with Retry.
    */
   for (const kind of ["player", "admin"] as const)
-    test(`the build's baked pictures are the device's (Nov 28): ${kind === "admin" ? "an admin" : "a player"}'s town loads them, none painted; with a file missing it paints them all itself, and every picture and what the GPU holds for it is the same`, { tag: "@phone-only" }, async ({ page }) => {
-      type P = { __townPictureSum: () => { n: number; hash: string; gpu: string | null }; __townPaint: () => { pictures: { baked: boolean; files: number; bytes: number; workers: number; byWorkers: number; saved: number | null | undefined }; atlas: { unkept: number } } };
+    test(`the town loads the build's baked pictures (Nov 28): ${kind === "admin" ? "an admin" : "a player"}'s town its own files alone, its sidekicks' frames among them, and what the GPU holds for each picture is its file's pixels; a file that fails once is asked for again; one that keeps failing: "The town didn't load. Please retry." with Retry, never a half town`, { tag: "@phone-only" }, async ({ page }) => {
+      type P = { __townPictureSum: (each?: boolean) => { n: number; each: number[] | null }; __townPaint: () => { pictures: { baked: boolean; files: number; bytes: number; open: boolean }; atlas: { unkept: number } } };
       const errors = watchErrors(page);
       if (kind === "admin") await asAdmin(page);
-      // (The town this device saved before the build baked its pictures, and its tops: cleared once a baked load is in. S5.)
+      // (The town this device saved before the build baked its pictures, and its tops: let go once a baked load is in. S5.)
       const saved = () =>
         page.evaluate(
           () =>
@@ -648,44 +735,69 @@ test.describe(() => {
         );
         expect(await saved()).toEqual({ pictures: true, tops: true });
       }
-      // (Why the baked town wasn't used: said once a page, in the request an error goes in. S3.)
+      // (Why the town didn't load: said once a page, in the request an error goes in. S3.)
       const reported: string[] = [];
       page.on("request", (r) => {
         if (!r.url().endsWith("/api/problems")) return;
         for (const e of (JSON.parse(r.postData() ?? "{}") as { errors?: { kind: string; message: string }[] }).errors ?? []) if (e.kind === TOWN_BAKED_FALLBACK.kind) reported.push(e.message);
       });
       const pngs: string[] = [];
-      let drop = "";
+      /** A file that fails: `times` requests of it (Infinity: every one). */
+      const fail = { name: "", times: 0 };
       await page.route("**/town-pictures/*.png", (route) => {
         const name = route.request().url().split("/").pop()!;
         pngs.push(name);
-        return name === drop ? route.abort() : route.continue();
+        return name === fail.name && fail.times-- > 0 ? route.abort() : route.continue();
       });
-      const visit = async () => {
-        await page.goto("/town?sky=day");
-        await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
-        return { sum: await page.evaluate(() => (window as unknown as P).__townPictureSum()), paint: await page.evaluate(() => (window as unknown as P).__townPaint()) };
-      };
-      // The baked files, loaded: this town's alone, none painted on the device.
-      const baked = await visit();
-      expect(baked.paint.pictures, "the town loaded the build's baked pictures: no paint workers").toMatchObject({ baked: true, workers: 0, saved: null });
-      expect(baked.paint.pictures.files, "files fetched").toBe(pngs.length);
-      expect(baked.paint.pictures.files, "files fetched").toBeGreaterThan(20);
+      const ready = () => expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
+      // The baked files, loaded: this town's alone, its sidekicks' frames among them (a file a sidekick), none painted on the device.
+      await page.goto("/town?sky=day");
+      await ready();
+      const paint = await page.evaluate(() => (window as unknown as P).__townPaint());
+      expect(paint.pictures, "the town loaded the build's baked pictures, and let their decoded files go once uploaded").toMatchObject({ baked: true, open: false });
+      expect(paint.pictures.files, "files fetched").toBe(pngs.length);
+      expect(paint.pictures.files, "files fetched").toBeGreaterThan(20);
       expect(pngs.filter((n) => n.includes(kind === "admin" ? ".player." : ".admin.")), "files only the other town draws").toEqual([]);
-      expect(pngs.filter((n) => n.startsWith("sidekick-")), "the sidekicks' sheets (not read from here yet)").toEqual([]);
-      expect(baked.sum.n, "pictures the loading screen put in place").toBeGreaterThan(2000);
-      expect(baked.paint.atlas.unkept, "pictures the atlas couldn't keep").toBe(0);
+      // (The ladder's fourteen; an admin's town has Rivet's and Tick's too, the admins-first bosses' kids.)
+      expect(pngs.filter((n) => n.startsWith("sidekick-")).length, "the sidekicks' frames: a file each").toBe(kind === "admin" ? 16 : 14);
+      expect(pngs.filter((n) => n.startsWith("sidekick-timber.")).length, "Rivet's, Timber's kid").toBe(kind === "admin" ? 1 : 0);
+      expect(paint.atlas.unkept, "pictures the atlas couldn't keep").toBe(0);
       if (kind === "player") await expect.poll(saved, { message: "the town this device saved before, let go" }).toEqual({ pictures: false, tops: false });
-      // One file missing: none of the baked town is used. The device paints every picture, as before.
-      drop = pngs[3]!;
-      const painted = await visit();
-      expect(painted.paint.pictures.baked, "a baked file missing: the device paints").toBe(false);
-      expect(painted.paint.pictures.byWorkers, "pictures its paint workers made").toBeGreaterThan(1000);
-      expect(painted.paint.pictures.saved, "and keeps none of them (the next visit loads the files)").toBeNull();
-      expect(painted.sum, "the painted town, by the town's own picture hash and the GPU's").toEqual(baked.sum);
-      await expect.poll(() => reported, { message: "the fallback and its reason, reported once", timeout: 15_000 }).toEqual(["file"]);
-      // (The one request that failed, by design.)
-      expect(errors.filter((e) => !e.includes(drop))).toEqual([]);
+      // What the GPU holds for every picture the loading screen put in place, in its order: the build's files' pixels.
+      const want = bakedTexels(kind);
+      const got = (await page.evaluate(() => (window as unknown as P).__townPictureSum(true))).each!;
+      expect(want.length, "pictures the loading screen put in place").toBeGreaterThan(2000);
+      expect(got.length, "as many as the build's list for this town").toBe(want.length);
+      expect(got.flatMap((k, i) => (k === want[i] ? [] : [i])).slice(0, 5), "pictures the GPU holds otherwise than the build's files have them").toEqual([]);
+      // One file failing once (a hiccup): asked for again, and the town loads all the same. Nothing to report.
+      const files = [...new Set(pngs)];
+      Object.assign(fail, { name: files[3]!, times: 1 });
+      pngs.length = 0;
+      await page.goto("/town?sky=day");
+      await ready();
+      expect(pngs.filter((n) => n === fail.name).length, "the file that failed once: asked for twice").toBe(2);
+      expect((await page.evaluate(() => (window as unknown as P).__townPaint())).pictures.baked).toBe(true);
+      expect(reported).toEqual([]);
+      // One file failing every time: asked for three times, then the town's box says it didn't load, with Retry, and nothing else:
+      // never a half town (and nothing is painted here instead, as until phase 1c).
+      Object.assign(fail, { name: files[5]!, times: Infinity });
+      pngs.length = 0;
+      await page.goto("/town?sky=day");
+      const box = page.locator(".town-broken");
+      await expect(box).toBeVisible({ timeout: 30_000 });
+      await expect(box).toHaveText(/^The town didn't load\. Please retry\.\s*Retry$/);
+      expect(pngs.filter((n) => n === fail.name).length, "the file that keeps failing: three tries").toBe(3);
+      await expect(canvas(page)).not.toHaveAttribute("data-ready", "1");
+      await expect(page.locator(".town-loading:not(.town-broken)")).toHaveCount(0);
+      await expect.poll(() => reported, { message: "why, reported once", timeout: 15_000 }).toEqual(["file"]);
+      if (STILLS) await page.screenshot({ path: `${STILLS}/town-pictures-didnt-load-${kind}-${test.info().project.name}.png` });
+      // Retry, the file coming again: the town.
+      fail.times = 0;
+      await box.getByRole("button", { name: "Retry" }).click();
+      await ready();
+      await expect(box).toHaveCount(0);
+      // (The requests that failed, by design.)
+      expect(errors.filter((e) => !files.slice(3, 6).some((f) => e.includes(f)))).toEqual([]);
     });
   test("the town's first frame doesn't wait for the music (Eric, Nov 14: \"christ it's taking forever\"); then the town's own theme, played in the street (Nov 15), its solos, then every boss theme fetched once, one piece at a time, none decoded, but the Hidden Boss's (fetched as his fight starts); Music off fetches none", { tag: "@phone-only" }, async ({ page }) => {
     const dir = "packages/app/public/music";

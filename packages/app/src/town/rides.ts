@@ -200,6 +200,15 @@ export class Rider {
     if (this.ready) queueMicrotask(() => f(this));
     else if (!this.dead) this.waiting.push(f);
   }
+  /**
+   * Calls `f` once its frames are ready or have failed (in a moment if either is so already): the town's loading screen waits for
+   * each ride with no time cap (Nov 28), so one whose drawing didn't come must still end the wait.
+   */
+  settled(f: () => void): void {
+    if (this.ready || this.dead) queueMicrotask(f);
+    else this.ending.push(f);
+  }
+  private readonly ending: (() => void)[] = [];
   /** Loads the ride's drawing (its own chunk, once for everyone: load.ts), then composes its frames from it, one an animation frame; then it's ready. */
   private start(): void {
     void loadRide(this.id)
@@ -219,7 +228,10 @@ export class Rider {
           this.drop();
           for (const [key, x] of riders) if (x === this) riders.delete(key);
         },
-      );
+      )
+      .then(() => {
+        for (const f of this.ending.splice(0)) f();
+      });
   }
   /** Its frames' jobs: every frame of every view, then its trail marks, from the ride's drawing `d`. */
   private jobs(d: RiderDraft): Job[] {

@@ -244,8 +244,6 @@ export const TOWN_FEEL = {
   loadPaintShare: 0.5,
   /** (Nov 28, the build's baked pictures: baked.ts) The share of the pictures' part of the bar that is their files coming in; the rest, each put in its place. */
   loadFetchShare: 0.8,
-  /** How long it waits for the sidekicks' sheets (ms; they load as the town opens): past it, one not in yet is drawn when it's in, as before. */
-  loadSheetWaitMs: 3000,
   /**
    * (Nov 28, Eric: "I don't want it to lag at all when the town loads"; "Load the town first so it doesn't lag") The warm-up: frames drawn
    * under the loading card, each waited for on the GPU (`settle`), so the first use of the textures and shaders is paid there, until this

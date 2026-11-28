@@ -54,7 +54,7 @@ export const tileTexel = (fg: FaceGeom, tile: Tile) => (X: number, Y: number): s
 
 /**
  * Box `b`'s roof (its art `box`) for the camera facing quarter `q` (0 north, 1 east, 2 south, 3 west), as pixels: every face, whole
- * and in triangles. Pure (no canvas): run on the main thread or in a paint worker (paint-jobs.ts), the same code either way.
+ * and in triangles. Pure (no canvas): the build's bake runs it in Node (paint-jobs.ts), the same code as the page's.
  */
 export function roofCuts(b: RoofInst, box: RoofBox, q: number): Cut[][] {
   // (The camera's quarter: 0 north, 1 east, 2 south, 3 west; its heading's cosine and sine.)
@@ -70,8 +70,8 @@ export function roofCuts(b: RoofInst, box: RoofBox, q: number): Cut[][] {
 }
 
 /**
- * Box `b`'s roof (its art `box`), painted for the camera facing quarter `q`: its pixels (`roofCuts`, or the same already worked out by
- * a paint worker) packed into sheets (so WebGL's atlas holds a few big pictures, not hundreds of small ones).
+ * Box `b`'s roof (its art `box`), painted for the camera facing quarter `q`: its pixels (`roofCuts`) packed into sheets (so WebGL's
+ * atlas holds a few big pictures, not hundreds of small ones).
  */
 export function bakeRoof(b: BoxInst, box: TownBox, q: number, cuts: Cut[][] = roofCuts(b, box, q)): RoofArt {
   return { faces: packFaces(cuts) };

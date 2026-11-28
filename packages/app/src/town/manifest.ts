@@ -13,7 +13,7 @@ export type TownKind = (typeof TOWNS)[number];
 export interface TownFile {
   /** Its name under /town-pictures/: its group (and the one town that draws it, if only one does), then its contents' hash. */
   name: string;
-  /** `home:<id>`, `row:<street>:<facing>`, `park`, `colosseum`, `props`, or `sidekick:<id>` (a sheet as it is, not a page). */
+  /** `home:<id>`, `row:<street>:<facing>`, `park`, `colosseum`, `props`, or `sidekick:<sheet>` (a sidekick's frames, each a picture). */
   group: string;
   /** The towns that draw something on it. */
   towns: TownKind[];
@@ -22,7 +22,8 @@ export interface TownFile {
   bytes: number;
 }
 export interface TownManifest {
-  v: 1;
+  /** 2 since phase 1c (Nov 28): the sidekicks' frames are pictures (`sidekick:<sheet>:<animation>#<frame>`), not sheets listed apart. */
+  v: 2;
   files: TownFile[];
   /** Each picture by name: its file (an index in `files`), x, y, width and height there. Names with the same pixels share a place. */
   pictures: Record<string, [file: number, x: number, y: number, w: number, h: number]>;
@@ -36,8 +37,6 @@ export interface TownManifest {
   anims: Record<string, number[]>;
   /** Each box's solid top (boxes.ts `solidTop`), by its art's id. */
   tops: Record<string, number>;
-  /** Each sidekick's sheet (its name in the app's SIDEKICK_SHEETS): its file. */
-  sheets: Record<string, number>;
 }
 
 /** A baked file's name: letters, digits, dots and dashes, then its contents' hash (12 hex) and its kind. Nothing that leaves the folder. */
@@ -51,10 +50,10 @@ const nums = (x: unknown): x is number[] => Array.isArray(x) && x.every((v) => t
 
 /**
  * `x` as a manifest, every file named as the bake names one and every picture on its file; null for anything else (a page sent for a
- * file the server no longer has, a cut-off answer). The town then paints on the device, as before.
+ * file the server no longer has, a cut-off answer).
  */
 export function manifestFrom(x: unknown): TownManifest | null {
-  if (!isRec(x) || x.v !== 1 || !Array.isArray(x.files) || !isRec(x.pictures) || !isRec(x.roofs) || !isRec(x.glows) || !isRec(x.anims) || !isRec(x.tops) || !isRec(x.sheets)) return null;
+  if (!isRec(x) || x.v !== 2 || !Array.isArray(x.files) || !isRec(x.pictures) || !isRec(x.roofs) || !isRec(x.glows) || !isRec(x.anims) || !isRec(x.tops)) return null;
   const files = x.files as Partial<TownFile>[];
   for (const f of files)
     if (!isRec(f) || typeof f.name !== "string" || !BAKED_NAME.test(f.name) || !isInt(f.w) || !isInt(f.h) || !f.w || !f.h || !isInt(f.bytes) || !Array.isArray(f.towns) || !f.towns.every((t) => (TOWNS as readonly string[]).includes(t))) return null;
@@ -68,15 +67,10 @@ export function manifestFrom(x: unknown): TownManifest | null {
   for (const g of Object.values(x.glows)) if (!nums(g) || g.length % 7) return null;
   for (const a of Object.values(x.anims)) if (!nums(a) || !a.length) return null;
   for (const t of Object.values(x.tops)) if (typeof t !== "number" || !Number.isFinite(t)) return null;
-  for (const s of Object.values(x.sheets)) if (!isInt(s) || !files[s]) return null;
   return x as unknown as TownManifest;
 }
 
-/**
- * The pages of pictures a town of this kind draws from: their indexes in the manifest's `files`. (Not the sidekicks' sheets: the town
- * still cuts each sidekick's frames from the copy its own code names, render.ts `SHEET_URL`.)
- */
+/** The pages of pictures a town of this kind draws from (its sidekicks' frames among them): their indexes in the manifest's `files`. */
 export function filesOf(m: TownManifest, kind: TownKind): number[] {
-  const sheets = new Set(Object.values(m.sheets));
-  return m.files.flatMap((f, i) => (f.towns.includes(kind) && !sheets.has(i) ? [i] : []));
+  return m.files.flatMap((f, i) => (f.towns.includes(kind) ? [i] : []));
 }

@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import preact from "@preact/preset-vite";
 import { APP_CACHE } from "../core/src/settings.ts";
-import { townArt } from "./town-art.ts";
 import { TOWN_PICTURES_DIR, bakeTown, report, type BakeResult } from "../../scripts/bake-town.ts";
 import { BAKED_NAME, TOWNS, TOWN_FILE_PATH, filesOf } from "./src/town/manifest.ts";
 
@@ -241,8 +240,6 @@ function maiaFileBytes(): Record<string, number> {
   return Object.fromEntries(readdirSync(dist).filter((f) => /\.(js|wasm|onnx)$/.test(f)).map((f) => [f, statSync(join(dist, f)).size]));
 }
 
-// (`__TOWN_ART__`, Nov 28: the town's art's fingerprint, which keys the town's pictures kept between visits, so a deploy that doesn't
-// change the art keeps them: town-art.ts. The dev server keeps no pictures, so it takes none.)
 // (`__TOWN_PICTURES__`, Nov 28, phase 1b: the baked town's manifest's name, by its contents. A build bakes here, before the app is
 // built, so the app is handed the name. The dev server is handed `order.json`, which names the latest bake's: `townPictures` above.)
 // (`__TOWN_PAGES__`: each town's pages' names, as the manifest has them. Home fetches them ahead by these, without reading the manifest:
@@ -254,7 +251,6 @@ export default defineConfig(async ({ command }) => {
     define: {
       __MAIA_FILE_BYTES__: JSON.stringify(maiaFileBytes()),
       __APP_VERSION__: JSON.stringify(VERSION),
-      __TOWN_ART__: JSON.stringify(command === "build" ? await townArt() : "dev"),
       __TOWN_PICTURES__: JSON.stringify(baked?.manifestName ?? "order.json"),
       __TOWN_PAGES__: JSON.stringify(baked ? Object.fromEntries(TOWNS.map((t) => [t, filesOf(baked.manifest, t).map((i) => baked.manifest.files[i]!.name)])) : {}),
     },

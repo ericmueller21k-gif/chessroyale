@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { OPS, TOWN_BAKED_FALLBACK, TOWN_GL_FALLBACK } from "@chessroyale/core";
+import { OPS, TOWN_BAKED_FALLBACK, TOWN_GL_FALLBACK, TOWN_LOAD_LATE } from "@chessroyale/core";
 
 /**
  * The town's WebGL fallback report (problems.ts, `reportTownFallback`; docs/decisions/2026-10-30-town-webgl.md, "Oct 30,
@@ -29,8 +29,8 @@ function page() {
   return sent;
 }
 
-describe("the baked town not used (Nov 28, the review of phase 1b, S3: problems.ts `reportBakedFallback`)", () => {
-  it("is sent once a page with its first reason, as its own kind, however often the town paints its own pictures; beside a WebGL fallback, each its own", async () => {
+describe("the town's pictures not loaded (Nov 28, the review of phase 1b, S3: problems.ts `reportBakedFallback`; since phase 1c the card says so, nothing is painted instead)", () => {
+  it("is sent once a page with its first reason, as its own kind, however often the load fails; beside a WebGL fallback, each its own", async () => {
     vi.useFakeTimers();
     const sent = page();
     const { reportBakedFallback, reportTownFallback } = await import("../src/problems.ts");
@@ -43,7 +43,25 @@ describe("the baked town not used (Nov 28, the review of phase 1b, S3: problems.
     reportBakedFallback("manifest");
     await vi.advanceTimersByTimeAsync(OPS.client.batchMs + 10);
     expect(sent).toHaveLength(1);
-    expect(TOWN_BAKED_FALLBACK.reasons).toEqual(["manifest", "file", "decode", "size", "list", "stall"]);
+    expect(TOWN_BAKED_FALLBACK.reasons).toEqual(["manifest", "file", "decode", "size", "list", "stall", "gpu"]);
+  });
+});
+
+describe("the town shown before something of its loading screen was in (Nov 28, phase 1c: problems.ts `reportTownLate`)", () => {
+  it("is sent once a page for each thing that was late (the fonts, the crate items, the rides), as its own kind", async () => {
+    vi.useFakeTimers();
+    const sent = page();
+    const { reportTownLate } = await import("../src/problems.ts");
+    reportTownLate("items");
+    reportTownLate("items");
+    reportTownLate("rides");
+    await vi.advanceTimersByTimeAsync(OPS.client.batchMs + 10);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.errors.map((e) => [e.kind, e.message, e.stack])).toEqual([[TOWN_LOAD_LATE.kind, "items", ""], [TOWN_LOAD_LATE.kind, "rides", ""]]);
+    reportTownLate("rides");
+    await vi.advanceTimersByTimeAsync(OPS.client.batchMs + 10);
+    expect(sent).toHaveLength(1);
+    expect(TOWN_LOAD_LATE.reasons).toEqual(["fonts", "items", "rides"]);
   });
 });
 
