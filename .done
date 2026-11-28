@@ -1,0 +1,7 @@
+The Stranger's polish: done (Nov 28). Branch claude/stranger-polish, main merged in (1e1fe3a). PR body: .pr-body.md.
+Stills: stills/stranger-polish (634db0a6): stranger-ult-phone.gif, stranger-ult-desktop.gif, stranger-knockback-crowded-phone.mp4,
+stranger-knockback-crowded-desktop.mp4, stranger-entrance-phone.gif, stranger-entrance-desktop.png, stranger-storm-turn-phone.png,
+stranger-unlocked-notice-phone.png, -desktop.png.
+Run locally: typecheck; unit tests (app, server, the boss kit); e2e/stranger.spec.ts on a phone (all four), the finisher on a computer.
+Not run locally: the town and tower specs the PR's e2e will pick (Town.tsx, tower-floor*.ts, boss-timing.ts are in its diff).
+For the director: no sound in his entrance yet; his speech boxes stay lit in the shade; `.mockup` and `.go` are dropped from the branch.
