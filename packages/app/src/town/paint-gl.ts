@@ -414,9 +414,12 @@ function fitShelf(pg: { shelves: { y: number; h: number; x: number }[]; top: num
   pg.top += H;
   return n;
 }
-/** (Pure: tests) How many pages pictures of these sizes (padding included), placed in this order, take. */
-export function countPages(sizes: readonly (readonly [number, number])[]): number {
-  const pages: { shelves: { y: number; h: number; x: number }[]; top: number }[] = [];
+/**
+ * (Pure: tests) How many new pages pictures of these sizes (padding included), placed in this order, take. `open`: pages there already
+ * with room left (each one's shelves and how far down it's filled; not changed): the pictures go on those first.
+ */
+export function countPages(sizes: readonly (readonly [number, number])[], open: readonly { shelves: readonly { y: number; h: number; x: number }[]; top: number }[] = []): number {
+  const pages: { shelves: { y: number; h: number; x: number }[]; top: number }[] = open.map((pg) => ({ shelves: pg.shelves.map((sh) => ({ ...sh })), top: pg.top }));
   for (const [W, H] of sizes) {
     let s = null;
     for (const pg of pages) if ((s = fitShelf(pg, W, H))) break;
@@ -427,7 +430,36 @@ export function countPages(sizes: readonly (readonly [number, number])[]): numbe
     }
     if (s) s.x += W;
   }
-  return pages.length;
+  return pages.length - open.length;
+}
+
+/**
+ * (Pure: tests) Where whole pages of these sizes go on the atlas's layers (`adopt`: a kept page, a baked file): each a rectangle as it
+ * is (its pictures padded inside it already), tallest first on shelves, a page beside another where both fit across. Each page's layer
+ * (from 0), x and y; and how far down each layer is filled. A page wider or taller than a layer: null (it can't go on one).
+ */
+export function placePages(sizes: readonly (readonly [number, number])[]): { at: [layer: number, x: number, y: number][]; tops: number[] } | null {
+  if (sizes.some(([w, h]) => w > PAGE || h > PAGE || w < 1 || h < 1)) return null;
+  const at: [number, number, number][] = sizes.map(() => [0, 0, 0]);
+  const layers: { shelves: { y: number; h: number; x: number }[]; top: number }[] = [];
+  const order = sizes.map((_, i) => i).sort((a, b) => sizes[b]![1] - sizes[a]![1] || sizes[b]![0] - sizes[a]![0] || a - b);
+  for (const i of order) {
+    const [w, h] = sizes[i]!;
+    let put = false;
+    for (let l = 0; l <= layers.length && !put; l++) {
+      const L = (layers[l] ??= { shelves: [], top: 0 });
+      let sh = L.shelves.find((s) => s.h >= h && PAGE - s.x >= w);
+      if (!sh && L.top + h <= PAGE) {
+        L.shelves.push((sh = { y: L.top, h, x: 0 }));
+        L.top += h;
+      }
+      if (!sh) continue;
+      at[i] = [l, sh.x, sh.y];
+      sh.x += w;
+      put = true;
+    }
+  }
+  return { at, tops: layers.map((L) => L.top) };
 }
 
 class GLPainter implements Painter {
@@ -685,7 +717,8 @@ class GLPainter implements Painter {
     if (this.lost) return 1;
     if (this.keepAt < 0) {
       q.sort((a, b) => hOf(b) - hOf(a) || wOf(b) - wOf(a));
-      const need = countPages(q.map((e) => [wOf(e) + 2 * PAD, hOf(e) + 2 * PAD] as const).filter(([w, h]) => w > 2 * PAD && w - 2 * PAD <= BIG && h - 2 * PAD <= BIG));
+      // (On the kept pages there already, where they have room: under an adopted page's files.)
+      const need = countPages(q.map((e) => [wOf(e) + 2 * PAD, hOf(e) + 2 * PAD] as const).filter(([w, h]) => w > 2 * PAD && w - 2 * PAD <= BIG && h - 2 * PAD <= BIG), this.pages.filter((pg) => pg.kept));
       const room = Math.min(MAX_PAGES, this.gl.getParameter(this.gl.MAX_ARRAY_TEXTURE_LAYERS) as number);
       this.limit = Math.max(this.limit, Math.min(room, this.pages.length + need + SPARE));
       this.grow(this.limit);
@@ -718,54 +751,64 @@ class GLPainter implements Painter {
   }
 
   /** (`adopt`) The kept pages waiting for `kept` to upload them whole, and how far it has come through them. */
-  private adoptQ: { tex: Tex; img: TexImageSource; w: number; h: number }[] = [];
+  private adoptQ: { tex: Tex; img: TexImageSource; x: number; y: number; w: number; h: number }[] = [];
   private adoptAt = 0;
   /** (`adopt`) Puts a kept picture's pixels on its canvas. */
   private fill: ((src: HTMLCanvasElement) => void) | null = null;
 
   /**
-   * A later visit's kept pages (keep-pictures.ts, Nov 25), packed as the atlas packs (`ATLAS`): each a layer of the atlas (or, one big
-   * picture's, its own texture), uploaded whole by `kept`, and each picture on it kept where its page put it, as `keep` would keep it.
-   * Until 7.0 s to a slowed phone's first frame, 3.3 s of it cutting 1,912 pictures out of these pages and 0.55 s uploading each.
+   * Whole pages of pictures, packed as the atlas packs (`ATLAS`: each picture with its clear pixels round it): the build's baked files
+   * (baked.ts, Nov 28: a group's page each, as wide and tall as its pictures reach) or a later visit's kept pages (keep-pictures.ts, Nov
+   * 25). Each is uploaded whole by `kept`, onto a layer of the atlas beside and under the others (`placePages`; one big picture's, into
+   * its own texture), and each picture on it kept where its page put it, as `keep` would keep it. Until Nov 25, 7.0 s to a slowed
+   * phone's first frame, 3.3 s of it cutting 1,912 pictures out of these pages and 0.55 s uploading each.
    * (Called once, before `kept` starts. Pages that wouldn't all fit, or one not of the atlas's layout, leave every picture to `keep`,
    * filled as it's uploaded.)
    */
   adopt(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): void {
     this.fill = fill;
-    const own = (pg: AtlasPage) => pg.pics.length === 1 && (pg.width > BIG || pg.height > BIG);
-    const fits = (pg: AtlasPage) =>
-      own(pg) ? pg.pics[0]!.x === 0 && pg.pics[0]!.y === 0 && pg.pics[0]!.src.width === pg.width && pg.pics[0]!.src.height === pg.height : pg.width <= PAGE && pg.height <= PAGE;
-    const layers = pages.filter((pg) => !own(pg)).length;
+    const own = (pg: AtlasPage) => pg.pics.length >= 1 && (pg.width > BIG || pg.height > BIG) && pg.pics.every((p) => p.x === 0 && p.y === 0 && p.src.width === pg.width && p.src.height === pg.height);
+    const shared = pages.filter((pg) => !own(pg));
+    const placed = placePages(shared.map((pg) => [pg.width, pg.height] as const));
     const room = Math.min(MAX_PAGES, this.gl.getParameter(this.gl.MAX_ARRAY_TEXTURE_LAYERS) as number) - SPARE;
-    const whole = !this.lost && this.keepAt < 0 && this.pages.length + layers <= room && pages.every(fits);
+    const whole = !this.lost && this.keepAt < 0 && !!placed && this.pages.length + placed.tops.length <= room;
+    // (Each layer the pages take, from the first free one: a kept page, filled as far down as its pages reach; `keep`'s pictures go under them.)
+    const base = this.pages.length;
+    if (whole)
+      for (const top of placed.tops) this.pages.push({ tex: { t: this.atlas, w: PAGE, h: PAGE, stream: null, layer: this.pages.length }, shelves: [], top, used: 0, entries: [], kept: true });
+    let k = 0;
     for (const pg of pages) {
       let tex: Tex | null = null;
       let page: Page | null = null;
+      let x0 = 0;
+      let y0 = 0;
+      const at = own(pg) ? null : placed?.at[k++];
       if (whole) {
-        if (own(pg)) tex = { t: null, w: pg.width, h: pg.height, stream: null, layer: -1 };
+        if (!at) tex = { t: null, w: pg.width, h: pg.height, stream: null, layer: -1 };
         else {
-          page = { tex: { t: this.atlas, w: PAGE, h: PAGE, stream: null, layer: this.pages.length }, shelves: [], top: PAGE, used: 0, entries: [], kept: true };
-          this.pages.push(page);
+          page = this.pages[base + at[0]]!;
           tex = page.tex;
+          x0 = at[1];
+          y0 = at[2];
         }
-        this.adoptQ.push({ tex, img: pg.img, w: pg.width, h: pg.height });
+        this.adoptQ.push({ tex, img: pg.img, x: x0, y: y0, w: pg.width, h: pg.height });
       }
       for (const p of pg.pics) {
         const e = this.entryOf(p.src);
         e.stand = true;
         if (!tex) continue;
-        Object.assign(e, { kept: true, tex, page, x: p.x, y: p.y, w: p.src.width, h: p.src.height, gen: this.gen, dirty: false });
+        Object.assign(e, { kept: true, tex, page, x: x0 + p.x, y: y0 + p.y, w: p.src.width, h: p.src.height, gen: this.gen, dirty: false });
         page?.entries.push(e);
       }
     }
   }
 
-  /** (`kept`) A kept page uploaded whole: onto its layer of the atlas, or into a texture of its own. */
-  private pageUp(a: { tex: Tex; img: TexImageSource; w: number; h: number }): void {
+  /** (`kept`) A kept page uploaded whole: onto its place on its layer of the atlas, or into a texture of its own. */
+  private pageUp(a: { tex: Tex; img: TexImageSource; x: number; y: number; w: number; h: number }): void {
     const { gl } = this;
     if (a.tex.layer >= 0) {
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, a.tex.t);
-      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, a.tex.layer, a.w, a.h, 1, gl.RGBA, gl.UNSIGNED_BYTE, a.img);
+      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, a.x, a.y, a.tex.layer, a.w, a.h, 1, gl.RGBA, gl.UNSIGNED_BYTE, a.img);
     } else {
       a.tex.t = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, a.tex.t);

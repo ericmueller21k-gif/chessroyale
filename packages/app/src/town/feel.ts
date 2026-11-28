@@ -242,6 +242,8 @@ export const TOWN_FEEL = {
    */
   loadSliceMs: 40,
   loadPaintShare: 0.5,
+  /** (Nov 28, the build's baked pictures: baked.ts) The share of the pictures' part of the bar that is their files coming in; the rest, each put in its place. */
+  loadFetchShare: 0.8,
   /** How long it waits for the sidekicks' sheets (ms; they load as the town opens): past it, one not in yet is drawn when it's in, as before. */
   loadSheetWaitMs: 3000,
   /**

@@ -45,6 +45,7 @@ import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, setSolidTop, solidT
 import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, upName, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
+import type { Baked } from "./baked.ts";
 import { Pictures, type Restored } from "./keep-pictures.ts";
 import { framePixels, glowPixels, type GlowPixels, type PaintSpec, type Pixels } from "./paint-jobs.ts";
 import { BOSS_ART, figureArt, roofKey, makeTownArt, townWants, type ArtCache, type TownArt } from "./pictures.ts";
@@ -299,30 +300,63 @@ function darkFrame(img: HTMLCanvasElement): HTMLCanvasElement {
   return f ? f.fc.dark(f.i) : img;
 }
 
-/** A character's frames as canvases, drawn the first time each shows (a frame at a time, never all at once). */
+/** An art's frames' times (ms a frame) by its id, where they're known without its animation (the build's manifest, baked.ts). */
+type FrameTimes = (id: string) => readonly number[] | undefined;
+/**
+ * A character's frames as canvases, drawn the first time each shows (a frame at a time, never all at once). How many frames it has and
+ * when each ends are laid out the first time they're asked for (Nov 28, phase 1b): from `times` if it knows this art (the baked town's
+ * manifest: then the character's animation is never built just to count its frames, 0.8 s of a slowed phone's load), else from its
+ * animation, as before.
+ */
 class FrameCache {
   private darker: FrameCache | null = null;
-  readonly frames: (HTMLCanvasElement | null)[];
-  /** When each frame ends, from the loop's start; and the loop's length. */
-  readonly ends: number[];
-  readonly loop: number;
-  constructor(readonly ch: Character) {
-    const idle = ch.anims.idle!;
-    this.frames = idle.frames.map(() => null);
+  private laid: { frames: (HTMLCanvasElement | null)[]; ends: number[]; loop: number } | null = null;
+  private own: Character | null;
+  /** `ch`: its character; null for `lighter`'s one step darker (made only if one of its frames is ever painted here). */
+  constructor(
+    ch: Character | null,
+    private readonly times: FrameTimes | null = null,
+    private readonly lighter: FrameCache | null = null,
+  ) {
+    this.own = ch;
+  }
+  get ch(): Character {
+    return (this.own ??= stepChar(this.lighter!.ch, -1));
+  }
+  private lay(): { frames: (HTMLCanvasElement | null)[]; ends: number[]; loop: number } {
+    if (this.laid) return this.laid;
+    // (A step darker: its lighter one's times.)
+    if (this.lighter) {
+      const l = this.lighter.lay();
+      return (this.laid = { frames: l.frames.map(() => null), ends: l.ends, loop: l.loop });
+    }
+    const ms = this.times?.(this.ch.id) ?? this.ch.anims.idle!.frames.map((f) => f.ms);
     let t = 0;
-    this.ends = idle.frames.map((f) => (t += Math.max(16, f.ms)));
-    this.loop = t;
+    const ends = ms.map((m) => (t += Math.max(16, m)));
+    return (this.laid = { frames: ms.map(() => null), ends, loop: t });
+  }
+  get frames(): (HTMLCanvasElement | null)[] {
+    return (this.laid ?? this.lay()).frames;
+  }
+  /** When each frame ends, from the loop's start; and the loop's length. */
+  get ends(): number[] {
+    return (this.laid ?? this.lay()).ends;
+  }
+  get loop(): number {
+    return (this.laid ?? this.lay()).loop;
   }
   /** The frame showing at `now` (each copy offset by `phase` ms, so two never move together). */
   at(now: number, phase: number): HTMLCanvasElement {
-    const t = (now + phase) % this.loop;
+    const { ends, loop } = this.laid ?? this.lay();
+    const t = (now + phase) % loop;
     let i = 0;
-    while (i < this.ends.length - 1 && t >= this.ends[i]!) i++;
+    while (i < ends.length - 1 && t >= ends[i]!) i++;
     return this.get(i);
   }
   /** Frame `i`, painted the first time it's asked for (from `px`, its pixels as a paint worker made them, if given: paint-pool.ts). */
   get(i: number, px?: Pixels | null): HTMLCanvasElement {
-    let c = this.frames[i];
+    const frames = (this.laid ?? this.lay()).frames;
+    let c = frames[i];
     if (c) return c;
     const t0 = REC ? performance.now() : 0;
     const { w, h, data } = px ?? framePixels(this.ch, i);
@@ -330,7 +364,7 @@ class FrameCache {
     c.width = w;
     c.height = h;
     art2d(c).putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
-    this.frames[i] = c;
+    frames[i] = c;
     frameOf.set(c, { fc: this, i });
     if (REC) REC.paint(performance.now() - t0);
     return c;
@@ -340,17 +374,18 @@ class FrameCache {
     return this.darkFc().get(i, px);
   }
   private darkFc(): FrameCache {
-    return (this.darker ??= new FrameCache(stepChar(this.ch, -1)));
+    return (this.darker ??= new FrameCache(null, null, this));
   }
   /**
-   * (The loading screen on a later visit, keep-pictures.ts) Frame `i` (or a step darker) as the last visit painted it: `made()` is
-   * that picture, asked for only if the frame isn't here already.
+   * (The loading screen, with the build's baked pictures or a later visit's kept ones: baked.ts, keep-pictures.ts) Frame `i` (or a step
+   * darker) as it was painted: `made()` is that picture, asked for only if the frame isn't here already.
    */
   kept(i: number, dark: boolean, made: () => HTMLCanvasElement): HTMLCanvasElement {
     const fc = dark ? this.darkFc() : this;
-    let c = fc.frames[i];
+    const frames = fc.frames;
+    let c = frames[i];
     if (!c) {
-      c = fc.frames[i] = made();
+      c = frames[i] = made();
       frameOf.set(c, { fc, i });
     }
     return c;
@@ -862,8 +897,40 @@ export class Renderer {
   private readonly fcs = new Map<ArtCache, FrameCache>();
   private fcOf(c: ArtCache): FrameCache {
     let fc = this.fcs.get(c);
-    if (!fc) this.fcs.set(c, (fc = new FrameCache(c.ch)));
+    if (!fc) this.fcs.set(c, (fc = new FrameCache(c.ch, this.frameTimes)));
     return fc;
+  }
+  /**
+   * The build's baked town, once the loading screen has it (`takeBaked`; baked.ts): its pictures stand in for the device's paintings
+   * (`plan`), and its manifest has each animation's frame times (`frameTimes`: no animation built to count its frames) and each box's top.
+   */
+  private baked: Baked | null = null;
+  private readonly frameTimes: FrameTimes = (id) => this.baked?.manifest.anims[id];
+  /** How many frames `ch`'s idle has: the manifest's count where it knows the art, else its animation's. */
+  private readonly frameCount = (ch: Character): number => this.frameTimes(ch.id)?.length ?? ch.anims.idle!.frames.length;
+  /**
+   * Takes the build's baked town (before the first `warm`): false, and nothing taken, if it isn't this town's: a picture, a roof's or a
+   * glow's pieces, or a box's top this town's list names isn't in it. From then on `plan` puts its pictures where the device's paintings
+   * went, by name, and the boxes' tops are the manifest's.
+   */
+  takeBaked(b: Baked): boolean {
+    if (this.pics || this.warmJobs || this.baked) return false;
+    const m = b.manifest;
+    const times: FrameTimes = (id) => m.anims[id];
+    for (const w of townWants(this.art, (ch) => times(ch.id)?.length ?? ch.anims.idle!.frames.length)) {
+      if (w.kind === "roof") {
+        const r = m.roofs[w.name];
+        if (!r || !r.every((f) => f.every((v, j) => j % 7 !== 0 || b.has(`${w.name}/${v}`)))) return false;
+      } else if (w.kind === "glow") {
+        const g = m.glows[w.name];
+        if (!g || (g.length > 0 && !b.has(w.name))) return false;
+      } else if (!b.has(w.name)) return false;
+    }
+    if (!this.boxes.every((bx) => typeof m.tops[bx.box.id] === "number")) return false;
+    this.baked = b;
+    for (const bx of this.boxes) setSolidTop(bx.box, m.tops[bx.box.id]!);
+    this.topsAt = this.boxes.length;
+    return true;
   }
   private readonly wallGlow = new Map<Character, Glow | null>();
   private readonly roofs = new Map<TownBox, Map<string, RoofArt>>();
@@ -1782,9 +1849,10 @@ export class Renderer {
    */
   warm(budgetMs: number, keep: (src: CanvasImageSource) => void, from: Restored | null = null, pool: PaintPool | null = null): number {
     if (!this.pics) {
-      this.pics = new Pictures(keep, from);
+      // (The build's baked pictures, `takeBaked`: none painted, none taken from a visit before.)
+      this.pics = new Pictures(keep, this.baked ? null : from, this.baked);
       // (A first visit's pictures painted ahead on the device's other cores, as the pool has them: paint-pool.ts. Not with kept ones.)
-      this.pool = from ? null : pool;
+      this.pool = from || this.baked ? null : pool;
     }
     const jobs = this.plan().jobs;
     const t0 = performance.now();
@@ -1844,14 +1912,16 @@ export class Renderer {
     const P = () => this.pics!;
     // (Each picture painted fresh, the first time a job comes to it, for the paint workers to paint ahead (paint-pool.ts): its index there.)
     const specs: PaintSpec[] = [];
-    for (const w of townWants(this.art)) {
+    for (const w of townWants(this.art, this.frameCount)) {
       sig.push(w.sig);
+      const { name } = w;
       if (w.kind === "frame") {
         const fc = this.fcOf(w.cache);
         const { k, dark } = w;
         const si = w.fresh ? specs.push(w.spec) - 1 : -1;
         jobs.push(() => {
           const p = P();
+          if (p.baked) return p.add(fc.kept(k, dark, () => p.baked!.pic(name)));
           if (p.from) return p.add(fc.kept(k, dark, () => p.next()));
           const px = si < 0 || !this.pool ? null : this.pool.take(si);
           if (px === "wait") return "wait";
@@ -1862,12 +1932,12 @@ export class Renderer {
         const si = w.fresh ? specs.push(w.spec) - 1 : -1;
         jobs.push(() => {
           const p = P();
-          const cuts = si < 0 || p.from || !this.pool ? null : this.pool.take(si);
+          const cuts = si < 0 || p.from || p.baked || !this.pool ? null : this.pool.take(si);
           if (cuts === "wait") return "wait";
           let fresh = false;
           const a = this.roofArt(b, q, (flat, qq) => {
             fresh = true;
-            return p.from ? p.roof() : bakeRoof(b, b.box, flat ? 0 : qq, (cuts as Cut[][] | null) ?? undefined);
+            return p.baked ? p.bakedRoof(name) : p.from ? p.roof() : bakeRoof(b, b.box, flat ? 0 : qq, (cuts as Cut[][] | null) ?? undefined);
           });
           for (const f of a.faces) {
             p.add(f.whole.cv);
@@ -1890,6 +1960,13 @@ export class Renderer {
         const si = specs.push(w.spec) - 1;
         jobs.push(() => {
           const p = P();
+          if (p.baked) {
+            const row = p.baked.manifest.glows[name]!;
+            const cv = row.length ? p.baked.pic(name) : null;
+            if (cv) p.add(cv);
+            put(keptGlow(cv, row, ch, spots));
+            return;
+          }
           if (p.from) {
             const row = p.glow();
             const cv = row.length ? p.next() : null;
@@ -1908,7 +1985,7 @@ export class Renderer {
         const { i } = w;
         jobs.push(() => {
           const p = P();
-          p.add(this.statueAt(i, p.from ? () => p.next() : undefined));
+          p.add(this.statueAt(i, p.baked ? () => p.baked!.pic(name) : p.from ? () => p.next() : undefined));
         });
       }
     }

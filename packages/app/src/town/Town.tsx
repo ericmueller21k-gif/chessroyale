@@ -74,6 +74,9 @@ import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_ITEM_FRAMES, TOW
 import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
+import { ADMIN_TOWN } from "./admin-town.ts";
+import { loadBaked, type Baked } from "./baked.ts";
+import { bakedFile, bakedManifest } from "./baked-files.ts";
 import { domPageIO, domSaveIO, idbShelf, pictureKey, restore, save, type Restored, type Shelf } from "./keep-pictures.ts";
 import { domPaintPool, workerCount, type PaintPool } from "./paint-pool.ts";
 import type { TownGlFallback } from "@chessroyale/core";
@@ -3071,28 +3074,48 @@ function startTown(
     const tick = () => new Promise<void>((go) => requestAnimationFrame(() => go()));
     // (Whatever goes wrong here, the town opens: what wasn't made is made as it shows, as before.)
     try {
-      // The pictures as the last visit painted them, if they're kept and the town's art is what it was (keep-pictures.ts, Nov 23; by the
-      // art's fingerprint since Nov 28, not the build's commit, so a deploy that leaves the art alone keeps them): then none is painted.
+      // The town's pictures as the build baked them (Nov 28, the town's structure, phase 1b: baked.ts): the manifest and this town's files
+      // fetched (the service worker keeps them), decoded off the main thread, and below handed to the painter whole. None is painted here,
+      // on a first visit or a later one; the bar's first share is their bytes coming in. (Not on a 2D painter, which never loads; nor with
+      // `?paintall`, which paints on the device as before.) A file missing, or anything else odd: none of it is used, and the device
+      // paints (below), as before.
+      const io = domPageIO(art2d);
+      let made: Baked | null = null;
+      if (painter.keep && painter.adopt && !TOWN_ASKED.paintAll)
+        made = await loadBaked(ADMIN_TOWN ? "admin" : "player", { manifest: bakedManifest, file: bakedFile }, io, (share) => alive && onLoading(share * f.loadFetchShare * f.loadPaintShare, "pictures"));
+      if (made && !(alive && r.takeBaked(made))) {
+        made.close();
+        made = null;
+      }
+      baked = made;
+      Object.assign(pictures, { baked: !!made, bakedMs: performance.now() - t0, files: made?.files ?? 0, bytes: made?.bytes ?? 0 });
+      // (Without them:) the pictures as the last visit painted them, if they're kept and the town's art is what it was (keep-pictures.ts,
+      // Nov 23; by the art's fingerprint since Nov 28, not the build's commit, so a deploy that leaves the art alone keeps them): then none is painted.
       // (Not in the dev server, whose code changes under the same name; nor on a 2D painter, which never loads; nor with `?paintall`.)
-      const shelf = painter.keep && !import.meta.env.DEV && !TOWN_ASKED.paintAll ? idbShelf() : null;
-      const key = pictureKey(TOWN_ART, r.pictureSig());
-      const from = (kept = await restore(shelf, key, domPageIO(art2d)));
+      const shelf = !made && painter.keep && !import.meta.env.DEV && !TOWN_ASKED.paintAll ? idbShelf() : null;
+      const key = made ? "" : pictureKey(TOWN_ART, r.pictureSig());
+      const from = made ? null : (kept = await restore(shelf, key, io));
       if (!alive) from?.close();
       // (Its pages uploaded whole, each picture where its page has it: none cut out or uploaded alone; Nov 25. Kept until the town
       // closes: a picture's pixels are cut from them only when something asks for them, paint-gl.ts `adopt`.)
       if (from && alive) painter.adopt?.(from.pages, from.fill);
       pictures.kept = !!from;
-      pictures.restoreMs = performance.now() - t0;
+      pictures.restoreMs = made ? 0 : performance.now() - t0 - pictures.bakedMs;
       // A first visit paints on the device's other cores too (paint-pool.ts; Nov 23): workers paint the pictures ahead, the main thread
       // puts them on their canvases and paints what's left. (`?paintworkers=N` sets how many, 0 none; `?paintslow=K`, tests: slower cores.)
       const n = TOWN_PAINT_ASKED.workers ?? workerCount(navigator.hardwareConcurrency);
-      pool = from ? null : domPaintPool(r.paintSpecs(), n, testSwitchesAllowed() ? TOWN_PAINT_ASKED.slow : 1);
+      pool = from || made ? null : domPaintPool(r.paintSpecs(), n, testSwitchesAllowed() ? TOWN_PAINT_ASKED.slow : 1);
       pictures.workers = pool?.workers ?? 0;
+      // (The baked pictures: the bar's share left after their bytes, while each is put in its place.)
+      const had = made ? f.loadFetchShare : 0;
       for (let share = 0; share < 1 && alive; ) {
         share = r.warm(f.loadSliceMs, keep, from, pool);
-        onLoading(share * f.loadPaintShare, "pictures");
+        onLoading((had + (1 - had) * share) * f.loadPaintShare, "pictures");
         await tick();
       }
+      // (The baked files handed to the painter whole, each picture where its file has it, once every job has put its pictures in place:
+      // uploaded below, a file at a time. Kept decoded until the town closes, as a later visit's pages were.)
+      if (made && alive) painter.adopt?.(made.pages(), made.fill);
       // (The pawns' crate items, Nov 26: waited for, up to loadSheetWaitMs from here, and kept with the rest.)
       const sheetsBy = performance.now() + f.loadSheetWaitMs;
       const until = () => new Promise((go) => setTimeout(go, Math.max(0, sheetsBy - performance.now())));
@@ -3116,20 +3139,22 @@ function startTown(
         console.warn("town: kept pictures didn't match; painting next time");
         void shelf?.clear().catch(() => undefined);
       }
-      // A first visit's pictures kept for the next (`keepPictures`), under the card after the box tops (below).
-      if (!from && r.warmClean && alive) keepLater = () => keepPictures(shelf, key);
+      // A first visit's pictures kept for the next (`keepPictures`), under the card after the box tops (below). (Painted here only: the
+      // baked town's files are the service worker's to keep.)
+      if (!from && !made && r.warmClean && alive) keepLater = () => keepPictures(shelf, key);
       loadPaintMs = performance.now() - t0;
       // (Each box's solid top, Nov 28: here, not in idle slices once the town shows, where one took 44 ms on Eric's computer.)
       onLoading(f.loadPaintShare, "building");
       // (Kept under the pictures' key, so a later visit on this build and layout has them at once: 1.6 s of a slowed phone's load.)
+      // (With the baked town they're the manifest's, taken with it: none worked out, none kept here.)
       const tt = performance.now();
-      let had: { key?: string; tops?: number[] } | null = null;
+      let hadTops: { key?: string; tops?: number[] } | null = null;
       try {
-        had = shelf ? JSON.parse(localStorage.getItem(TOPS_KEY) ?? "null") : null;
+        hadTops = shelf ? JSON.parse(localStorage.getItem(TOPS_KEY) ?? "null") : null;
       } catch {
         // (None kept, or no storage: worked out.)
       }
-      if (!(had?.key === key && had.tops && r.takeTops(had.tops))) {
+      if (!made && !(hadTops?.key === key && hadTops.tops && r.takeTops(hadTops.tops))) {
         while (alive && !r.warmTops(f.loadSliceMs)) await tick();
         try {
           if (shelf && alive) localStorage.setItem(TOPS_KEY, JSON.stringify({ key, tops: r.topsList() }));
@@ -3200,9 +3225,12 @@ function startTown(
   let warmMs = 0;
   /** (`loadTown`) The last visit's pictures, if they were kept: their pages let go as the town closes. */
   let kept: Restored | null = null;
-  /** (Tests, `hookPaint`) The kept pictures: loaded from the last visit; how long reading them took (ms); what this visit kept (bytes;
-   * null: nothing; undefined: not yet) and how long that took; the art's fingerprint they're keyed by. */
-  const pictures: { kept: boolean; restoreMs: number; saved: number | null | undefined; saveMs: number; workers: number; byWorkers: number; whileWaiting: number; art: string } = { kept: false, restoreMs: 0, saved: undefined, saveMs: 0, workers: 0, byWorkers: 0, whileWaiting: 0, art: TOWN_ART };
+  /** (`loadTown`) The build's baked pictures, if the town loaded them: their files let go as the town closes. */
+  let baked: Baked | null = null;
+  /** (Tests, `hookPaint`) The pictures: loaded from the build's baked files (`baked`; how long fetching and decoding them took, ms; how
+   * many files, their bytes); else the kept ones: loaded from the last visit; how long reading them took (ms); what this visit kept
+   * (bytes; null: nothing; undefined: not yet) and how long that took; the art's fingerprint they're keyed by. */
+  const pictures: { baked: boolean; bakedMs: number; files: number; bytes: number; kept: boolean; restoreMs: number; saved: number | null | undefined; saveMs: number; workers: number; byWorkers: number; whileWaiting: number; art: string } = { baked: false, bakedMs: 0, files: 0, bytes: 0, kept: false, restoreMs: 0, saved: undefined, saveMs: 0, workers: 0, byWorkers: 0, whileWaiting: 0, art: TOWN_ART };
   /** (`loadTown`) The first visit's paint workers while its loading screen runs. */
   let pool: PaintPool | null = null;
   let keepLater: (() => Promise<void>) | null = null;
@@ -3436,6 +3464,8 @@ function startTown(
       alive = false;
       kept?.close();
       kept = null;
+      baked?.close();
+      baked = null;
       // (Every rider's frames freed: they'd stay in memory into a game otherwise.)
       r.youRider = r.youSoon = null;
       r.riders.clear();

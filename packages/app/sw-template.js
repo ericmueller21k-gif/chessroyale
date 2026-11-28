@@ -19,6 +19,13 @@ const MUSIC = "/music/";
 const MUSIC_CACHE = "brc-music";
 const MUSIC_HASHES = __MUSIC_HASHES__;
 
+// The baked town (/town-pictures/, Nov 28: Chess Town's pictures as the build painted them, and their manifest): not precached, as the
+// music isn't: fetched by the town's loading screen, or by home when idle (town/baked-files.ts), then kept in this version's cache. Each
+// is named by its contents (TOWN_FILE), so it's answered from any version's cache, and a new version copies over the ones an older
+// version keeps (precache): a deploy fetches only the groups it changed, and a deploy that leaves the town alone fetches none.
+const TOWN_FILES = __TOWN_FILES__;
+const TOWN_FILE = /^\/town-pictures\/[a-z0-9][a-z0-9.-]*\.[0-9a-f]{12}\.(png|json)$/;
+
 // Each precached file's contents' hash (but under /assets/, where Vite puts it in the name), kept on its cached copy as HASH_HEADER.
 const HASHES = __HASHES__;
 const HASH_HEADER = "x-brc-hash";
@@ -45,6 +52,12 @@ async function precache() {
       headers.set(HASH_HEADER, HASHES[file]);
       await cache.put(file, new Response(res.body, { status: res.status, statusText: res.statusText, headers }));
     }
+  }
+  // (The baked town's files an older version keeps: copied, never fetched here.)
+  for (const file of TOWN_FILES) {
+    if (await cache.match(file)) continue;
+    const kept = await caches.match(file);
+    if (kept) await cache.put(file, kept);
   }
 }
 
@@ -194,8 +207,9 @@ self.addEventListener("fetch", (event) => {
   }
 
   // A file under /assets/ (Vite's names carry their contents' hash) from any version kept: an older tab's own files are its version's.
+  // The baked town's files too (TOWN_FILE: named by their contents).
   // Any other file (one name, whatever the version) from this version only, as the server would answer it: never an older copy.
-  const hashed = url.pathname.startsWith("/assets/");
+  const hashed = url.pathname.startsWith("/assets/") || TOWN_FILE.test(url.pathname);
   event.respondWith(
     (hashed ? caches.match(request) : caches.open(VERSION).then((cache) => cache.match(request))).then(
       (cached) =>

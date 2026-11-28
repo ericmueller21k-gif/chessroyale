@@ -4765,12 +4765,19 @@ export const ALERTS = {
  * card, after its box tops (Nov 28: kept after the first frame, it was a hitch about 2 s in): composed a page at a time, encoded in a
  * worker. `sliceMs`: the default slice a frame for a save outside the loading screen.
  * docs/decisions/2026-11-23-town-keep-pictures.md.
+ *
+ * Since Nov 28 (the town's structure, phase 1b) the build paints the pictures and the town loads them as files (the app's
+ * town/baked.ts): `baked` is that switch; off, or with a file missing, the town paints on the device as above. `homeFetchAfterMs`: home
+ * fetches the town's files, one at a time at low priority, once it has shown this long (so the service worker has them before the first
+ * visit to the town). docs/decisions/2026-11-28-town-load-baked.md.
  */
 export const TOWN_PICTURES = {
   on: true,
   maxMB: 24,
   waitMs: 4000,
   sliceMs: 3,
+  baked: true,
+  homeFetchAfterMs: 4000,
 } as const;
 
 /**
