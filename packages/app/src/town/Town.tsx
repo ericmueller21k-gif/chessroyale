@@ -3042,14 +3042,17 @@ function startTown(
         keepLater = null;
       }
       // The warm-up (Nov 28): the town's first frames drawn under the loading card, each waited for on the GPU, until loadWarmFrames in a
-      // row are smooth; then the card lifts. No time cap (Eric, Nov 28: "That doesn't mean so it lags for a few seconds… It means load the
-      // town so it doesn't lag"): only a device that is slow with everything already loaded lifts after loadWarmMaxFrames.
+      // row are settled: under loadWarmSmoothMs, or within loadWarmSettled of the quickest so far (a device slow at its steady speed: its
+      // one-time costs paid, nothing left to warm). Then the card lifts. No time cap (Eric, Nov 28: "That doesn't mean so it lags for a few
+      // seconds… It means load the town so it doesn't lag"); loadWarmMaxFrames only stops a device whose frames never settle.
       const tw = performance.now();
-      for (let i = 0, smooth = 0; smooth < f.loadWarmFrames && i < f.loadWarmMaxFrames && alive && !painter.lost; i++) {
+      for (let i = 0, smooth = 0, best = Infinity; smooth < f.loadWarmFrames && i < f.loadWarmMaxFrames && alive && !painter.lost; i++) {
         const t1 = performance.now();
         r.draw(t1, camX, camY, zoomCur, 0, heading);
         painter.settle?.();
-        smooth = performance.now() - t1 < f.loadWarmSmoothMs ? smooth + 1 : 0;
+        const ms = performance.now() - t1;
+        best = Math.min(best, ms);
+        smooth = ms < f.loadWarmSmoothMs || ms <= best * f.loadWarmSettled ? smooth + 1 : 0;
         await tick();
       }
       warmMs = performance.now() - tw;

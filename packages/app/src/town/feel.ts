@@ -247,10 +247,12 @@ export const TOWN_FEEL = {
   /**
    * (Nov 28, Eric: "I don't want it to lag at all when the town loads"; "Load the town first so it doesn't lag") The warm-up: frames drawn
    * under the loading card, each waited for on the GPU (`settle`), so the first use of the textures and shaders is paid there, until this
-   * many in a row each take under loadWarmSmoothMs. No time cap: only a device slow with everything loaded lifts after loadWarmMaxFrames.
+   * many in a row are settled: under loadWarmSmoothMs, or at most loadWarmSettled times the quickest so far (a device slow at its steady
+   * speed). No time cap; loadWarmMaxFrames only stops a device whose frames never settle.
    */
   loadWarmFrames: 3,
   loadWarmSmoothMs: 20,
+  loadWarmSettled: 1.3,
   loadWarmMaxFrames: 30,
   /** A home's floating name: how far over its roof it floats (px), and the step it drops by to keep off the buildings behind. */
   nameOverRoof: 6,
