@@ -48,12 +48,12 @@ async function playOne(page: Page, onto?: string) {
 
 /**
  * Every frame: the power events shown, the banners' words, the timers' slots and the board's box, the timers' frames, and the
- * first lump's minutes left in the state (each change, in order).
+ * first lump's minutes left in the state (each change, in order), and the minutes its timer shows, with the phase each first showed in.
  */
 async function watch(page: Page) {
   await page.evaluate(() => {
     const w = window as any;
-    w.__dd = { kinds: [] as string[], banners: [] as string[], timers: [] as string[], board: [] as string[], frames: [] as string[], gold: [] as string[], left0: [] as number[] };
+    w.__dd = { kinds: [] as string[], banners: [] as string[], timers: [] as string[], board: [] as string[], frames: [] as string[], gold: [] as string[], left0: [] as number[], shown0: [] as [number, string, number][] };
     const box = (el: Element | null) => {
       if (!el) return "";
       const r = el.getBoundingClientRect();
@@ -76,6 +76,8 @@ async function watch(page: Page) {
       }
       const l0 = (w.match?.boss?.powers?.zebra?.lumps ?? []).find((l: { n: number }) => l.n === 0);
       if (l0 && r.left0[r.left0.length - 1] !== l0.left) r.left0.push(l0.left);
+      const t0 = document.querySelector<HTMLElement>('.dd-slot[data-slot="0"] .dd-timer')?.dataset.left;
+      if (t0 !== undefined && r.shown0[r.shown0.length - 1]?.[0] !== Number(t0)) r.shown0.push([Number(t0), w.match?.phase?.kind ?? "", l0?.left ?? -1]);
       for (const p of document.querySelectorAll(".board-wrap piece.gold")) {
         const k = p.className;
         if (!r.gold.includes(k)) r.gold.push(k);
@@ -85,7 +87,7 @@ async function watch(page: Page) {
     requestAnimationFrame(look);
   });
 }
-const seen = (page: Page) => page.evaluate(() => (window as any).__dd as { kinds: string[]; banners: string[]; timers: string[]; board: string[]; frames: string[]; gold: string[]; left0: number[] });
+const seen = (page: Page) => page.evaluate(() => (window as any).__dd as { kinds: string[]; banners: string[]; timers: string[]; board: string[]; frames: string[]; gold: string[]; left0: number[]; shown0: [number, string, number][] });
 const zebraOf = (page: Page) => page.evaluate(() => (window as any).match.boss.powers.zebra as { lumps: { n: number; piece: string; square: string; left: number; slot: number }[]; drops: number; rise: { n: number; square: string; piece: string } | null; gold: string[] });
 
 test.describe("Don Dough", () => {
@@ -126,6 +128,20 @@ test.describe("Don Dough", () => {
     await expect(page.locator('.dd-slot[data-slot="0"] .dd-timer')).toHaveAttribute("data-left", String(BOSS_POWERS.doughTimers.p));
     await expect(page.locator('.dd-slot[data-slot="0"] .dd-timer')).toHaveAttribute("data-kind", "p");
     expect((await seen(page)).kinds).toContain("doughDrop");
+    // Where the timers are: a phone's in the boss bar; a computer's at his feet by the board's bottom-left corner, a bit bigger (95 px a
+    // timer, 2.5x; the bar's 76), none in the bar (Eric, Nov 27), on screen.
+    const at = await page.evaluate(() => {
+      const r = (e: Element | null) => e?.getBoundingClientRect() ?? null;
+      return { bar: document.querySelectorAll(".boss-bar .dd-timers").length, side: r(document.querySelector(".boss-side > .dd-timers")), board: r(document.querySelector(".board-wrap")), slot: r(document.querySelector(".dd-slot")) };
+    });
+    if (test.info().project.name === "desktop") {
+      expect(at.bar).toBe(0);
+      expect(at.slot!.width).toBeCloseTo(95, 0);
+      expect(at.side!.right).toBeLessThanOrEqual(at.board!.left);
+      expect(at.side!.right).toBeGreaterThan(at.board!.left - 20);
+      expect(Math.abs(at.side!.bottom - at.board!.bottom)).toBeLessThanOrEqual(4);
+      expect(at.side!.left).toBeGreaterThanOrEqual(0);
+    } else expect([at.bar, at.side]).toEqual([1, null]);
     // A minute off each move, yours and his: 3 after yours, 2 after his.
     // (Read from the watcher, every frame: your move's minute comes off once the judge has scored it, which took over 5 s on CI's
     // desktop (main's run 43016010621), and a look after his move has already seen 2.)
@@ -135,6 +151,11 @@ test.describe("Don Dough", () => {
     const P = BOSS_POWERS.doughTimers.p;
     const mm = (n: number) => String(n).padStart(2, "0");
     expect(s.left0).toEqual([P, P - 1, P - 2]);
+    // Shown a minute off on every turn (Eric, Nov 27: "8 and then to 7 to 6"): yours as your move goes in (while it's judged, before
+    // the rules count it as his turn begins), his as he moves.
+    expect(s.shown0.map(([n]) => n)).toEqual([P, P - 1, P - 2]);
+    // (When yours shows, while your move is judged, is the unit test's (zebra.test.ts, shownLeft): with ?pace=quick the judging can be
+    // over before a frame is drawn on CI, so a frame inside it isn't always there to see (#1026's run, phone, twice).)
     expect((await zebraOf(page)).lumps.find((l) => l.n === 0)?.left).toBe(P - 2);
     await expect(page.locator('.dd-slot[data-slot="0"] .dd-timer')).toHaveAttribute("data-left", String(P - 2));
     // (The roll from its start and from a minute under played: their frames drawn.)

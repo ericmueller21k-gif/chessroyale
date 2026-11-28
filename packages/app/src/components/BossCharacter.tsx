@@ -638,7 +638,7 @@ export function bossPortraitUrl(name: string): string | null {
  * A boss with a character, on a computer: standing by the board's bottom-left corner, facing the God King across the
  * board (by its bottom-right). Goes first in a screen's `.board-row`; on a phone it's hidden (the boss bar has him).
  */
-export function BossSide({ match }: { match: GameView }) {
+export function BossSide({ match, children }: { match: GameView; children?: ComponentChildren }) {
   const el = useRef<HTMLDivElement>(null);
   const name = match.boss?.name;
   // Its size and the God King's by the room beside the board (characters/side-size.ts): measured as it's first drawn and as the window
@@ -654,12 +654,13 @@ export function BossSide({ match }: { match: GameView }) {
   return (
     <div ref={el} class="boss-side">
       <BossCharacter match={match} place="side" />
+      {children}
     </div>
   );
 }
 
 /** Where the figures beside the board are sized (styles.css reads `--side-s` and `--king-k` there): a computer from 1100 px wide. */
-const SIDES = "(min-width: 1100px) and (min-height: 600px)";
+export const SIDES = "(min-width: 1100px) and (min-height: 600px)";
 /**
  * The figures' sizes and places on this screen for the room beside its board (sideSizes): `--side-s` (the boss's size), `--side-d` (his
  * box's middle, px left of his anchor), `--side-room` (the room his words open into, from his box's right edge to the side menu's), `--king-k`
