@@ -1360,7 +1360,12 @@ atlas packs (`paint.ts` `ATLAS`: 2048 px, 2 px padding, a picture over 1024 px a
 when something reads it (its 2D context: hit tests, statue masks; a 2D context drawing from it: the chips' and the large map's faces,
 `cutBeforeDraw`, Nov 25 round 2) or it must be uploaded alone (a lost context). The pages stay decoded
 until the town closes. Headless, repeat visit at 4x: 5.47 → 4.52 s to the first frame (a page upload is about 50 to 65 ms at 4x here).
-Anything odd paints as before and clears the entry. `?paintall` skips it. Hooks: `__townPaint().pictures`, `__townPictureSum()` (its `gpu`:
+Anything odd paints as before and clears the entry. `?paintall` skips it.
+**Warm before it shows (Nov 28; [decision](../decisions/2026-11-28-town-load-smooth.md)):** the loading screen also waits for every rider it
+knows (yours, the bots') and keeps their frames and trail marks (`Rider.pictures`; "ride frame", "ride trail" in the report), works out each
+box's solid top (`warmTops`; kept between visits under the pictures' key, `brc.townTops`), then draws `loadWarmFrames` (3) frames under the
+card, each waited for on the GPU (`settle`), at most `loadWarmMs` (2 s). Hooks: `__townPaint()`'s `topsMs`, `warmMs`. Test: `@perf` "Chess
+Town busy" (you ride the Chirp: its first walk uploads nothing). Hooks: `__townPaint().pictures`, `__townPictureSum()` (its `gpu`:
 what the atlas holds for each picture; `(true)`: each one's hash). Tests: `town-keep-pictures.test.ts`, `e2e/perf.spec.ts` ("a second
 visit…": canvas and GPU hashes the same on all three visits), `e2e/town-street.spec.ts` ("the town's loading screen…": a lost context on
 either visit gives back the same texels), `e2e/town-controls.spec.ts` ("the minimap…": its reload is a repeat visit; every chip's face and

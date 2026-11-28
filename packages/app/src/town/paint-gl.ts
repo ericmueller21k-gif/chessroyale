@@ -1914,7 +1914,7 @@ class GLCtx {
       const blur = this.shadowBlur;
       const pad = Math.ceil(blur * 1.6 + Math.max(Math.abs(this.shadowOffsetX), Math.abs(this.shadowOffsetY)) * this.unit()) + 2;
       const old = this.baked.length >= BAKE_MAX ? this.baked.reduce((a, e) => (a.used <= e.used ? a : e)) : null;
-      const cv = old?.cv ?? document.createElement("canvas");
+      const cv = old?.cv ?? upName(document.createElement("canvas"), "shadowed fill");
       cv.width = Math.ceil(x1 - bx) + 2 * pad + 1;
       cv.height = Math.ceil(y1 - by) + 2 * pad + 1;
       const g = art2d(cv);
