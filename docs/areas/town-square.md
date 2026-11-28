@@ -1368,6 +1368,11 @@ when something reads it (its 2D context: hit tests, statue masks; a 2D context d
 `cutBeforeDraw`, Nov 25 round 2) or it must be uploaded alone (a lost context). The pages stay decoded
 until the town closes. Headless, repeat visit at 4x: 5.47 → 4.52 s to the first frame (a page upload is about 50 to 65 ms at 4x here).
 Anything odd paints as before and clears the entry. `?paintall` skips it.
+**Baked by the build (Nov 28, phase 1a; [decision](../decisions/2026-11-28-town-bake.md)):** the pictures' list is its own module, `town/pictures.ts`
+(`townWants`: each picture's name, group and how it's painted; `plan` runs a job a want), and `npm run build` paints it in Node
+(`scripts/bake-town.ts`, `town/bake.ts`; by hand `npx tsx scripts/bake-town.ts`, which prints each file's cost) into `/town-pictures/`: a PNG a
+group's page (a home, a street's row, the park, the Colosseum, the props; `.player` / `.admin` what one town alone draws), the sidekicks' sheets,
+`manifest.json` (places, roofs' and glows' pieces, frame times, box tops), `order.json`. Nothing reads them until phase 1b. Tests: `town-bake.test.ts`, `e2e/town-street.spec.ts` ("the build's baked pictures…").
 **Warm before it shows (Nov 28; [decision](../decisions/2026-11-28-town-load-smooth.md)):** the loading screen also waits for every rider it
 knows (yours, the bots') and keeps their frames and trail marks (`Rider.pictures`; "ride frame", "ride trail" in the report), works out each
 box's solid top (`warmTops`; kept between visits under the pictures' key, `brc.townTops`), then draws `loadWarmFrames` (3) frames under the

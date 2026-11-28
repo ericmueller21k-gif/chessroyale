@@ -549,6 +549,68 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   expect(errors).toEqual([]);
 });
 
+/**
+ * The build's baked town (Nov 28, the town's structure, phase 1a: scripts/bake-town.ts, docs/decisions/2026-11-28-town-bake.md). The town
+ * still paints on the device; the build now paints the same list (town/pictures.ts) into picture files. Here the two are compared by
+ * the town's own picture hash (`__townPictureSum`: every kept picture's size and pixels, in the loading screen's order): the same
+ * hash worked out from the baked files alone, each picture cut from its page where the manifest says, in the order order.json gives.
+ * The pages go through the browser's own PNG decoding (as phase 1b will load them), so what a device will hold is what it paints today.
+ */
+for (const kind of ["player", "admin"] as const)
+  test(`the build's baked pictures are the device's (Nov 28): every picture ${kind === "admin" ? "an admin" : "a player"}'s town paints on its loading screen, pixel for pixel and in its order, cut from the baked files`, { tag: "@phone-only" }, async ({ page }) => {
+    const errors = watchErrors(page);
+    if (kind === "admin") await asAdmin(page);
+    // (`paintall`: painted on the device, never taken from an earlier visit's kept pictures.)
+    await page.goto("/town?sky=day&paintall");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
+    const device = await page.evaluate(() => (window as unknown as { __townPictureSum: () => { n: number; hash: string } }).__townPictureSum());
+    expect(device.n, "pictures the loading screen kept").toBeGreaterThan(2000);
+    const baked = await page.evaluate(async (town) => {
+      const get = async (name: string) => {
+        const res = await fetch(`/town-pictures/${name}`);
+        if (!res.ok) throw new Error(`${name}: ${res.status}`);
+        return res;
+      };
+      const manifest = (await (await get("manifest.json")).json()) as { files: { name: string; towns: string[]; w: number; h: number }[]; pictures: Record<string, [number, number, number, number, number]> };
+      const order = ((await (await get("order.json")).json()) as Record<string, number[]>)[town]!;
+      const places = Object.values(manifest.pictures);
+      // Each page this town fetches, decoded as the town decodes a kept page (keep-pictures.ts `domPageIO`) and laid on a canvas in memory.
+      const pages = new Map<number, Uint8ClampedArray>();
+      let foreign = 0;
+      for (const i of new Set(order.map((k) => places[k]![0]))) {
+        const f = manifest.files[i]!;
+        if (!f.towns.includes(town)) foreign++;
+        const bm = await createImageBitmap(await (await get(f.name)).blob(), { colorSpaceConversion: "none", premultiplyAlpha: "default" });
+        const cv = document.createElement("canvas");
+        cv.width = bm.width;
+        cv.height = bm.height;
+        const g = cv.getContext("2d", { willReadFrequently: true })!;
+        g.drawImage(bm, 0, 0);
+        bm.close();
+        if (cv.width !== f.w || cv.height !== f.h) throw new Error(`${f.name}: not its size`);
+        pages.set(i, g.getImageData(0, 0, cv.width, cv.height).data);
+      }
+      // The town's own hash (Town.tsx `hookPictureSum`), over the baked pictures in the loading screen's order.
+      let h = 0x811c9dc5;
+      for (const k of order) {
+        const [f, x, y, w, ph] = places[k]!;
+        const d = pages.get(f)!;
+        const W = manifest.files[f]!.w;
+        h = Math.imul(h ^ w, 16777619);
+        h = Math.imul(h ^ ph, 16777619);
+        for (let j = 0; j < ph; j++) {
+          let o = ((y + j) * W + x) * 4;
+          for (let i = 0; i < w; i++, o += 4) h = Math.imul(h ^ (d[o]! | (d[o + 1]! << 8) | (d[o + 2]! << 16) | (d[o + 3]! << 24)), 16777619);
+        }
+      }
+      return { n: order.length, hash: (h >>> 0).toString(16), files: pages.size, foreign };
+    }, kind);
+    expect(baked.foreign, "pictures on a file this town isn't listed for").toBe(0);
+    expect(baked.files, "files this town's pictures are on").toBeGreaterThan(20);
+    expect({ n: baked.n, hash: baked.hash }, "the baked pictures, by the town's own picture hash").toEqual({ n: device.n, hash: device.hash });
+    expect(errors).toEqual([]);
+  });
+
 // (Its own service worker blocked: page.route sees only what the page fetches itself, never what a worker answers.)
 test.describe(() => {
   test.use({ serviceWorkers: "block" });

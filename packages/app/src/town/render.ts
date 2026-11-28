@@ -12,33 +12,15 @@
 import { frameKeys, renderFrame, type Character } from "../characters/sprite.ts";
 import { mirrorFor } from "../characters/sprite-kit.ts";
 import { artFacing } from "../characters/sprites.ts";
-import { GINGERBREAD } from "../characters/gingerbread.ts";
-import { GREX } from "../characters/grex.ts";
-import { HOLLOW } from "../characters/hollow.ts";
-import { MOO } from "../characters/moo.ts";
-import { ALFIL } from "../characters/alfil.ts";
-import { BIGBOY } from "../characters/bigboy.ts";
-import { CLOWN } from "../characters/clown.ts";
-import { GARDENER } from "../characters/gardener.ts";
-import { HOPPER } from "../characters/hopper.ts";
-import { PIG } from "../characters/pig.ts";
-import { SAWYER } from "../characters/sawyer.ts";
-import { SMUDGY } from "../characters/smudgy.ts";
-import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
-import { FOLIO } from "../characters/folio.ts";
-import { BOSS_BEAVER } from "../characters/timber.ts";
-import { BOSS_BLITZ } from "../characters/boss-blitz.ts";
-import { CHANDY_TOWN } from "../characters/chandy-figure.ts";
-import { BIRDIE_TOWN, YOUNG_DX, YOUNG_DY } from "../characters/birdie-figure.ts";
+import { YOUNG_DX, YOUNG_DY } from "../characters/birdie-figure.ts";
 import { TIMBER_ROOM } from "../characters/timber-figure.ts";
 import { portraitOf } from "../characters/portraits.ts";
 import { BOSS_ROSTER } from "@chessroyale/core";
-import { NPC_ZEBRA_GUARD_A } from "./shops/zebra-crew.ts";
 import { N, colI, rowI, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rel, rimYAt, setHeading, setView, stepCams, tableLift, toCam, wrapF, wrapFX, wrapFY, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
 import { MAP_BOX } from "./minimap.ts";
 import { TOWN_FEEL } from "./feel.ts";
-import { PIECE_ART, statueSpot } from "./houses/coliseum.ts";
+import { statueSpot } from "./houses/coliseum.ts";
 import { COLISEUM_CHIP, artOf } from "./houses/index.ts";
 import { HOUSE_ZEBRA_CHIP } from "./houses/zebra.ts";
 import { HOUSE_RECLUSE_CHIP } from "./houses/recluse.ts";
@@ -50,58 +32,31 @@ import { SkyPainter } from "./sky-draw.ts";
 import type { Ctx, PaintLayer, Painter } from "./paint.ts";
 import { ATLAS, art2d } from "./paint.ts";
 import type { LightPool, LightSpot } from "./houses/kit.ts";
-import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
+import { PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
 import type { SidekickSheet } from "./sidekick-sheets.ts";
 import type { Rider, RiderTrail } from "./rides.ts";
 import { building } from "./buildings.ts";
 import type { TownBox } from "./town-kit.ts";
-import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
-import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS } from "./street.ts";
+import { HEDGE } from "./dressing.ts";
+import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY } from "./street.ts";
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
-import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, setSolidTop, solidTop, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
+import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, setSolidTop, solidTop, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, upName, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { Pictures, type Restored } from "./keep-pictures.ts";
 import { framePixels, glowPixels, type GlowPixels, type PaintSpec, type Pixels } from "./paint-jobs.ts";
+import { BOSS_ART, figureArt, roofKey, makeTownArt, townWants, type ArtCache, type TownArt } from "./pictures.ts";
 import type { PaintPool } from "./paint-pool.ts";
 import type { Cut } from "./kit/bake.ts";
 import { stepChar } from "./kit/bake.ts";
-import { ALL_HOMES, ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type NoFigureId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
+import { ALL_HOMES, ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { drawZzz } from "./zzz.ts";
 import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
-export const BOSS_ART: Record<TownBossId, Character> = {
-  tiger: TIGER_FIGURE,
-  gingerbread: GINGERBREAD,
-  grex: GREX,
-  hollow: HOLLOW,
-  moo: MOO,
-  clown: CLOWN,
-  bigboy: BIGBOY,
-  sawyer: SAWYER,
-  pig: PIG,
-  smudgy: SMUDGY,
-  hopper: HOPPER,
-  gardener: GARDENER,
-  alfil: ALFIL,
-  folio: FOLIO,
-  // (His approved drawing, without the room his game figure keeps over his head for his entrance's drop: timber-figure.ts.)
-  timber: BOSS_BEAVER,
-  // (Dash as drawn, without the room his game figure keeps on its right for his entrance's zip-in: dash-figure.ts.)
-  dash: BOSS_BLITZ,
-  // (Chandy at rest, his rifle slung, without the room his board figure keeps for it held out: chandy-figure.ts.)
-  chandy: CHANDY_TOWN,
-  // (Young Birdie on his toy diesel, as drawn: birdie-figure.ts.)
-  birdie: BIRDIE_TOWN,
-};
-/** A home whose boss is inside: its stand-in's sprite out front (world.ts STAND_IN). Rolling Dough's guard (Nov 11): the front room's
- * flat-cap door guard, his roll at port arms; Don's size, as drawn. */
-const STAND_IN_ART: Record<Exclude<IndoorId, NoFigureId>, Character> = { zebra: NPC_ZEBRA_GUARD_A };
-/** The town figure's sprite for a home: its boss's, or its stand-in's (a home with nobody out front, world.ts hasFigure, has none). */
-const figureArt = (id: HomeId): Character => (id === "zebra" ? STAND_IN_ART[id] : BOSS_ART[id as TownBossId]);
+export { BOSS_ART };
 /**
  * Each town figure's face box (x, y and a side, in its own pixels): what its edge chip and its large-map portrait show. Taken from its
  * boss's portrait window (portraits.gen.ts, made from the drawing and kept in step with it by portraits.test.ts), so a redrawn boss
@@ -898,10 +853,18 @@ export class Renderer {
     const r = rowI(Math.round(y));
     return c >= 0 && r >= 0 && this.seen[r * N + c] === 1;
   }
-  private readonly homeBox: (BoxInst | null)[];
-  private readonly propBox: (BoxInst | null)[];
+  private readonly homeBox: readonly (BoxInst | null)[];
+  private readonly propBox: readonly (BoxInst | null)[];
   private readonly partItems: Item[];
   private readonly wallFrames = new Map<Character, FrameCache>();
+  /** The town's art (pictures.ts), and the frame cache of each of its characters' caches (made the first time it's asked for). */
+  private readonly art: TownArt;
+  private readonly fcs = new Map<ArtCache, FrameCache>();
+  private fcOf(c: ArtCache): FrameCache {
+    let fc = this.fcs.get(c);
+    if (!fc) this.fcs.set(c, (fc = new FrameCache(c.ch)));
+    return fc;
+  }
   private readonly wallGlow = new Map<Character, Glow | null>();
   private readonly roofs = new Map<TownBox, Map<string, RoofArt>>();
   /** The camera's heading this frame (degrees from north: the street town's turn). */
@@ -926,7 +889,10 @@ export class Renderer {
     this.propItems = PROPS.map((_, i) => newItem("prop", i));
     // The street town's boxes (Nov 5, round 3): each lot's, shed's and hedge's; its front is its home's or prop's item, its sides, back
     // and roof items of their own (sorted with everything else); a shed's and a hedge's drawn with their front.
-    this.boxes = streetBoxes(PROPS);
+    // (The town's art, Nov 28: its boxes and the character behind every frame cache, from the picture list's module, pictures.ts, which
+    // the loading screen (`plan`) and the build's bake read too.)
+    const art = (this.art = makeTownArt(homes, town.bosses.map((bs) => bs.home.id)));
+    this.boxes = art.boxes;
     this.plans = this.boxes.map((b) => newPlan(b.box));
     this.warmAt = [new Int32Array(this.boxes.length), new Int32Array(this.boxes.length)];
     // (Each box's footprint's squares: it shows when the rows let you see any of them, seen.ts.)
@@ -943,40 +909,18 @@ export class Renderer {
         }
       return Int32Array.from(ks);
     });
-    this.homeBox = this.places.map((h) => this.boxes.find((b) => b.home === h.id) ?? null);
-    this.propBox = PROPS.map((pr, i) => (pr.kind === "front" ? this.boxes.find((b) => b.kind !== "home" && b.lot === STREET_LOTS.indexOf(STREET_BUILDINGS[pr.lot!]!)) : this.boxes.find((b) => b.prop === i || b.props.includes(i))) ?? null);
+    this.homeBox = art.homeBox;
+    this.propBox = art.propBox;
     this.partItems = [];
     for (const b of this.boxes) if (b.kind !== "shed" && b.kind !== "hedge") for (let k = 0; k < 4; k++) this.partItems.push(newItem("part", b.i * 4 + k));
     this.items = [...this.houseItems, ...this.bossItems, ...this.propItems, ...this.partItems];
-    const trees = PARK_TREES.map((t) => new FrameCache(t));
-    const bench = new FrameCache(PARK_BENCH);
-    const table = new FrameCache(PARK_TABLE);
-    const fountain = new FrameCache(PARK_FOUNTAIN);
-    const lamp = new FrameCache(PARK_LAMP);
-    // (The street town's, Nov 5: the gardens' hedges, bushes, beds and sheds, and the everyday buildings' fronts, one cache a picture.)
-    const street = new Map<string, FrameCache>();
-    const art = (key: string, ch: () => Character) => street.get(key) ?? street.set(key, new FrameCache(ch())).get(key)!;
-    this.propFrames = PROPS.map((p) => {
-      // (The street town's plaza, the north edge round: the chess pieces on their plinths and the statues stand on it as figures.)
-      if (p.kind === "piece") return art(`piece${p.v}`, () => PIECE_ART[p.v]!);
-      if (p.kind === "statue") return art(`statue${p.v}`, () => statueArt(STATUES[p.v]!.id, 1));
-      if (p.kind === "hedge") return art(`hedge${p.v}`, () => hedgeFront(p.v));
-      if (p.kind === "bush") return art(`bush${p.v}`, () => bush(p.v));
-      if (p.kind === "bed") return art(`bed${p.v}`, () => bed(p.v));
-      if (p.kind === "shed") return art(`shed${p.v}`, () => shed(p.v).front);
-      if (p.kind === "front") {
-        const b = STREET_BUILDINGS[p.lot!]!;
-        const box = lotArt(b);
-        // (One cache a picture: the Colosseum's stretches share theirs.)
-        return art(box.front.id, () => box.front);
-      }
-      return p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : p.kind === "lamp" ? lamp : fountain;
-    });
-    this.hedgeTops = [0, 1, 2].map((v) => new FrameCache(hedgeTop(v)));
+    // (One cache a picture: the park's things, the gardens' hedges, bushes, beds and sheds, the everyday buildings' fronts; pictures.ts.)
+    this.propFrames = art.props.map((c) => this.fcOf(c));
+    this.hedgeTops = art.hedgeTops.map((c) => this.fcOf(c));
     this.propTop = PROPS.map(() => 0);
-    this.bossFrames = town.bosses.map((b) => new FrameCache(figureArt(b.home.id)));
+    this.bossFrames = art.bosses.map((c) => this.fcOf(c));
     for (const p of town.people) if (isSprite(p.look) && !this.spriteArt.has(p.look.sprite)) this.spriteArt.set(p.look.sprite, new SpriteFrames(p.look.sprite));
-    this.houseFrames = this.places.map((h) => new FrameCache(artOf(h).ch));
+    this.houseFrames = art.houses.map((c) => this.fcOf(c));
     this.placeGlow = this.places.map(() => null);
     this.chipIcon = new FrameCache(COLISEUM_CHIP);
     // Each square is kept this frame (its corners, its face's corners, its color) and drawn with all the others of its
@@ -1889,8 +1833,9 @@ export class Renderer {
     return this.plan().specs;
   }
   /**
-   * The loading screen's jobs (`warm`): one picture (or one roof) each. Each picture is painted, or on a later visit taken from the
-   * last visit's (`pics.from`, in the same order: keep-pictures.ts), and handed to `pics.add` (the painter's `keep`).
+   * The loading screen's jobs (`warm`): one picture (or one roof) each, in the picture list's order (pictures.ts `townWants`, Nov 28: the
+   * list the build bakes from too). Each picture is painted, or on a later visit taken from the last visit's (`pics.from`, in the same
+   * order: keep-pictures.ts), and handed to `pics.add` (the painter's `keep`).
    */
   private plan(): { jobs: (() => boolean | "wait" | void)[]; sig: string; specs: PaintSpec[] } {
     if (this.warmJobs) return this.warmJobs;
@@ -1899,117 +1844,73 @@ export class Renderer {
     const P = () => this.pics!;
     // (Each picture painted fresh, the first time a job comes to it, for the paint workers to paint ahead (paint-pool.ts): its index there.)
     const specs: PaintSpec[] = [];
-    const framesOf = new Map<FrameCache, Set<number>>();
-    const frameSpec = (fc: FrameCache, k: number, dark: boolean): number => {
-      let m = framesOf.get(fc);
-      if (!m) framesOf.set(fc, (m = new Set()));
-      const key = dark ? -1 - k : k;
-      if (m.has(key)) return -1;
-      m.add(key);
-      return specs.push({ kind: "frame", ch: fc.ch, k, dark }) - 1;
-    };
-    const roofsOf = new Map<TownBox, Set<string>>();
-    const roofSpec = (b: BoxInst, q: number): number => {
-      let m = roofsOf.get(b.box);
-      if (!m) roofsOf.set(b.box, (m = new Set()));
-      const key = this.roofKey(b, q);
-      if (m.has(key)) return -1;
-      m.add(key);
-      return specs.push({ kind: "roof", b, q: key === "flat" ? 0 : q }) - 1;
-    };
-    const frame = (fc: FrameCache, k: number, dark: boolean) => {
-      sig.push(`${fc.ch.id}#${k}${dark ? "d" : ""}`);
-      const si = frameSpec(fc, k, dark);
-      jobs.push(() => {
-        const p = P();
-        if (p.from) return p.add(fc.kept(k, dark, () => p.next()));
-        const px = si < 0 || !this.pool ? null : this.pool.take(si);
-        if (px === "wait") return "wait";
-        p.add(dark ? fc.dark(k, px as Pixels | null) : fc.get(k, px as Pixels | null));
-      });
-    };
-    const fcs = new Set<FrameCache>();
-    const frames = (fc: FrameCache) => {
-      if (fcs.has(fc)) return;
-      fcs.add(fc);
-      for (let k = 0; k < fc.frames.length; k++) frame(fc, k, false);
-    };
-    const roof = (b: BoxInst, q: number) => {
-      sig.push(`roof:${b.box.id}:${this.roofKey(b, q)}`);
-      const si = roofSpec(b, q);
-      jobs.push(() => {
-        const p = P();
-        const cuts = si < 0 || p.from || !this.pool ? null : this.pool.take(si);
-        if (cuts === "wait") return "wait";
-        let fresh = false;
-        const a = this.roofArt(b, q, (flat, qq) => {
-          fresh = true;
-          return p.from ? p.roof() : bakeRoof(b, b.box, flat ? 0 : qq, (cuts as Cut[][] | null) ?? undefined);
+    for (const w of townWants(this.art)) {
+      sig.push(w.sig);
+      if (w.kind === "frame") {
+        const fc = this.fcOf(w.cache);
+        const { k, dark } = w;
+        const si = w.fresh ? specs.push(w.spec) - 1 : -1;
+        jobs.push(() => {
+          const p = P();
+          if (p.from) return p.add(fc.kept(k, dark, () => p.next()));
+          const px = si < 0 || !this.pool ? null : this.pool.take(si);
+          if (px === "wait") return "wait";
+          p.add(dark ? fc.dark(k, px as Pixels | null) : fc.get(k, px as Pixels | null));
         });
-        for (const f of a.faces) {
-          p.add(f.whole.cv);
-          for (const t of f.tris) p.add(t.cv);
-        }
-        if (fresh) p.roofDone(a);
-      });
-    };
-    // The lights (Nov 26): every home's, front's, side's and lamp's glow, baked and kept whatever the sky now (the clock brings dusk as
-    // you play). Eric's laptop at night: 1,211 uploads in 16.7 s of walking, each window's light baked and uploaded as it first shone,
-    // 3 to 12 a frame, the worst frames 50 to 117 ms. First, so this thread bakes them while the paint workers start on the frames; a
-    // later visit takes each glow's sheet and pieces from the kept pages (`pics.glow`). One job a glow, each glow once.
-    const glowSeen = new Set<object>();
-    const glow = (id: string, key: object, ch: Character, spots: readonly LightSpot[], pools: readonly LightPool[], put: (g: Glow) => void) => {
-      if (glowSeen.has(key)) return;
-      glowSeen.add(key);
-      sig.push(`glow:${id}`);
-      const si = specs.push({ kind: "glow", ch, spots, pools }) - 1;
-      jobs.push(() => {
-        const p = P();
-        if (p.from) {
-          const row = p.glow();
-          const cv = row.length ? p.next() : null;
-          if (cv) p.add(cv);
-          put(keptGlow(cv, row, ch, spots));
-          return;
-        }
-        const px = !this.pool ? null : this.pool.take(si);
-        if (px === "wait") return "wait";
-        const g = bakeGlow(ch, spots, pools, px as GlowPixels | null);
-        put(g);
-        if (g.pieces.length) p.add(g.pieces[0]!.cv);
-        p.glowDone(g.pieces.flatMap((pc) => [pc.sx, pc.sy, pc.w, pc.h, pc.x, pc.y, pc.flicker ? 1 : 0]));
-      });
-    };
-    for (let i = 0; i < this.places.length; i++) {
-      const art = artOf(this.places[i]!);
-      if (art.lights.length || art.pools.length) glow(`home${i}`, art, art.ch, art.lights, art.pools, (g) => (this.placeGlow[i] = g));
-    }
-    for (let i = 0; i < PROPS.length; i++) {
-      const pr = PROPS[i]!;
-      const fc = this.propFrames[i]!;
-      if (pr.lot !== undefined) {
-        const box = lotArt(STREET_BUILDINGS[pr.lot]!);
-        if (box.lights.length) glow(`front${i}`, fc, box.front, box.lights, [], (g) => this.frontGlow.set(fc, g));
+      } else if (w.kind === "roof") {
+        const { b, q } = w;
+        const si = w.fresh ? specs.push(w.spec) - 1 : -1;
+        jobs.push(() => {
+          const p = P();
+          const cuts = si < 0 || p.from || !this.pool ? null : this.pool.take(si);
+          if (cuts === "wait") return "wait";
+          let fresh = false;
+          const a = this.roofArt(b, q, (flat, qq) => {
+            fresh = true;
+            return p.from ? p.roof() : bakeRoof(b, b.box, flat ? 0 : qq, (cuts as Cut[][] | null) ?? undefined);
+          });
+          for (const f of a.faces) {
+            p.add(f.whole.cv);
+            for (const t of f.tris) p.add(t.cv);
+          }
+          if (fresh) p.roofDone(a);
+        });
+      } else if (w.kind === "glow") {
+        // The lights (Nov 26): every home's, front's, side's and lamp's glow, baked and kept whatever the sky now (the clock brings dusk as
+        // you play). Eric's laptop at night: 1,211 uploads in 16.7 s of walking, each window's light baked and uploaded as it first shone,
+        // 3 to 12 a frame, the worst frames 50 to 117 ms. First, so this thread bakes them while the paint workers start on the frames; a
+        // later visit takes each glow's sheet and pieces from the kept pages (`pics.glow`). One job a glow, each glow once.
+        const { ch, spots, pools, to } = w;
+        const put = (g: Glow) => {
+          if (to.of === "place") this.placeGlow[to.i] = g;
+          else if (to.of === "front") this.frontGlow.set(this.propFrames[to.i]!, g);
+          else if (to.of === "lamp") this.lampGlow = g;
+          else this.wallGlow.set(to.ch, g);
+        };
+        const si = specs.push(w.spec) - 1;
+        jobs.push(() => {
+          const p = P();
+          if (p.from) {
+            const row = p.glow();
+            const cv = row.length ? p.next() : null;
+            if (cv) p.add(cv);
+            put(keptGlow(cv, row, ch, spots));
+            return;
+          }
+          const px = !this.pool ? null : this.pool.take(si);
+          if (px === "wait") return "wait";
+          const g = bakeGlow(ch, spots, pools, px as GlowPixels | null);
+          put(g);
+          if (g.pieces.length) p.add(g.pieces[0]!.cv);
+          p.glowDone(g.pieces.flatMap((pc) => [pc.sx, pc.sy, pc.w, pc.h, pc.x, pc.y, pc.flicker ? 1 : 0]));
+        });
+      } else {
+        const { i } = w;
+        jobs.push(() => {
+          const p = P();
+          p.add(this.statueAt(i, p.from ? () => p.next() : undefined));
+        });
       }
-      if (pr.kind === "lamp") glow("lamp", PARK_LAMP, PARK_LAMP, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, (g) => (this.lampGlow = g));
-    }
-    for (const b of this.boxes)
-      for (const side of [b.box.left, b.box.right, b.box.back ?? b.box.rear])
-        if (side?.lights.length) glow(`side:${side.ch.id}`, side.ch, side.ch, side.lights, [], (g) => this.wallGlow.set(side.ch, g));
-    for (const b of this.boxes) {
-      for (const list of [0, 1]) for (const w of this.warmList(b, list)) frame(w.fc, w.k, w.dark);
-      for (let q = 0; q < 4; q++) roof(b, q);
-    }
-    for (const fc of this.hedgeTops) frames(fc);
-    for (const fc of this.propFrames) frames(fc);
-    for (const fc of this.houseFrames) frames(fc);
-    for (const fc of this.bossFrames) frames(fc);
-    for (let i = 0; i < STATUES.length; i++) {
-      sig.push(`statue:${STATUES[i]!.id}`);
-      jobs.push(() => {
-        const p = P();
-        p.add(this.statueAt(i, p.from ? () => p.next() : undefined));
-      });
     }
     // (The sidekicks' frames: cut from their sheets once they've loaded, as the town opens. Not kept between visits: the sheets are
     // the site's own files, and cutting them is quick.)
@@ -2084,7 +1985,7 @@ export class Renderer {
     if (had) return had;
     let m = this.roofs.get(box);
     if (!m) this.roofs.set(box, (m = new Map()));
-    const key = this.roofKey(b, q);
+    const key = roofKey(b, q);
     let a = m.get(key);
     if (!a) {
       const t0 = REC ? performance.now() : 0;
@@ -2094,11 +1995,6 @@ export class Renderer {
     }
     this.instArt[q]![b.i] = a;
     return a;
-  }
-  /** Which of its art's roof paintings box `b` shows facing quarter `q`. (A flat roof is lit the same whichever way the camera faces:
-   * one painting serves all four. Round 4's flat fronts are most of them.) */
-  private roofKey(b: BoxInst, q: number): string {
-    return geomOf(b.box).faces.every((f) => f.nz > 0.999) ? "flat" : `${b.facing}${q}`;
   }
   /** Each box's roof paintings as it last asked for them, by heading (no lookup a frame). */
   private readonly instArt: (RoofArt | undefined)[][] = [[], [], [], []];
@@ -2240,7 +2136,7 @@ export class Renderer {
   }
   private wallFc(ch: Character): FrameCache {
     let fc = this.wallFrames.get(ch);
-    if (!fc) this.wallFrames.set(ch, (fc = new FrameCache(ch)));
+    if (!fc) this.wallFrames.set(ch, (fc = this.fcOf(this.art.wall(ch))));
     return fc;
   }
   /** A side's windows lit at dusk and night (the art's: its own lights, baked as a front's are), once a picture. */

@@ -1,1 +1,3 @@
 public/engine/
+# Chess Town's baked pictures (scripts/bake-town.ts): made by every build, about 3.5 MB
+public/town-pictures/
