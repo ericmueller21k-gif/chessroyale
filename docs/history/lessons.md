@@ -1251,6 +1251,16 @@ can keep its pieces home too.
 **The fix:** Folio's `?power=draft` starts from BALLOON_TEST_MOVES (its queen on d5), as Don Dough's and Smudgy's switches already
 do; after the smoke's Na3 every reply leaves a mark, and a unit test checks all of them. docs/decisions/2026-11-25-folio-draft-test-start.md.
 
+
+## The town that never went away (Nov 27, 2026)
+
+Eric's phone reloaded the game twice after Battle Tower floors (Big Boy, then the Stranger), each time onto the plaza. No test
+measured memory, and every e2e passed. A probe of live canvases, ImageBitmaps and WebGL textures (`e2e/mem-probe.js`) across a floor
+showed the last town's renderer and its pictures (about 230 MB) alive through the battle, held by a window hook a room never took off
+(`__shopElves`), and, once that was fixed, by module-level vnodes (TowerHearts' pixels) and Preact's first vnode, whose handlers keep
+the screen's refs. Back from the floor, a second whole street loaded beside it just to show the tower. A heap snapshot's retaining
+path (CDP `HeapProfiler`) found each holder in minutes; guessing had found none. docs/decisions/2026-11-27-town-return.md.
+
 ## A storm that showed before its scene, and sheets let go every turn (Nov 27, 2026)
 
 Eric, playing the Stranger on a phone: "right when he triggered his ult, it showed the tornado before he even initiated anything ...

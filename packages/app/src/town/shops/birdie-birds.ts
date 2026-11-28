@@ -540,7 +540,8 @@ const pt = newPt();
 export function birdieFx(you: () => { c: number; r: number } | null): RoomFx {
   const img = birdSheet();
   const flock = new Flock();
-  let near = false;
+  /** Whether you're near the pile (checked every `F.checkMs`) and when the flock was last drawn. */
+  const seen = { near: false, at: 0 };
   let checked = -Infinity;
   const fig = {
     z: 5.5,
@@ -548,15 +549,22 @@ export function birdieFx(you: () => { c: number; r: number } | null): RoomFx {
       if (now - checked >= F.checkMs) {
         checked = now;
         const at = you();
-        near = !!at && Flock.near(at.c, at.r);
+        seen.near = !!at && Flock.near(at.c, at.r);
       }
-      flock.step(now, near);
+      flock.step(now, seen.near);
       flock.draw(d, now, img);
-      drawnAt = now;
+      seen.at = now;
     },
   };
-  let drawnAt = 0;
   const list = [fig];
-  if (testSwitchesAllowed()) (window as unknown as { __birdieBirds?: () => ReturnType<Flock["counts"]> & { near: boolean } }).__birdieBirds = () => ({ ...flock.counts(drawnAt), near });
+  if (testSwitchesAllowed()) hookBirds(flock, seen);
   return { figures: () => list };
+}
+
+/**
+ * (Tests) The flock's counts. Made outside `birdieFx`, so the hook (never taken off: a room's effects have no end) holds the flock and
+ * its two numbers only, never the room's `you` and through it the room and the town (Nov 27, window-hooks.ts).
+ */
+function hookBirds(flock: Flock, seen: { near: boolean; at: number }) {
+  (window as unknown as { __birdieBirds?: () => ReturnType<Flock["counts"]> & { near: boolean } }).__birdieBirds = () => ({ ...flock.counts(seen.at), near: seen.near });
 }

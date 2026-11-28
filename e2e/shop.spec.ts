@@ -1730,6 +1730,8 @@ test("Birdie's Station (Nov 23): his bartender sells Birdie's Boss Crate, his Tr
     // (His Train, Yellow as his train is, under your pawn in the town.)
     const [train] = await giveItems(page, [{ def: "birdie-train", color: "yellow", blemish: 0 }]);
     await wearItem(page, "ride", train!);
+    // (Out on the street, not back in his room: the last town spot let go, town/spot.ts.)
+    await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("brc.town.spot")).forEach((k) => localStorage.removeItem(k)));
     await page.goto("/town?sky=day");
     await townReady(page);
     await expect.poll(async () => (await page.evaluate(() => (window as unknown as Hooks).__townRide?.().you)) ?? null, { timeout: 30_000 }).toMatchObject({ ride: "birdie-train", ready: true });
