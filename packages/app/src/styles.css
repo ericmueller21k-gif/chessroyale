@@ -22322,11 +22322,12 @@ button.sq-tiny {
     min-height: 0;
     contain: size;
   }
-  /* (The end page's sizes from its column's height, the board's: 1 from an 810 px window; at 1280 × 600 0.65 (its gap kept at 8 px), so
+  /* (The end page's sizes from its column's height, the board's: 1 from an 810 px window; at 1280 × 600 0.6 (its gap kept at 8 px), so
      the chat keeps 40 px of messages in a column no taller than the board. Were 1 from 800 and 0.69 at 600: the coin strip, Nov 25,
-     took more room than the coins line it replaced.) */
+     took more room than the coins line it replaced; then 0.65 at 600, until Nov 28: the XP box is one height in every state now, the
+     earned one's, which that scale had only been checked without.) */
   .screen.game.dv-ended .dv-box > .dv-end-col {
-    --es-u: clamp(0.64px, calc((var(--app-h) - 210px) / 600), 1px);
+    --es-u: clamp(0.6px, calc((var(--app-h) - 285px) / 525), 1px);
   }
   .dv-actions {
     flex: none;
