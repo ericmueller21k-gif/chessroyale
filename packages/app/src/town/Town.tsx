@@ -1516,6 +1516,8 @@ export const GATE_YOUNG = "Accounts are for players 13 and older.";
  * sidekicks' sheets downloaded (`TOWN_FEEL.loadPaintShare` of the bar); "building": the pictures put on the GPU for good. (The music
  * is no step since Nov 14: it comes after the first frame.)
  */
+/** (Nov 28) The boxes' solid tops kept between visits, by the kept pictures' key (`loadTown`). */
+const TOPS_KEY = "brc.townTops";
 const LOAD_STEPS = { pictures: "Loading the town's pictures…", building: "Building the town…" } as const;
 type LoadStep = keyof typeof LOAD_STEPS;
 
@@ -3010,8 +3012,22 @@ function startTown(
       loadPaintMs = performance.now() - t0;
       // (Each box's solid top, Nov 28: here, not in idle slices once the town shows, where one took 44 ms on Eric's computer.)
       onLoading(f.loadPaintShare, "building");
+      // (Kept under the pictures' key, so a later visit on this build and layout has them at once: 1.6 s of a slowed phone's load.)
       const tt = performance.now();
-      while (alive && !r.warmTops(f.loadSliceMs)) await tick();
+      let had: { key?: string; tops?: number[] } | null = null;
+      try {
+        had = shelf ? JSON.parse(localStorage.getItem(TOPS_KEY) ?? "null") : null;
+      } catch {
+        // (None kept, or no storage: worked out.)
+      }
+      if (!(had?.key === key && had.tops && r.takeTops(had.tops))) {
+        while (alive && !r.warmTops(f.loadSliceMs)) await tick();
+        try {
+          if (shelf && alive) localStorage.setItem(TOPS_KEY, JSON.stringify({ key, tops: r.topsList() }));
+        } catch {
+          // (No storage: worked out again next time.)
+        }
+      }
       topsMs = performance.now() - tt;
       for (let share = 0; share < 1 && alive; ) {
         share = painter.kept?.(f.loadSliceMs) ?? 1;

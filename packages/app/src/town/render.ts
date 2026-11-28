@@ -59,7 +59,7 @@ import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
 import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS } from "./street.ts";
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
-import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, solidTop, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
+import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, setSolidTop, solidTop, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, upName, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
@@ -3721,6 +3721,17 @@ export class Renderer {
     const t0 = performance.now();
     while (this.topsAt < this.boxes.length && performance.now() - t0 < budgetMs) solidTop(this.boxes[this.topsAt++]!.box);
     return this.topsAt >= this.boxes.length;
+  }
+  /** Every box's solid top (kept for the next visit on this build and layout: Town.tsx `loadTown`). */
+  topsList(): number[] {
+    return this.boxes.map((b) => solidTop(b.box));
+  }
+  /** A later visit: the tops as the last visit worked them out, none to work out again (false: they don't fit these boxes). */
+  takeTops(tops: readonly number[]): boolean {
+    if (this.topsAt > 0 || tops.length !== this.boxes.length || !tops.every((t) => typeof t === "number")) return false;
+    this.boxes.forEach((b, i) => setSolidTop(b.box, tops[i]!));
+    this.topsAt = tops.length;
+    return true;
   }
   private nextTagSlice(): void {
     this.tagSlicing = true;
