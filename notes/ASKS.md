@@ -53,6 +53,6 @@
 - Nov 28 · Town load stutter ("I don't want it to lag at all when the town loads") · IN PROGRESS (town-load-smooth.md)
 - Nov 28 · Menu sounds (item tap, magnifier) half as loud · PR #1034
 - Nov 28 · Town structure overhaul for loading + drawing (Eric: "permanent change… might make the town bigger… ask Fable") · DESIGN DONE Nov 28 05:30; Eric 05:40: do ALL phases, no questions · IN PROGRESS: town-phases.md (0 → 1a/1b/1c → 2 → 3 → 4), Fable each
-- Nov 28 · Stranger crash on 2nd ult · FIXED PR #1044 (pieceAt reads a drawn board without the rules)
+- Nov 28 · Stranger crash on 2nd ult · LIVE Nov 28 10:44 (#1044)
 - Nov 28 · Power banner looks inconsistent (sizes, fonts, name) · QUEUED banner-consistent.md
 - Nov 28 · Ledger check: 4 accounts disagree (found in ops:report) · QUEUED ledger-mismatch.md (xhigh)
