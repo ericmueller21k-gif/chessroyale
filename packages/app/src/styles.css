@@ -28397,8 +28397,9 @@ body.mo-on .mm-scrim {
   pointer-events: none;
 }
 /* His oven timers, in the boss bar's prop slot (right of his bars, under the status): a slot for each lump the rules allow at once,
-   side by side, each a kitchen timer at 2x (76 x 44: a computer's bar is one short row, so not the art's 3x there); an empty slot a
-   faint outline of the same size. Absolute, never taking a tap: nothing in the bar moves for them. */
+   side by side, each a kitchen timer at 2x (76 x 44: a computer's bar is one short row, so not the art's 3x there); an empty slot keeps
+   its room but draws nothing (Eric, Nov 28: its outline read as a leftover placeholder). Absolute, never taking a tap: nothing in the
+   bar moves for them. */
 .dd-timers {
   /* (Two timers in the boss's room, a 4 px gap: no wider than the room, Nov 12: his name column moved right as his figure grew.) */
   --dd-w: min(76px, (100cqw - 4px) / 2);
@@ -28415,11 +28416,6 @@ body.mo-on .mm-scrim {
   display: block;
   width: var(--dd-w);
   height: var(--dd-h);
-}
-.dd-slot.empty {
-  box-sizing: border-box;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  border-radius: 6px;
 }
 .dd-timer {
   display: block;
@@ -28461,10 +28457,6 @@ body.mo-on .mm-scrim {
     bottom: var(--side-lift, 0px);
     /* (Stacked, one over the other, in the room between him and the board: a row of two reached back over his figure. Eric, Nov 27.) */
     flex-direction: column-reverse;
-  }
-  /* (An empty slot's outline gray, not the bar's faint white: it shows on the page in light and dark mode alike.) */
-  .boss-side > .dd-timers > .dd-slot.empty {
-    border-color: rgba(128, 128, 128, 0.55);
   }
 }
 
