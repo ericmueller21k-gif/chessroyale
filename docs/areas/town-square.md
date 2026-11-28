@@ -228,7 +228,8 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   drawn once per look into a small canvas; a frame only places them (a slow drift and a little parallax).
 - **`rimLine`** (`feel.ts`, off): a dark line along the world's rim instead of the haze alone (Eric was curious), with its
   color and width.
-- **The chips** (and the large map's portraits) show each boss's head (`BOSS_FACE` in `render.ts`: a square round its portrait
+- **The chips** (each place's face drawn once, on a canvas of its own, and a place keeps the chip it had: Nov 28, `placeChips`;
+  and the large map's portraits) show each boss's head (`BOSS_FACE` in `render.ts`: a square round its portrait
   window in portraits.gen.ts, so it follows a redraw; a home with nobody out front: `HOUSE_*_CHIP` in its house module), and the Colosseum's
   a gold crown over the board's squares (`COLISEUM_CHIP`, `houses/coliseum.ts`).
 - **The Colosseum** (`town/houses/coliseum.ts`, slice 5; redrawn about twice the size in slice 6): a Roman amphitheater of
@@ -1355,9 +1356,12 @@ in the paint workers on a first visit and from the kept pages on a later one (`M
 (the bosses' bubbles). Load: about +0.4 s on a first visit at 1x, +0.75 s at 4x; +0.07 / +0.2 s on a later one; 14 atlas pages. A glow's lit
 pixels (`litOf`, the tests' `lightAt`) are worked out when first asked for. The guard spec walks across the town at `?sky=night&crowd=12`.
 **Kept between visits (Nov 23; [decision](../decisions/2026-11-23-town-keep-pictures.md)):** after a first visit's first frame its pictures are
-packed into PNG pages (a worker encodes them; 5.8 MB) and kept in IndexedDB (`town/keep-pictures.ts`, `TOWN_PICTURES`). A later visit on the
-same build and layout (`pictureKey`: version, the town chunk's hashed name, `render.ts` `pictureSig`) loads them instead of painting:
-4x slowed, 18.5 s → 5.9 s. **Uploaded whole (Nov 25; [decision](../decisions/2026-11-25-town-atlas-pages.md)):** the pages are packed as the
+packed into PNG pages (a worker encodes them; 5.8 MB) and kept in IndexedDB (`town/keep-pictures.ts`, `TOWN_PICTURES`). A later visit with
+the same art and layout (`pictureKey`: the art's fingerprint, `render.ts` `pictureSig`) loads them instead of painting: 4x slowed,
+18.5 s → 5.9 s. **The art's fingerprint (Nov 28; [decision](../decisions/2026-11-28-town-art-key.md)):** the build bundles the code the
+pictures come from with all it uses (`packages/app/town-art.ts`, esbuild, tree-shaken) and hashes it: `__TOWN_ART__`. Not the build's
+commit, as before: every deploy threw the saved town away. A deploy that leaves the art alone now keeps it (after a deploy, 4x slowed:
+11.8 to 12.3 s → 5.6 to 6.7 s; a computer: 4.3 to 4.5 → 2.2 to 2.4 s); a changed house color paints again. Test: `town-art.test.ts`. **Uploaded whole (Nov 25; [decision](../decisions/2026-11-25-town-atlas-pages.md)):** the pages are packed as the
 atlas packs (`paint.ts` `ATLAS`: 2048 px, 2 px padding, a picture over 1024 px alone), so a later visit uploads each page as one atlas layer
 (`paint-gl.ts` `adopt`) instead of cutting 1,912 pictures out and uploading each. Each picture is a stand-in canvas, cut from its page only
 when something reads it (its 2D context: hit tests, statue masks; a 2D context drawing from it: the chips' and the large map's faces,

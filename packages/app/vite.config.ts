@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import preact from "@preact/preset-vite";
 import { APP_CACHE } from "../core/src/settings.ts";
+import { townArt } from "./town-art.ts";
 
 const require = createRequire(import.meta.url);
 /** This config's own folder (packages/app): its files resolve from here, whichever folder Vite was started from. */
@@ -171,9 +172,11 @@ function maiaFileBytes(): Record<string, number> {
   return Object.fromEntries(readdirSync(dist).filter((f) => /\.(js|wasm|onnx)$/.test(f)).map((f) => [f, statSync(join(dist, f)).size]));
 }
 
-export default defineConfig({
-  define: { __MAIA_FILE_BYTES__: JSON.stringify(maiaFileBytes()), __APP_VERSION__: JSON.stringify(VERSION) },
+// (`__TOWN_ART__`, Nov 28: the town's art's fingerprint, which keys the town's pictures kept between visits, so a deploy that doesn't
+// change the art keeps them: town-art.ts. The dev server keeps no pictures, so it takes none.)
+export default defineConfig(async ({ command }) => ({
+  define: { __MAIA_FILE_BYTES__: JSON.stringify(maiaFileBytes()), __APP_VERSION__: JSON.stringify(VERSION), __TOWN_ART__: JSON.stringify(command === "build" ? await townArt() : "dev") },
   plugins: [stockfish(), maiaBox(), preact(), serviceWorker(), versionFile()],
   server: { host: true },
   build: { target: "es2020", chunkSizeWarningLimit: 1000 },
-});
+}));

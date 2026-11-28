@@ -2,17 +2,17 @@
  * Chess Town's pictures kept between visits (Nov 23, Eric: "the drawn pictures between visits ... it seems like just smart").
  *
  * The loading screen paints every picture the town can show (render.ts `warm`) before the first frame (Eric's rule: nothing painted
- * while you walk). On the first visit on a build, that's as before; then the pictures are packed into pages, encoded as PNG off the
+ * while you walk). On a first visit, that's as before; then the pictures are packed into pages, encoded as PNG off the
  * main thread (keep-pictures.worker.ts) and kept in IndexedDB with a manifest: each picture's place on its page, in the order the
- * loading screen keeps them, and each roof's pieces. A later visit on the same build and layout (`pictureKey`) decodes the pages, and
+ * loading screen keeps them, and each roof's pieces. A later visit with the same art and layout (`pictureKey`) decodes the pages, and
  * since Nov 25 hands them to the painter whole (`Painter.adopt`): they're packed as the WebGL atlas packs (paint.ts `ATLAS`), so each is
  * uploaded as one layer, never cut up and uploaded a picture at a time (1,912 of them: 3.3 s and 0.55 s of a slowed phone's 7 s). Each
  * picture is a canvas standing in for it, put where its painting would have gone (render.ts `plan`) and drawn by as before; it's empty
  * until something asks for its pixels (its 2D context: a tap's hit test, a statue's mask; a 2D context drawing from it: a chip's face,
  * `cutBeforeDraw`; or the painter uploading it alone), then cut from its page. The town draws exactly what it drew before.
  *
- * It never breaks the town: no storage, a quota error, a missing, partial, corrupt or other build's entry, a decode failure or a slow
- * read (`TOWN_PICTURES.waitMs`) paints as before, silently, and the entry is cleared. Only one entry is ever kept (the last build's).
+ * It never breaks the town: no storage, a quota error, a missing, partial or corrupt entry, one of other art, a decode failure or a slow
+ * read (`TOWN_PICTURES.waitMs`) paints as before, silently, and the entry is cleared. Only one entry is ever kept (the last visit's).
  * docs/decisions/2026-11-23-town-keep-pictures.md.
  */
 import { TOWN_PICTURES } from "@chessroyale/core";
@@ -153,12 +153,13 @@ export function hash(s: string): string {
 }
 
 /**
- * The entry's key: the app's version (each deploy's commit), the town's code and everything it imports (its file's hashed name,
- * which changes when any of them does), and the loading screen's pictures (render.ts `pictureSig`: the layout; an admin's town is
- * another). Any of them changed, and the pictures are painted again.
+ * The entry's key: the town's art (the build's fingerprint of the code its pictures come from and everything that code uses:
+ * packages/app/town-art.ts, `__TOWN_ART__`) and the loading screen's pictures (render.ts `pictureSig`: the layout; an admin's town is
+ * another). Either changed, and the pictures are painted again. (Until Nov 28 the build's commit and the town's file's hashed name:
+ * both new with every deploy, so every deploy painted the town again.)
  */
-export function pictureKey(version: string, code: string, sig: string): string {
-  return `${version}|${code}|${hash(sig)}`;
+export function pictureKey(art: string, sig: string): string {
+  return `${art}|${hash(sig)}`;
 }
 
 /** A picture the atlas gives a texture of its own (paint-gl.ts): on a page of its own, at its top left. */
