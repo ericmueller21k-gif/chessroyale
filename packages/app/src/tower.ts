@@ -174,6 +174,8 @@ export const towerApi = {
     ask<{ outcome: FloorOutcome; floor: number; status: string; lives?: number; lost?: number[]; run: TowerRun | null; best: number }>("/api/tower/floor/finish", { fight, outcome, ...kindOf(kind) }),
   stop: (fight: string, moves: number | undefined, free = false, kind?: RunKind) =>
     ask<{ stopped: "between" | "free" | "lost"; floor?: number; status?: string; lives?: number; lost?: number[]; run: TowerRun | null }>("/api/tower/stop", { fight, ...(moves !== undefined ? { moves } : {}), ...(free ? { free: true } : {}), ...kindOf(kind) }),
+  /** An admin's jump (Settings, "For testers"): their solo run's next floor set to `floor`, lives full (server tower.ts setTowerFloor). */
+  adminFloor: (floor: number) => ask<{ message: string; floor: number; run: TowerRun | null }>("/api/tower/admin/floor", { floor }),
 };
 
 /** A boss as the screens draw it: his own, or a safe stand-in for an id this app doesn't know (a boss renamed or removed since). */
