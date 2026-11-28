@@ -515,8 +515,14 @@ test("the stage: your pawn on the left platform while searching; the opponent's 
   const spans = await watchSpans(a, { versus: { selector: ".dv-st-them .dv-st-name", text: /^Bo Stage$/ }, board: { selector: ".dv-vote" } });
 
   await b.goto(`/1v1?nolanding&pool=${pool}`);
-  // Found: Bo's pawn on the right platform, his name and rank under it, "VS" between; nothing else on the stage moved.
-  await expect(stage.locator(".dv-st-them .dv-st-name")).toHaveText("Bo Stage", { timeout: 20_000 });
+  // Found: Bo's pawn on the right platform, his name and rank under it, "VS" between; nothing else on the stage moved. And Bo sees the
+  // same from his side, himself on the left and Ann on the right, read at once: the stage holds only the versus moment (2.5 s), and
+  // read after Ann's checks below it was once gone on a slow runner (main 3fba12e3, desktop).
+  await Promise.all([
+    expect(stage.locator(".dv-st-them .dv-st-name")).toHaveText("Bo Stage", { timeout: 20_000 }),
+    expect(b.locator(".dv-st-you .dv-st-name")).toHaveText("Bo Stage", { timeout: 20_000 }),
+    expect(b.locator(".dv-st-them .dv-st-name")).toHaveText("Ann Stage", { timeout: 20_000 }),
+  ]);
   await expect(stage.locator(".dv-st-them .dv-st-pawn .avatar")).toBeVisible();
   await expect(stage.locator(".dv-st-them .dv-st-rank")).toHaveText("Placement 0/5");
   await expect(stage.locator(".dv-st-vs")).toHaveText("VS");
@@ -525,9 +531,6 @@ test("the stage: your pawn on the left platform while searching; the opponent's 
   const found = await stageBoxes(a);
   expect(found).toEqual(before);
   await expect(a.locator('.dv-st-you .dv-st-pawn[data-kept="1"]')).toHaveCount(1);
-  // Bo sees the same from his side: himself on the left, Ann on the right.
-  await expect(b.locator(".dv-st-you .dv-st-name")).toHaveText("Bo Stage", { timeout: 10_000 });
-  await expect(b.locator(".dv-st-them .dv-st-name")).toHaveText("Ann Stage");
 
   // It holds for the game's versus moment, then the board loads with the vote on it, and the stage is gone.
   await expect(a.locator(".dv-vote")).toBeVisible({ timeout: 10_000 });
