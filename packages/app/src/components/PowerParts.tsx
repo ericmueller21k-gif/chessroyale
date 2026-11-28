@@ -1,4 +1,4 @@
-import { useContext, useLayoutEffect, useRef } from "preact/hooks";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import type { ComponentChildren, JSX } from "preact";
 import type { ChandyMove, PowerEvent, PowerEventKind, WaterGrowth } from "@chessroyale/core";
@@ -317,52 +317,63 @@ export function Flight({ name, anim, square, orientation, since, ms, aim = false
   );
 }
 
-/** The share of the banner's width its words take (the portraits, their gaps and a margin take the rest: styles.css). */
-const WORDS_SHARE = 0.42;
+/**
+ * The power banner's type (Eric, Nov 28: "All the words look different… his name looks weird… the worlds is, like, bigger than
+ * the rest"): one face, the app's own Archivo (the same on a phone and a computer), for the name, the title and the line under it;
+ * the title's lines one size. Sizes in cqw (hundredths of the board's width: styles.css, `.power-cut`), so the fit needs no layout.
+ */
+export const BANNER_FONT = "Archivo, system-ui, sans-serif";
+/** The words' share of the banner (cqw): between the boss's portrait and your pawn (styles.css, `.power-cut .kc-words`). */
+const ROOM = 42;
+/** The title's size when it fits (cqw), and the name's. */
+const TITLE_MAX = 8;
+const NAME_MAX = 3.6;
+
+let measurer: CanvasRenderingContext2D | null | undefined;
+/** A text's width in ems, in the banner's face (a canvas: no layout); a rough width where there's no canvas (unit tests). */
+const ems = (text: string, weight: string, spacing: number): number => {
+  measurer ??= typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d");
+  if (!measurer) return text.length * (0.72 + spacing);
+  measurer.font = `${weight} 100px ${BANNER_FONT}`;
+  return measurer.measureText(text).width / 100 + text.length * spacing;
+};
 
 /**
- * Fits the big word between the two portraits: when its longest word is wider than the words' share of the banner, it's
- * made smaller, by the ratio, measured in the page's own font (a canvas: no layout per frame, once as the banner appears).
- * The phrase wraps at its spaces (styles.css). Eric, Nov 1: "MAMMOTH SLAM!" ran off a computer's board ("you can't read any
- * of it"), and the same banner cut its portraits off the edges; now every power's banner fits its board.
+ * The banner's fit: the title on one line or two (split at the space that makes its longer line shortest), every line one size,
+ * the size that fits its longest line in the words' share (never above TITLE_MAX); the name on one line, smaller only if it must.
+ * (Before: each word wrapped on its own and the longest one sized the title, so "STORM OF TWO WORLDS!" took three ragged lines.)
  */
-function fitBigWord(banner: HTMLElement | null) {
-  const word = banner?.querySelector<HTMLElement>(".kc-text");
-  if (!banner || !word) return;
-  word.style.fontSize = "";
-  const style = getComputedStyle(word);
-  const size = parseFloat(style.fontSize);
-  const ctx = document.createElement("canvas").getContext("2d");
-  if (!ctx || !size) return;
-  ctx.font = `${style.fontStyle} ${style.fontWeight} ${size}px ${style.fontFamily}`;
-  if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = style.letterSpacing;
-  // (The stroke around the letters, 3 px each side, is the margin.)
-  const longest = Math.max(...(word.textContent ?? "").split(" ").map((w) => ctx.measureText(w).width)) + 6;
-  const room = banner.clientWidth * WORDS_SHARE;
-  if (longest > room) word.style.fontSize = `${((size * room) / longest).toFixed(2)}px`;
-  // The boss's name on one line, made smaller when it's wider than the words' share (Eric, Nov 5: "Wrangler" cut off the
-  // strip's top; a long name like "Boingo the Clown" wrapped to two lines and pushed the stack out of the strip).
-  const label = banner.querySelector<HTMLElement>(".kc-label");
-  if (!label) return;
-  label.style.fontSize = "";
-  const lstyle = getComputedStyle(label);
-  const lsize = parseFloat(lstyle.fontSize);
-  ctx.font = `${lstyle.fontStyle} ${lstyle.fontWeight} ${lsize}px ${lstyle.fontFamily}`;
-  if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = lstyle.letterSpacing;
-  const nameWide = ctx.measureText(label.textContent ?? "").width;
-  if (nameWide > room) label.style.fontSize = `${((lsize * room) / nameWide).toFixed(2)}px`;
+export function fitBanner(text: string, name: string, measure = ems): { lines: string[]; size: number; nameSize: number } {
+  // (Margin: the letters' stroke and shadow; the name's plate.)
+  const wide = (line: string) => measure(line, "italic 900", 0.02) + 0.15;
+  const words = text.split(" ");
+  let lines = [text];
+  let longest = wide(text);
+  for (let i = 1; i < words.length; i++) {
+    const two = [words.slice(0, i).join(" "), words.slice(i).join(" ")];
+    const w = Math.max(...two.map(wide));
+    if (w < longest && longest * TITLE_MAX > ROOM) [lines, longest] = [two, w];
+  }
+  const size = Math.min(TITLE_MAX, ROOM / longest);
+  const nameSize = Math.min(NAME_MAX, ROOM / (measure(name.toUpperCase(), "800", 0.08) + 1.3));
+  return { lines, size: Math.floor(size * 100) / 100, nameSize: Math.floor(nameSize * 100) / 100 };
 }
 
 /**
- * The power's banner: the God King's cut-in style, the boss on the left and the God King on the right; off the board by
+ * The power's banner: the God King's cut-in style, the boss on the left and your pawn on the right; off the board by
  * `ms` (BOSS_BANNER.ms, or sooner where the power starts sooner: PowerMoment's `banner`).
  */
 export function PowerBanner({ boss, side, text, sub, tone = "", ms }: { boss: BossView; side: "w" | "b"; text: string; sub?: string; tone?: string; ms: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  // (Before the first paint: the banner is drawn at its fitted size from its first frame.)
-  useLayoutEffect(() => fitBigWord(ref.current), [text]);
+  const name = boss.name.replace(/^The /, "");
+  // (Fitted again once the face has loaded, where a battle opens before it has: measured in the fallback until then.)
+  const [loaded, setLoaded] = useState(0);
+  useEffect(() => {
+    const face = `italic 900 10px ${BANNER_FONT}`;
+    if (typeof document !== "undefined" && document.fonts && !document.fonts.check(face)) void document.fonts.load(face).then(() => setLoaded(1), () => undefined);
+  }, []);
+  const fit = useMemo(() => fitBanner(text, name), [text, name, loaded]);
   return (
-    <div ref={ref} class={`fight-banner king-cut power-cut ${tone}`} style={bannerLength(ms)} role="alert" aria-label={sub ? `${boss.name}: ${text} ${sub}` : `${boss.name}: ${text}`}>
+    <div class={`fight-banner king-cut power-cut ${tone}`} style={bannerLength(ms)} role="alert" aria-label={sub ? `${boss.name}: ${text} ${sub}` : `${boss.name}: ${text}`}>
       <div class="fb-flash" />
       <div class="fb-band">
         <div class="fb-lines" />
@@ -370,8 +381,11 @@ export function PowerBanner({ boss, side, text, sub, tone = "", ms }: { boss: Bo
           <BossFace boss={boss} />
         </span>
         <span class="fb-words kc-words">
-          <span class="kc-label">{boss.name.replace(/^The /, "")}</span>
-          <span class="fb-text kc-text">{text}</span>
+          <span class="kc-label" style={{ fontSize: `${fit.nameSize}cqw` }}>{name}</span>
+          <span class="fb-text kc-text" style={{ fontSize: `${fit.size}cqw` }}>
+            {/* (A space between the lines, so its text reads as the whole title.) */}
+            {fit.lines.map((line, i) => [i > 0 ? " " : null, <span key={i} class="kc-line">{line}</span>])}
+          </span>
           {sub && <span class="fb-sub">{sub}</span>}
         </span>
         {/* (Your own pawn, as your profile has it: the God King keeps his banner only for his save, LastStand.tsx.) */}

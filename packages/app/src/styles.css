@@ -16415,12 +16415,6 @@ img.qicon {
   width: 100%;
   height: 100%;
 }
-/* A long line under the word wraps to two (Eric, Oct 28: Folio's "Your pieces can't cross it for 4 turns" on one line pushed
-   its portrait off the board's left and the God King's off its right; docs/decisions/2026-10-28-folio-desktop-fixes.md). */
-.fight-banner.power-cut .fb-sub {
-  max-width: 46cqw;
-  text-wrap: balance;
-}
 .fight-banner.power-cut .fb-band {
   /* (Taller than the king-cut's 36%: the name, the power's word and its line stack with room, so the name is whole, Eric, Nov 5.) */
   height: 44%;
@@ -16437,7 +16431,24 @@ img.qicon {
   background: repeating-linear-gradient(115deg, #7e1d5c 0 6cqw, #5b21b6 6cqw 12cqw);
   border-color: #fde68a;
 }
+/* One face for the name, the title and the line under it (Eric, Nov 28: "All the words look different"): the app's own Archivo,
+   the same on a phone and a computer. Sizes: PowerBanner's fitBanner (the title's lines one size, at most two). The name on a
+   dark plate above the title, so the stripes never eat it. docs/decisions/2026-11-28-banner-consistent.md. */
+.fight-banner.power-cut .kc-words {
+  max-width: 42cqw;
+  font-family: Archivo, system-ui, sans-serif;
+}
 .fight-banner.power-cut .kc-label {
+  font-family: inherit;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  padding: 0.18em 0.65em;
+  border-radius: 999px;
+  background: rgba(8, 6, 16, 0.78);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+  text-shadow: none;
   color: #fecaca;
   white-space: nowrap;
 }
@@ -16445,7 +16456,7 @@ img.qicon {
   color: #bae6fd;
 }
 .fight-banner.power-cut .kc-text {
-  font-size: 10cqw;
+  font-family: inherit;
   text-shadow:
     5px 5px 0 #0b0b1a,
     0 0 var(--fb-glow, 24px) rgba(252, 165, 165, 0.9);
@@ -16455,24 +16466,24 @@ img.qicon {
     5px 5px 0 #0b0b1a,
     0 0 var(--fb-glow, 24px) rgba(186, 230, 253, 0.95);
 }
-.fight-banner.power-cut .fb-sub {
-  font-size: 3.4cqw;
-}
-/* The big word wraps at its spaces within the words' share of the banner (the portraits stay in view); PowerBanner's
-   fitBigWord makes a word that's still too wide smaller (Eric, Nov 1: "MAMMOTH SLAM!" ran off a computer's board). */
-.fight-banner.power-cut .kc-words {
-  max-width: 42cqw;
-}
-.fight-banner.power-cut .kc-text {
-  white-space: normal;
-  text-wrap: balance;
-  line-height: 0.95;
-}
-/* Ginger's thaw names the pieces it frees: a line that can run longer than its title, so it wraps under it rather than
-   widening the words and pushing the faces off the board. */
-.fight-banner.power-cut.thaw .fb-sub {
-  max-width: 50cqw;
+/* The title's lines (one or two, PowerBanner's fit) and the line under it, which wraps inside the words' share. */
+.fight-banner.power-cut .kc-line {
+  display: block;
   text-align: center;
+  line-height: 1;
+}
+.fight-banner.power-cut .fb-sub {
+  max-width: 100%;
+  margin-top: 0.8cqw;
+  font-family: inherit;
+  font-size: 3.6cqw;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  text-transform: none;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow: 0 0 3px #0b0b1a, 2px 2px 0 #0b0b1a;
 }
 /* The rage meter in the boss bar: fills as the boss loses material; flashes for the warning. */
 .rage-meter {
@@ -16713,9 +16724,6 @@ img.qicon {
   background: linear-gradient(90deg, #1a0700, #9a3412 22%, #7c2d12 50%, #9a3412 78%, #1a0700);
   border-color: #fdba74;
   box-shadow: 0 0 0 3px #0b0b1a, 0 0 26px rgba(251, 146, 60, 0.6), 0 10px 30px rgba(0, 0, 0, 0.55);
-}
-.fight-banner.power-cut.long .kc-text {
-  font-size: 7.4cqw;
 }
 .fight-banner.power-cut.fire .kc-label {
   color: #fed7aa;
@@ -17962,9 +17970,6 @@ img.qicon {
 .fight-banner.power-cut.western .fb-band {
   background: repeating-linear-gradient(115deg, #6c3d1c 0 7cqw, #b5733a 7cqw 8.5cqw, #6c3d1c 8.5cqw 15cqw);
   border-color: #ffd451;
-}
-.fight-banner.power-cut.western.draw .fb-text {
-  letter-spacing: 0.12em;
 }
 /* His moments on the board: on the board's own squares (eighths of --board-size), over the pieces, never taking a tap. */
 .pg-layer {
