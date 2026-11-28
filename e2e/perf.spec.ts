@@ -647,11 +647,11 @@ for (const who of ["a player's town", "an admin's town"] as const)
       const w = window as unknown as { __long: { s: number; d: number }[]; __tap: number };
       return Math.max(0, ...w.__long.filter((e) => e.s >= w.__tap - 5).map((e) => e.d));
     });
-    // (A first visit paints on the phone's other cores too, Nov 23: town/paint-pool.ts.)
-    const paint = await page.evaluate(() => (window as unknown as { __townPaint: () => { pictures: { workers: number; byWorkers: number; whileWaiting: number; count: number } } }).__townPaint().pictures);
-    console.log(`${who} (slowed phone): loading screen ${Math.round(shown)} ms after the tap, the town's first frame ${Math.round(loaded)} ms (${(loaded / ref).toFixed(1)} x the reference job's ${Math.round(ref)} ms), longest task ${Math.round(long)} ms; ${paint.workers} paint workers made ${paint.byWorkers} of ${paint.count} pictures (${paint.whileWaiting} more painted here while waiting)`);
-    expect(paint.workers, "paint workers that ran to the end").toBeGreaterThan(0);
-    expect(paint.byWorkers, "pictures the workers painted").toBeGreaterThan(paint.count / 2);
+    // (Nov 28, phase 1b: none painted here. The build's baked files, fetched and uploaded whole: town/baked.ts. Until then a first visit
+    // painted them, on the phone's other cores too: town/paint-pool.ts, Nov 23.)
+    const paint = await page.evaluate(() => (window as unknown as { __townPaint: () => { pictures: { baked: boolean; files: number; bytes: number; workers: number; count: number } } }).__townPaint().pictures);
+    console.log(`${who} (slowed phone): loading screen ${Math.round(shown)} ms after the tap, the town's first frame ${Math.round(loaded)} ms (${(loaded / ref).toFixed(1)} x the reference job's ${Math.round(ref)} ms), longest task ${Math.round(long)} ms; ${paint.count} pictures from ${paint.files} baked files (${(paint.bytes / 1048576).toFixed(2)} MB)`);
+    expect({ baked: paint.baked, workers: paint.workers }, "the build's baked pictures loaded: none painted here").toEqual({ baked: true, workers: 0 });
     // (Nov 10, headless Chromium: about 2.1 s and 1.4 s for the street town; before phone load 3, 5.8 s and 4.6 s. The old town, a player's
     // until Nov 13: about 1.7 s to its first frame.)
     expect(shown, "tap to the loading screen (ms)").toBeLessThan(3000);
@@ -665,17 +665,22 @@ for (const who of ["a player's town", "an admin's town"] as const)
     expect(long / ref, "longest task, in reference jobs").toBeLessThan(TOWN_LONG_REFS);
   });
 
-/** A second visit's first frame, with the first's pictures kept (keep-pictures.ts): this many reference jobs (Nov 23: measured 4.6 to 5.3
- * over 4 runs, the first visit 14.8 to 15.8; the median and a quarter, as TOWN_LOAD_REFS). docs/decisions/2026-11-23-town-keep-pictures.md. */
+/** A visit's first frame with its pictures loaded whole, not painted: this many reference jobs. (Nov 23, a second visit with the first's
+ * pictures kept, keep-pictures.ts: measured 4.6 to 5.3 over 4 runs, the first visit 14.8 to 15.8; the median and a quarter, as
+ * TOWN_LOAD_REFS. docs/decisions/2026-11-23-town-keep-pictures.md. Nov 28, phase 1b: every visit loads the build's baked files; a
+ * second visit measured 4.7.) */
 const TOWN_KEPT_REFS = 6;
+/** A first visit's, its files fetched from the server (Nov 28, phase 1b: measured 5.9 to 6.0 over 3 runs, a quarter's room; 19.9 painted
+ * on the device, as every first visit was). Phase 1c measures the town's budgets again. */
+const TOWN_BAKED_FIRST_REFS = 8;
 
-test("Chess Town on a slow phone: a second visit loads the first visit's kept pictures, exactly as painted, and draws much sooner (Nov 23)", { tag: "@perf" }, async ({ page }) => {
+test("Chess Town on a slow phone: a first visit and a second both load the build's baked pictures, exactly as the device paints them, and draw as soon as each other (Nov 28; Nov 23: a second visit's kept pictures)", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   const cdp = await page.context().newCDPSession(page);
-  type Pics = { kept: boolean; saved: number | null | undefined; saveMs: number; restoreMs: number; count: number; workers: number };
+  type Pics = { baked: boolean; bakedMs: number; files: number; bytes: number; kept: boolean; count: number; workers: number };
   const pics = () => page.evaluate(() => (window as unknown as { __townPaint?: () => { pictures: Pics } | null }).__townPaint?.()?.pictures ?? null);
-  const sum = () => page.evaluate(() => (window as unknown as { __townPictureSum: () => { n: number; hash: string } }).__townPictureSum());
+  const sum = () => page.evaluate(() => (window as unknown as { __townPictureSum: () => { n: number; hash: string; gpu: string | null } }).__townPictureSum());
   const visit = async (q = "") => {
     await page.goto(TOWN_SLOW + q);
     const town = page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).first();
@@ -689,27 +694,22 @@ test("Chess Town on a slow phone: a second visit loads the first visit's kept pi
     await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
     const loaded = await page.evaluate(() => performance.now() - (window as unknown as { __tap: number }).__tap);
     await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
-    return { ref, loaded, workers: (await pics())?.workers ?? 0 };
+    return { ref, loaded, pics: (await pics())! };
   };
-  // The first visit paints, then keeps its pictures after its first frame.
+  // The first visit loads the build's baked files: none painted here.
   const one = await visit();
-  expect((await pics())?.kept, "the first visit paints").toBe(false);
-  await expect.poll(async () => (await pics())?.saved, { timeout: 60_000 }).not.toBeUndefined();
-  const saved = (await pics())!;
-  expect(saved.saved, "the first visit's pictures kept (bytes)").toBeGreaterThan(0);
+  expect({ baked: one.pics.baked, workers: one.pics.workers }, "the first visit loads the baked pictures").toEqual({ baked: true, workers: 0 });
   const first = await sum();
-  // The second loads them: none painted, every picture's pixels the first's.
+  // The second loads the same files (the service worker's kept copies): every picture's pixels, and what the GPU holds for each, the first's.
   const two = await visit();
-  const p2 = (await pics())!;
-  expect(p2.kept, "the second visit loads the kept pictures").toBe(true);
-  expect(await sum(), "every kept picture's pixels, as the first visit painted them").toEqual(first);
-  // The first visit's pictures (painted by the paint workers, Nov 23) are the main thread's, every pixel: painted again without workers.
-  expect(one.workers, "the first visit's paint workers").toBeGreaterThan(0);
+  expect(two.pics.baked, "the second visit loads the baked pictures").toBe(true);
+  expect(await sum(), "every picture's pixels, as the first visit had them").toEqual(first);
+  // The baked pictures are the device's own, every pixel: painted here, on the main thread alone.
   const three = await visit("&paintall&paintworkers=0");
-  const p3 = (await pics())!;
-  expect(p3.kept || p3.workers, "painted on the main thread alone").toBeFalsy();
-  expect(await sum(), "every picture the paint workers made, as the main thread paints it").toEqual(first);
-  console.log(`Chess Town kept pictures (slowed phone): first visit ${Math.round(one.loaded)} ms (${(one.loaded / one.ref).toFixed(1)} x ${Math.round(one.ref)} ms), second ${Math.round(two.loaded)} ms (${(two.loaded / two.ref).toFixed(1)} x ${Math.round(two.ref)} ms; reading and decoding ${Math.round(p2.restoreMs)} ms); ${first.n} pictures kept in ${(saved.saved! / 1048576).toFixed(1)} MB, ${Math.round(saved.saveMs)} ms`);
+  expect(three.pics.baked || three.pics.kept || three.pics.workers, "painted on the main thread alone").toBeFalsy();
+  expect(await sum(), "every baked picture, as the main thread paints it").toEqual(first);
+  console.log(`Chess Town's baked pictures (slowed phone): first visit ${Math.round(one.loaded)} ms (${(one.loaded / one.ref).toFixed(1)} x ${Math.round(one.ref)} ms; fetching and decoding ${Math.round(one.pics.bakedMs)} ms), second ${Math.round(two.loaded)} ms (${(two.loaded / two.ref).toFixed(1)} x ${Math.round(two.ref)} ms; ${Math.round(two.pics.bakedMs)} ms); painted on the device ${Math.round(three.loaded)} ms (${(three.loaded / three.ref).toFixed(1)} x); ${first.n} pictures in ${one.pics.files} files, ${(one.pics.bytes / 1048576).toFixed(2)} MB`);
+  expect(one.loaded / one.ref, "a first visit's tap to its first frame, in reference jobs").toBeLessThan(TOWN_BAKED_FIRST_REFS);
   expect(two.loaded / two.ref, "a second visit's tap to its first frame, in reference jobs").toBeLessThan(TOWN_KEPT_REFS);
 });
 

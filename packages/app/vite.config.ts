@@ -8,7 +8,8 @@ import { defineConfig, type Plugin } from "vite";
 import preact from "@preact/preset-vite";
 import { APP_CACHE } from "../core/src/settings.ts";
 import { townArt } from "./town-art.ts";
-import { TOWN_PICTURES_DIR, bakeTown, report } from "../../scripts/bake-town.ts";
+import { TOWN_PICTURES_DIR, bakeTown, report, type BakeResult } from "../../scripts/bake-town.ts";
+import { BAKED_NAME, TOWNS, TOWN_FILE_PATH, filesOf } from "./src/town/manifest.ts";
 
 const require = createRequire(import.meta.url);
 /** This config's own folder (packages/app): its files resolve from here, whichever folder Vite was started from. */
@@ -61,18 +62,59 @@ function maiaBox(): Plugin {
 }
 
 /**
- * Bakes Chess Town's pictures (scripts/bake-town.ts; Nov 28, the town's structure, phase 1a): the build paints every picture the town
+ * Chess Town's baked pictures (scripts/bake-town.ts; Nov 28, the town's structure, phase 1): the build paints every picture the town
  * draws that is the same for every player and writes them, with their manifest, into public/town-pictures/ (not committed), so they're
- * served at /town-pictures/. It prints what each group cost (pictures, pixels, bytes) and the totals. Nothing reads them yet: the town
- * still paints on the device until phase 1b, so the service worker doesn't precache them (`serviceWorker` below) and the dev server
- * doesn't bake. docs/decisions/2026-11-28-town-bake.md.
+ * served at /town-pictures/. It prints what each group cost (pictures, pixels, bytes) and the totals. The app is handed the manifest's
+ * name (`__TOWN_PICTURES__`, named by its contents: the config below), fetches it and its files on the town's loading screen
+ * (src/town/baked.ts) and uploads them; the service worker keeps them (`serviceWorker` below).
+ *
+ * The dev server bakes too (phase 1b), the first time anything under /town-pictures/ is asked for (the town opening: about 10 s,
+ * once; never for the many scripts that start a dev server and don't open the town), and again after a source file the pictures are
+ * painted from changes. There the app is handed `order.json`, which names the manifest of the latest bake. This plugin answers the
+ * files itself, fresh each time. docs/decisions/2026-11-28-town-load-baked.md.
  */
 function townPictures(): Plugin {
+  const dir = join(APP, "public", TOWN_PICTURES_DIR);
+  let baked: Promise<BakeResult> | null = null;
+  let inputs: string[] = [];
+  /** One bake at a time: the next waits for the one running (each clears the folder first, and would take the other's files). */
+  let running: Promise<unknown> = Promise.resolve();
+  const bake = (log: (text: string) => void) => {
+    const p = running
+      .then(() => bakeTown(dir))
+      .then((r) => {
+        inputs = r.inputs;
+        log(report(r));
+        return r;
+      });
+    running = p.catch(() => undefined);
+    return p;
+  };
   return {
     name: "bake-town",
-    apply: "build",
-    async buildStart() {
-      console.log(report(await bakeTown(join(APP, "public", TOWN_PICTURES_DIR))));
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const name = req.url?.startsWith(`/${TOWN_PICTURES_DIR}/`) ? req.url.slice(TOWN_PICTURES_DIR.length + 2).split("?")[0]! : null;
+        if (name === null || !(name === "order.json" || BAKED_NAME.test(name))) return next();
+        const mine = (baked ??= bake((text) => server.config.logger.info(text)));
+        mine.then(
+          () => {
+            if (!existsSync(join(dir, name))) return next();
+            res.setHeader("Content-Type", name.endsWith(".json") ? "application/json" : "image/png");
+            res.setHeader("Cache-Control", "no-store");
+            res.end(readFileSync(join(dir, name)));
+          },
+          (e) => {
+            if (baked === mine) baked = null;
+            next(e);
+          },
+        );
+      });
+    },
+    handleHotUpdate({ file }) {
+      // (A source of the pictures changed: baked again the next time the town asks.)
+      if (inputs.includes(resolve(file))) baked = null;
     },
   };
 }
@@ -111,7 +153,8 @@ function serviceWorker(): Plugin {
         // Nor the bosses' music (Nov 11, 1 to 2 MB a piece): fetched after the town's first frame or when its battle needs it
         // (music.ts), then kept in a cache of its own, piece by piece (MUSIC_HASHES below, MUSIC in sw-template.js).
         .filter((f) => !f.startsWith("/music/"))
-        // Nor the baked town (Nov 28, phase 1a: nothing reads it yet; phase 1b decides how the worker keeps its files).
+        // Nor the baked town (Nov 28): its files are fetched by the town's loading screen or by home when idle (town/baked-files.ts),
+        // then kept by the worker and copied to each later version that still has them (TOWN_FILES below).
         .filter((f) => !f.startsWith(`/${TOWN_PICTURES_DIR}/`))
         // Hosts redirect /index.html to /, and a cached redirect can't answer a page load.
         .map((f) => (f === "/index.html" ? "/" : f))
@@ -125,6 +168,10 @@ function serviceWorker(): Plugin {
       const musicHashes = existsSync(musicDir)
         ? Object.fromEntries(readdirSync(musicDir).sort().map((f) => [`/music/${f}`, createHash("sha256").update(readFileSync(join(musicDir, f))).digest("hex").slice(0, 12)]))
         : {};
+      // The baked town's files this version has (Nov 28, phase 1b): each named by its contents, so the worker answers one from any
+      // version's cache and, as a new version installs, copies over those an older one keeps: a deploy fetches only the groups it changed.
+      const townDir = join(outDir, TOWN_PICTURES_DIR);
+      const townFiles = existsSync(townDir) ? readdirSync(townDir).filter((f) => BAKED_NAME.test(f)).sort().map((f) => `/${TOWN_PICTURES_DIR}/${f}`) : [];
       // The Maia box's cache is named by its own files, so an app update keeps it and a new model replaces it. (Not its
       // source archive: the game never fetches it, so a change to the box's README or tests leaves players' copies be.)
       const maiaDir = join(outDir, "engine/maia");
@@ -139,6 +186,8 @@ function serviceWorker(): Plugin {
         .replace("__VERSION__", `brc-${hash.digest("hex").slice(0, 12)}`)
         .replace("__HASHES__", JSON.stringify(hashes))
         .replace("__MUSIC_HASHES__", JSON.stringify(musicHashes))
+        .replace("__TOWN_FILES__", JSON.stringify(townFiles))
+        .replace("__TOWN_FILE_PATH__", String(TOWN_FILE_PATH))
         .replace("__KEEP_VERSIONS__", String(APP_CACHE.keepVersions))
         .replace("__MAIA__", `brc-maia-${maia.digest("hex").slice(0, 12)}`)
         .replace("__FILES__", JSON.stringify(files));
@@ -194,9 +243,23 @@ function maiaFileBytes(): Record<string, number> {
 
 // (`__TOWN_ART__`, Nov 28: the town's art's fingerprint, which keys the town's pictures kept between visits, so a deploy that doesn't
 // change the art keeps them: town-art.ts. The dev server keeps no pictures, so it takes none.)
-export default defineConfig(async ({ command }) => ({
-  define: { __MAIA_FILE_BYTES__: JSON.stringify(maiaFileBytes()), __APP_VERSION__: JSON.stringify(VERSION), __TOWN_ART__: JSON.stringify(command === "build" ? await townArt() : "dev") },
-  plugins: [stockfish(), maiaBox(), townPictures(), preact(), serviceWorker(), versionFile()],
-  server: { host: true },
-  build: { target: "es2020", chunkSizeWarningLimit: 1000 },
-}));
+// (`__TOWN_PICTURES__`, Nov 28, phase 1b: the baked town's manifest's name, by its contents. A build bakes here, before the app is
+// built, so the app is handed the name. The dev server is handed `order.json`, which names the latest bake's: `townPictures` above.)
+// (`__TOWN_PAGES__`: each town's pages' names, as the manifest has them. Home fetches them ahead by these, without reading the manifest:
+// src/town/baked-files.ts. None in the dev server, where home fetches nothing ahead.)
+export default defineConfig(async ({ command }) => {
+  const baked = command === "build" ? await bakeTown(join(APP, "public", TOWN_PICTURES_DIR)) : null;
+  if (baked) console.log(report(baked));
+  return {
+    define: {
+      __MAIA_FILE_BYTES__: JSON.stringify(maiaFileBytes()),
+      __APP_VERSION__: JSON.stringify(VERSION),
+      __TOWN_ART__: JSON.stringify(command === "build" ? await townArt() : "dev"),
+      __TOWN_PICTURES__: JSON.stringify(baked?.manifestName ?? "order.json"),
+      __TOWN_PAGES__: JSON.stringify(baked ? Object.fromEntries(TOWNS.map((t) => [t, filesOf(baked.manifest, t).map((i) => baked.manifest.files[i]!.name)])) : {}),
+    },
+    plugins: [stockfish(), maiaBox(), townPictures(), preact(), serviceWorker(), versionFile()],
+    server: { host: true },
+    build: { target: "es2020", chunkSizeWarningLimit: 1000 },
+  };
+});

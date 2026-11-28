@@ -189,8 +189,10 @@ const PARK_KINDS: ReadonlySet<string> = new Set(["tree", "bench", "table", "lamp
  * Everything the loading screen makes ready for the town of `art`, in its order (render.ts `plan` runs one job a want): the lights'
  * glows first (every home's, front's, lamp's and side's), then each box's sides, back and front (each frame, and a step darker) and its
  * roof for the camera's four quarters, then every frame of the hedges' tops, the props, the places and the figures, then the statues.
+ * `count`: how many frames a character's idle has (the device, with the build's manifest in hand, reads it there: a character's
+ * animation is then never built just to count its frames; by default its animation's own).
  */
-export function townWants(art: TownArt): Want[] {
+export function townWants(art: TownArt, count: (ch: Character) => number = (ch) => ch.anims.idle!.frames.length): Want[] {
   const out: Want[] = [];
   const placeGroup = (i: number) => (art.places[i]!.id === "coliseum" ? "colosseum" : `home:${art.places[i]!.id}`);
   const propGroup = (i: number) => {
@@ -219,7 +221,7 @@ export function townWants(art: TownArt): Want[] {
   const frames = (cache: ArtCache, group: string) => {
     if (whole.has(cache)) return;
     whole.add(cache);
-    for (let k = 0; k < cache.ch.anims.idle!.frames.length; k++) frame(cache, k, false, group);
+    for (let k = 0, n = count(cache.ch); k < n; k++) frame(cache, k, false, group);
   };
   const roofsOf = new Map<object, Set<string>>();
   const roof = (b: BoxInst, q: number) => {
@@ -262,7 +264,7 @@ export function townWants(art: TownArt): Want[] {
     const pi = hi < 0 ? art.propBox.indexOf(b) : -1;
     const front = hi >= 0 ? art.houses[hi] : pi >= 0 ? art.props[pi] : undefined;
     if (front)
-      for (let k = 0; k < front.ch.anims.idle!.frames.length; k++) {
+      for (let k = 0, n = count(front.ch); k < n; k++) {
         frame(front, k, false, g);
         frame(front, k, true, g);
       }

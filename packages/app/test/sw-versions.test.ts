@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { BAKED_NAME, TOWN_FILE_PATH } from "../src/town/manifest.ts";
 
 /**
  * The service worker's caches across a deploy (sw-template.js, Nov 15): a tab left open on an older version keeps that version's files
@@ -56,12 +57,15 @@ const tab = (entry: string | null) => ({
  * The worker of version `current`, with `caches` as the device has them and `tabs` open; the network has nothing (`net`, else 404; an
  * Error: no answer at all, the fetch fails as it does offline).
  */
-function worker(current: string, store: FakeCaches, tabs: ReturnType<typeof tab>[], net: (path: string) => Response | Error | null = () => null) {
+function worker(current: string, store: FakeCaches, tabs: ReturnType<typeof tab>[], net: (path: string) => Response | Error | null = () => null, townFiles: string[] = [], files: string[] = []) {
   const code = readFileSync(new URL("../sw-template.js", import.meta.url), "utf8")
     .replace("__VERSION__", current)
-    .replace("__FILES__", "[]")
+    .replace("__FILES__", JSON.stringify(files))
     .replace("__HASHES__", "{}")
     .replace("__MUSIC_HASHES__", JSON.stringify({ "/music/kept.mp3": "aaaaaaaaaaaa" }))
+    .replace("__TOWN_FILES__", JSON.stringify(townFiles))
+    // (As the build fills it in: vite.config.ts.)
+    .replace("__TOWN_FILE_PATH__", String(TOWN_FILE_PATH))
     .replace("__MAIA__", "brc-maia-new")
     .replace("__KEEP_VERSIONS__", "3")
     // (A tab that doesn't answer is given up on in 20 ms here, not 1.5 s.)
@@ -91,6 +95,7 @@ function worker(current: string, store: FakeCaches, tabs: ReturnType<typeof tab>
   };
   return {
     fetched,
+    install: () => fire("install", {}),
     activate: () => fire("activate", {}),
     loaded: () => fire("message", { data: { type: "brc-loaded" } }),
     get: (path: string) => fire("fetch", { request: { method: "GET", mode: "no-cors", url: ORIGIN + path } }),
@@ -180,6 +185,92 @@ describe("a deploy while a tab is open: the new worker takes over", () => {
     expect((await sw.get("/assets/Gone-x.js"))!.headers.get("content-type")).toContain("text/html");
     await new Promise((ok) => setTimeout(ok, 0));
     expect(await store.match("/assets/Gone-x.js")).toBeUndefined();
+  });
+});
+
+describe("the baked town's files (Nov 28: Chess Town's pictures, each named by its contents)", () => {
+  const HOME = "/town-pictures/home-alfil.0123456789ab.png";
+  const ROW = "/town-pictures/row-south-st-s.player.ba9876543210.png";
+  const LIST = "/town-pictures/manifest.00112233aabb.json";
+  it("a new version, as it installs, copies over the ones an older version keeps and fetches none: a deploy that leaves the town alone downloads nothing of it", async () => {
+    const [a, b] = [V("a"), V("b")];
+    const store = await device([a]);
+    await (await store.open(a)).put(HOME, new Response("home"));
+    await (await store.open(a)).put(LIST, new Response("list"));
+    // (This version's town: the same home and list, and a row the device never fetched.)
+    const sw = worker(b, store, [], () => null, [HOME, LIST, ROW]);
+    await sw.install();
+    expect([...store.named.get(b)!.files.keys()].sort()).toEqual([HOME, LIST].sort());
+    expect(sw.fetched).toEqual([]);
+    // The old version gone (no tab runs it): the town's files stay, in this version's cache.
+    await sw.activate();
+    expect(await store.keys()).not.toContain(a);
+    expect(await (await sw.get(HOME))!.text()).toBe("home");
+    expect(sw.fetched).toEqual([]);
+  });
+  it("one is answered from any version's cache; one not kept yet is fetched once, then kept; a page sent for one the server no longer has is never kept", async () => {
+    const [a, b] = [V("a"), V("b")];
+    const store = await device([a, b]);
+    await (await store.open(a)).put(HOME, new Response("home"));
+    const sw = worker(b, store, [tab(entry(a)), tab(entry(b))], (p) => (p === ROW ? new Response("row", { headers: { "content-type": "image/png" } }) : p === LIST ? new Response("<!doctype html>", { headers: { "content-type": "text/html" } }) : null), [HOME, ROW]);
+    await sw.activate();
+    expect(await (await sw.get(HOME))!.text()).toBe("home");
+    expect(sw.fetched).toEqual([]);
+    expect(await (await sw.get(ROW))!.text()).toBe("row");
+    expect(await (await sw.get(ROW))!.text()).toBe("row");
+    expect(sw.fetched).toEqual([ROW]);
+    expect(store.named.get(b)!.files.has(ROW)).toBe(true);
+    await sw.get(LIST);
+    expect(store.named.get(b)!.files.has(LIST)).toBe(false);
+  });
+  it("the worker's test of a town file's path is the bake's test of its name (filled in by the build: the two can't drift)", () => {
+    // (Nothing left to fill in the template but what the build fills: a new placeholder would have to be filled here too.)
+    expect(readFileSync(new URL("../sw-template.js", import.meta.url), "utf8")).toContain("const TOWN_FILE = __TOWN_FILE_PATH__;");
+    for (const name of ["home-alfil.0123456789ab.png", "manifest.00112233aabb.json", "order.json", "x.0123456789ab.js", "../x.0123456789ab.png"]) expect(TOWN_FILE_PATH.test(`/town-pictures/${name}`), name).toBe(BAKED_NAME.test(name));
+    expect(TOWN_FILE_PATH.test("/assets/home-alfil.0123456789ab.png")).toBe(false);
+  });
+  it("a copy that fails as a new version installs (no room left) never fails the install: the town fetches that file again", async () => {
+    const [a, b] = [V("a"), V("b")];
+    const store = await device([a]);
+    await (await store.open(a)).put(HOME, new Response("home"));
+    const full = await store.open(b);
+    full.put = async () => Promise.reject(new DOMException("no room", "QuotaExceededError"));
+    await expect(worker(b, store, [], () => null, [HOME]).install()).resolves.toBeNull();
+    expect(full.files.has(HOME)).toBe(false);
+  });
+  it("a file there with one name in every version (order.json) is this version's, never an older copy", async () => {
+    const [a, b] = [V("a"), V("b")];
+    const store = await device([a, b]);
+    await (await store.open(a)).put("/town-pictures/order.json", new Response("old order"));
+    const sw = worker(b, store, [tab(entry(a))], (p) => (p === "/town-pictures/order.json" ? new Response("new order") : null));
+    expect(await (await sw.get("/town-pictures/order.json"))!.text()).toBe("new order");
+  });
+});
+
+describe("the precache keeps only the file itself (Nov 28, the review of phase 1b)", () => {
+  const page = () => new Response("<!doctype html>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+  const js = (text: string) => new Response(text, { status: 200, headers: { "content-type": "text/javascript" } });
+  const APP = "/assets/index-new.js";
+  it("the app's page sent for a file under /assets/ (a deploy caught half way) is never kept: the install fails, and the next try keeps the file", async () => {
+    const b = V("b");
+    const store = await device([]);
+    let half = true;
+    const sw = worker(b, store, [], (p) => (p === "/" ? page() : p === APP ? (half ? page() : js("app")) : null), [], ["/", APP]);
+    await expect(sw.install()).rejects.toThrow(/precache: \/assets\/index-new\.js 200/);
+    // (The page itself is a page: kept. The file isn't there.)
+    expect([...store.named.get(b)!.files.keys()]).toEqual(["/"]);
+    half = false;
+    await sw.install();
+    expect(await (await store.match(APP))!.text()).toBe("app");
+  });
+  it("nor an answer that isn't a 200; nor is a page an older version kept under that name copied over (fetched again)", async () => {
+    const [a, b] = [V("a"), V("b")];
+    const store = await device([a]);
+    await (await store.open(a)).put(APP, page());
+    const sw = worker(b, store, [], (p) => (p === APP ? js("app") : p === "/engine/x.js" ? new Response(null, { status: 204 }) : null), [], [APP, "/engine/x.js"]);
+    await expect(sw.install()).rejects.toThrow(/precache: \/engine\/x\.js 204/);
+    expect(await (await (await store.open(b)).match(APP))!.text()).toBe("app");
+    expect(sw.fetched).toEqual([APP, "/engine/x.js"]);
   });
 });
 

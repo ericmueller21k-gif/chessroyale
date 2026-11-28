@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { expect, type Page, type Route } from "@playwright/test";
-import { RECLUSE_MUSIC } from "@chessroyale/core";
-import { asAdmin, tapInTown, test, townHeld, townTap } from "./helpers.ts";
+import { RECLUSE_MUSIC, TOWN_BAKED_FALLBACK, TOWN_PICTURES } from "@chessroyale/core";
+import { asAdmin, leaveQueue, pickMode, tapInTown, test, townHeld, townTap } from "./helpers.ts";
 import { ALL_HOMES } from "../packages/app/src/town/world.ts";
 
 /**
@@ -428,8 +428,8 @@ test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of 
   expect(errors).toEqual([]);
 });
 
-test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking across the town at night among the bots and a crowd's tags (Nov 26), a full turn and zooming in and out paint nothing new, upload nothing (Nov 25) and start no atlas page again, on a first visit and a second (its pictures kept)", { tag: "@phone-only" }, async ({ page }) => {
-  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number; uploadsBy: [string, number][] } | null } | null; __townYou: () => { moving: boolean } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townChips: () => { faces: number }; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number }; pictures: { kept: boolean; saved: number | null | undefined } } };
+test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking across the town at night among the bots and a crowd's tags (Nov 26), a full turn and zooming in and out paint nothing new, upload nothing (Nov 25) and start no atlas page again, on a first visit and a second (both load the build's baked pictures, Nov 28)", { tag: "@phone-only" }, async ({ page }) => {
+  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number; uploadsBy: [string, number][] } | null } | null; __townYou: () => { moving: boolean } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townChips: () => { faces: number }; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number }; pictures: { baked: boolean; kept: boolean; workers: number; count: number } } };
   const errors = watchErrors(page);
   const bar = page.locator(".town-loading").getByRole("progressbar", { name: "Loading Chess Town" });
   // The bar's share as it shows (sampled every frame until it goes): it only goes up. And the step named under it (Nov 14), each new one.
@@ -463,6 +463,9 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   expect(paint.loading).toBe(false);
   expect(paint.atlas.kept, "the town's pictures kept").toBeGreaterThan(1000);
   expect(paint.atlas.unkept, "all of them").toBe(0);
+  // (Nov 28, phase 1b) None of them painted here: the build's baked files, fetched and uploaded whole (town/baked.ts).
+  expect({ baked: paint.pictures.baked, workers: paint.pictures.workers }, "the first visit loads the build's baked pictures: no paint workers").toEqual({ baked: true, workers: 0 });
+  expect(paint.pictures.count, "pictures the loading screen put in place").toBeGreaterThan(2000);
   // Walking, then a full turn on the spot (360° in about 2 s), then zooming in and out: nothing painted, nothing uploaded (Eric's laptop,
   // Nov 25: "1063 uploads" in 15 s of walking, every worst frame one with uploads), no page started again. (The bosses hushed: a line
   // said is a new picture, its bubble, the one thing made as it comes.)
@@ -510,8 +513,8 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
     expect(faces, `${visit}: chips' faces drawn`).toBeGreaterThan(4);
     expect(faces, `${visit}: chips' faces drawn, one a place at most`).toBeLessThanOrEqual(ALL_HOMES.length + 1);
   };
-  // (Nov 25) The context lost and back: every picture on screen uploaded again (on the second visit, each cut from its kept page as it
-  // is): what the GPU holds for each the same as before.
+  // (Nov 25) The context lost and back: every picture on screen uploaded again (each cut from its baked file's page as it is): what the
+  // GPU holds for each the same as before.
   const lossCheck = async (visit: string) => {
     type S = { __townPictureSum: (each: boolean) => { each: number[] | null } };
     const sums = () => page.evaluate(() => (window as unknown as S).__townPictureSum(true).each!);
@@ -539,81 +542,151 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   };
   await roam("the first visit");
   await lossCheck("the first visit");
-  // The second visit: its pictures' pages uploaded whole (keep-pictures.ts, paint-gl.ts `adopt`, Nov 25), and the labels made again; the same.
-  await expect.poll(() => page.evaluate(() => (window as unknown as R).__townPaint().pictures.saved), { timeout: 60_000 }).not.toBeUndefined();
+  // The second visit: the same files (the service worker's kept copies now), uploaded whole again (paint-gl.ts `adopt`), and the labels
+  // made again; the same.
   await page.goto(at);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-  expect((await page.evaluate(() => (window as unknown as R).__townPaint())).pictures.kept, "the second visit's pictures were kept").toBe(true);
+  expect((await page.evaluate(() => (window as unknown as R).__townPaint())).pictures.baked, "the second visit loads the baked pictures too").toBe(true);
   await roam("the second visit");
   await lossCheck("the second visit");
   expect(errors).toEqual([]);
 });
 
 /**
- * The build's baked town (Nov 28, the town's structure, phase 1a: scripts/bake-town.ts, docs/decisions/2026-11-28-town-bake.md). The town
- * still paints on the device; the build now paints the same list (town/pictures.ts) into picture files. Here the two are compared by
- * the town's own picture hash (`__townPictureSum`: every kept picture's size and pixels, in the loading screen's order): the same
- * hash worked out from the baked files alone, each picture cut from its page where the manifest says, in the order order.json gives.
- * The pages go through the browser's own PNG decoding (as phase 1b will load them), so what a device will hold is what it paints today.
+ * The build's baked town, kept by the service worker (Nov 28, phase 1b: sw-template.js TOWN_FILE, town/baked-files.ts). Home fetches
+ * this town's files when idle, before any visit to the town; they're in the worker's cache then, each under its contents' name, and the
+ * town loads them.
  */
-for (const kind of ["player", "admin"] as const)
-  test(`the build's baked pictures are the device's (Nov 28): every picture ${kind === "admin" ? "an admin" : "a player"}'s town paints on its loading screen, pixel for pixel and in its order, cut from the baked files`, { tag: "@phone-only" }, async ({ page }) => {
-    const errors = watchErrors(page);
-    if (kind === "admin") await asAdmin(page);
-    // (`paintall`: painted on the device, never taken from an earlier visit's kept pictures.)
-    await page.goto("/town?sky=day&paintall");
-    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
-    const device = await page.evaluate(() => (window as unknown as { __townPictureSum: () => { n: number; hash: string } }).__townPictureSum());
-    expect(device.n, "pictures the loading screen kept").toBeGreaterThan(2000);
-    const baked = await page.evaluate(async (town) => {
-      const get = async (name: string) => {
-        const res = await fetch(`/town-pictures/${name}`);
-        if (!res.ok) throw new Error(`${name}: ${res.status}`);
-        return res;
-      };
-      const manifest = (await (await get("manifest.json")).json()) as { files: { name: string; towns: string[]; w: number; h: number }[]; pictures: Record<string, [number, number, number, number, number]> };
-      const order = ((await (await get("order.json")).json()) as Record<string, number[]>)[town]!;
-      const places = Object.values(manifest.pictures);
-      // Each page this town fetches, decoded as the town decodes a kept page (keep-pictures.ts `domPageIO`) and laid on a canvas in memory.
-      const pages = new Map<number, Uint8ClampedArray>();
-      let foreign = 0;
-      for (const i of new Set(order.map((k) => places[k]![0]))) {
-        const f = manifest.files[i]!;
-        if (!f.towns.includes(town)) foreign++;
-        const bm = await createImageBitmap(await (await get(f.name)).blob(), { colorSpaceConversion: "none", premultiplyAlpha: "default" });
-        const cv = document.createElement("canvas");
-        cv.width = bm.width;
-        cv.height = bm.height;
-        const g = cv.getContext("2d", { willReadFrequently: true })!;
-        g.drawImage(bm, 0, 0);
-        bm.close();
-        if (cv.width !== f.w || cv.height !== f.h) throw new Error(`${f.name}: not its size`);
-        pages.set(i, g.getImageData(0, 0, cv.width, cv.height).data);
-      }
-      // The town's own hash (Town.tsx `hookPictureSum`), over the baked pictures in the loading screen's order.
-      let h = 0x811c9dc5;
-      for (const k of order) {
-        const [f, x, y, w, ph] = places[k]!;
-        const d = pages.get(f)!;
-        const W = manifest.files[f]!.w;
-        h = Math.imul(h ^ w, 16777619);
-        h = Math.imul(h ^ ph, 16777619);
-        for (let j = 0; j < ph; j++) {
-          let o = ((y + j) * W + x) * 4;
-          for (let i = 0; i < w; i++, o += 4) h = Math.imul(h ^ (d[o]! | (d[o + 1]! << 8) | (d[o + 2]! << 16) | (d[o + 3]! << 24)), 16777619);
-        }
-      }
-      return { n: order.length, hash: (h >>> 0).toString(16), files: pages.size, foreign };
-    }, kind);
-    expect(baked.foreign, "pictures on a file this town isn't listed for").toBe(0);
-    expect(baked.files, "files this town's pictures are on").toBeGreaterThan(20);
-    expect({ n: baked.n, hash: baked.hash }, "the baked pictures, by the town's own picture hash").toEqual({ n: device.n, hash: device.hash });
-    expect(errors).toEqual([]);
-  });
+test("home fetches Chess Town's baked pictures when idle and the service worker keeps them (Nov 28): none while its queue shows; then every file of a player's town in the worker's cache before the town opens; then the town loads them", { tag: "@phone-only" }, async ({ page }) => {
+  const errors = watchErrors(page);
+  const pngs: string[] = [];
+  page.on("request", (r) => void (/\/town-pictures\/[^/]+\.png$/.test(r.url()) && pngs.push(r.url())));
+  // Home with its queue showing (50 v 50's lobby, people only so it waits; a boss battle's lobby, a match loading and a 1 v 1's search
+  // are the same: home's frame with the queue in it): the network is the match's, and none is fetched ahead however long it shows (the
+  // review of phase 1b, S1). The worker is answering the page by then (a first visit: after its own files are in), which is what the
+  // fetch waits for, never a time (S4).
+  await page.addInitScript(() => localStorage.setItem("brc.matchmaking", "botsoff"));
+  await page.goto(`/?nolanding&pool=bk${Math.random().toString(36).slice(2, 9)}`);
+  await pickMode(page, "50 v 50");
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Keep me in the queue" }).waitFor();
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 60_000 });
+  // (The moment home's own effects take to stop, then everything from here on.)
+  await page.waitForTimeout(500);
+  pngs.length = 0;
+  await page.waitForTimeout(TOWN_PICTURES.homeFetchAfterMs + 3000);
+  expect(pngs, "fetched ahead while the queue showed").toEqual([]);
+  await leaveQueue(page);
+  await page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).first().waitFor({ timeout: 60_000 });
+  // The files this town draws from (the manifest, by the name order.json gives; not the sidekicks' sheets, which the town doesn't read from here).
+  const kept = () =>
+    page.evaluate(async () => {
+      const order = (await (await fetch("/town-pictures/order.json")).json()) as { manifest: string };
+      const m = (await (await fetch(`/town-pictures/${order.manifest}`)).json()) as { files: { name: string; towns: string[] }[]; sheets: Record<string, number> };
+      const sheets = new Set(Object.values(m.sheets));
+      const want = [order.manifest, ...m.files.filter((f, i) => f.towns.includes("player") && !sheets.has(i)).map((f) => f.name)];
+      let n = 0;
+      for (const name of want) if (await caches.match(`/town-pictures/${name}`)) n++;
+      return { want: want.length, kept: n, admins: (await Promise.all(m.files.filter((f) => !f.towns.includes("player")).map((f) => caches.match(`/town-pictures/${f.name}`)))).filter(Boolean).length };
+    });
+  // (Home's fetch starts TOWN_PICTURES.homeFetchAfterMs after it shows, a file at a time, each through the worker: all of them kept.)
+  await expect.poll(async () => ((k) => k.want - k.kept)(await kept()), { message: "files of a player's town, and the manifest, not in the worker's cache yet", timeout: 60_000, intervals: [1000] }).toBe(0);
+  const all = await kept();
+  expect(all.want).toBeGreaterThan(30);
+  expect(all.admins, "none of an admin's town's own files").toBe(0);
+  // (Each once at most: home never asks again for a file this page has read.)
+  expect(new Set(pngs).size, "each page fetched ahead once").toBe(pngs.length);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
+  const pictures = await page.evaluate(() => (window as unknown as { __townPaint: () => { pictures: { baked: boolean; files: number } } }).__townPaint().pictures);
+  expect(pictures, "the town loaded them").toMatchObject({ baked: true, files: all.want - 1 });
+  expect(errors).toEqual([]);
+});
 
 // (Its own service worker blocked: page.route sees only what the page fetches itself, never what a worker answers.)
 test.describe(() => {
   test.use({ serviceWorkers: "block" });
+
+  /**
+   * The build's baked town is the device's (Nov 28, the town's structure, phase 1: scripts/bake-town.ts, town/baked.ts;
+   * docs/decisions/2026-11-28-town-load-baked.md). The town loads the files the build painted; with one of them missing it paints every
+   * picture itself, as it did until phase 1b. The two are the same town by its own picture hash (`__townPictureSum`: every picture the
+   * loading screen put in place, its size and pixels, in order; and what the GPU holds for each).
+   */
+  for (const kind of ["player", "admin"] as const)
+    test(`the build's baked pictures are the device's (Nov 28): ${kind === "admin" ? "an admin" : "a player"}'s town loads them, none painted; with a file missing it paints them all itself, and every picture and what the GPU holds for it is the same`, { tag: "@phone-only" }, async ({ page }) => {
+      type P = { __townPictureSum: () => { n: number; hash: string; gpu: string | null }; __townPaint: () => { pictures: { baked: boolean; files: number; bytes: number; workers: number; byWorkers: number; saved: number | null | undefined }; atlas: { unkept: number } } };
+      const errors = watchErrors(page);
+      if (kind === "admin") await asAdmin(page);
+      // (The town this device saved before the build baked its pictures, and its tops: cleared once a baked load is in. S5.)
+      const saved = () =>
+        page.evaluate(
+          () =>
+            new Promise<{ pictures: boolean; tops: boolean }>((ok) => {
+              const q = indexedDB.open("hunchess-town", 1);
+              q.onupgradeneeded = () => q.result.createObjectStore("pictures");
+              q.onsuccess = () => {
+                const g = q.result.transaction("pictures").objectStore("pictures").get("town");
+                g.onsuccess = () => (q.result.close(), ok({ pictures: g.result !== undefined, tops: localStorage.getItem("brc.townTops") !== null }));
+              };
+            }),
+        );
+      if (kind === "player") {
+        await page.goto("/version.json");
+        await page.evaluate(
+          () =>
+            new Promise<void>((ok) => {
+              localStorage.setItem("brc.townTops", JSON.stringify({ key: "old", tops: [1] }));
+              const q = indexedDB.open("hunchess-town", 1);
+              q.onupgradeneeded = () => q.result.createObjectStore("pictures");
+              q.onsuccess = () => {
+                const tx = q.result.transaction("pictures", "readwrite");
+                tx.objectStore("pictures").put({ manifest: { key: "old" }, blobs: [] }, "town");
+                tx.oncomplete = () => (q.result.close(), ok());
+              };
+            }),
+        );
+        expect(await saved()).toEqual({ pictures: true, tops: true });
+      }
+      // (Why the baked town wasn't used: said once a page, in the request an error goes in. S3.)
+      const reported: string[] = [];
+      page.on("request", (r) => {
+        if (!r.url().endsWith("/api/problems")) return;
+        for (const e of (JSON.parse(r.postData() ?? "{}") as { errors?: { kind: string; message: string }[] }).errors ?? []) if (e.kind === TOWN_BAKED_FALLBACK.kind) reported.push(e.message);
+      });
+      const pngs: string[] = [];
+      let drop = "";
+      await page.route("**/town-pictures/*.png", (route) => {
+        const name = route.request().url().split("/").pop()!;
+        pngs.push(name);
+        return name === drop ? route.abort() : route.continue();
+      });
+      const visit = async () => {
+        await page.goto("/town?sky=day");
+        await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
+        return { sum: await page.evaluate(() => (window as unknown as P).__townPictureSum()), paint: await page.evaluate(() => (window as unknown as P).__townPaint()) };
+      };
+      // The baked files, loaded: this town's alone, none painted on the device.
+      const baked = await visit();
+      expect(baked.paint.pictures, "the town loaded the build's baked pictures: no paint workers").toMatchObject({ baked: true, workers: 0, saved: null });
+      expect(baked.paint.pictures.files, "files fetched").toBe(pngs.length);
+      expect(baked.paint.pictures.files, "files fetched").toBeGreaterThan(20);
+      expect(pngs.filter((n) => n.includes(kind === "admin" ? ".player." : ".admin.")), "files only the other town draws").toEqual([]);
+      expect(pngs.filter((n) => n.startsWith("sidekick-")), "the sidekicks' sheets (not read from here yet)").toEqual([]);
+      expect(baked.sum.n, "pictures the loading screen put in place").toBeGreaterThan(2000);
+      expect(baked.paint.atlas.unkept, "pictures the atlas couldn't keep").toBe(0);
+      if (kind === "player") await expect.poll(saved, { message: "the town this device saved before, let go" }).toEqual({ pictures: false, tops: false });
+      // One file missing: none of the baked town is used. The device paints every picture, as before.
+      drop = pngs[3]!;
+      const painted = await visit();
+      expect(painted.paint.pictures.baked, "a baked file missing: the device paints").toBe(false);
+      expect(painted.paint.pictures.byWorkers, "pictures its paint workers made").toBeGreaterThan(1000);
+      expect(painted.paint.pictures.saved, "and keeps none of them (the next visit loads the files)").toBeNull();
+      expect(painted.sum, "the painted town, by the town's own picture hash and the GPU's").toEqual(baked.sum);
+      await expect.poll(() => reported, { message: "the fallback and its reason, reported once", timeout: 15_000 }).toEqual(["file"]);
+      // (The one request that failed, by design.)
+      expect(errors.filter((e) => !e.includes(drop))).toEqual([]);
+    });
   test("the town's first frame doesn't wait for the music (Eric, Nov 14: \"christ it's taking forever\"); then the town's own theme, played in the street (Nov 15), its solos, then every boss theme fetched once, one piece at a time, none decoded, but the Hidden Boss's (fetched as his fight starts); Music off fetches none", { tag: "@phone-only" }, async ({ page }) => {
     const dir = "packages/app/public/music";
     const themes = JSON.parse(readFileSync(`${dir}/themes.json`, "utf8")) as { themes: Record<string, { intro: string | null; loop: string }>; town: { loop: string; solos: { file: string }[] } };

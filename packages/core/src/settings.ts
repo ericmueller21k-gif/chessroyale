@@ -4765,13 +4765,40 @@ export const ALERTS = {
  * card, after its box tops (Nov 28: kept after the first frame, it was a hitch about 2 s in): composed a page at a time, encoded in a
  * worker. `sliceMs`: the default slice a frame for a save outside the loading screen.
  * docs/decisions/2026-11-23-town-keep-pictures.md.
+ *
+ * Since Nov 28 (the town's structure, phase 1b) the build paints the pictures and the town loads them as files (the app's
+ * town/baked.ts): `baked` is that switch; off, or with a file missing, the town paints on the device as above. `homeFetchAfterMs`: home
+ * fetches the town's files, one at a time at low priority, once it has shown this long (so the service worker has them before the first
+ * visit to the town). docs/decisions/2026-11-28-town-load-baked.md.
+ * `homeFetchNotOn`: the connections home doesn't fetch ahead on (the browser's `effectiveType`; nor on one that asks to save data).
+ * `stallMs`: the loading screen's limit with nothing arriving (no byte of the manifest or of any file, the page showing): then it stops
+ * waiting and the device paints, as with a file missing. Never a cap on a load that's still moving.
+ * docs/decisions/2026-11-28-town-load-baked-fixes.md.
  */
 export const TOWN_PICTURES = {
   on: true,
   maxMB: 24,
   waitMs: 4000,
   sliceMs: 3,
+  baked: true,
+  homeFetchAfterMs: 4000,
+  homeFetchNotOn: ["slow-2g", "2g", "3g"],
+  stallMs: 15000,
 } as const;
+
+/**
+ * The baked town not used (Nov 28, the review of phase 1b: the app's town/baked.ts): the town painted its pictures on the device instead,
+ * and the page says so once, through the error reporting (the app's problems.ts, `reportBakedFallback`), as this kind with its reason as
+ * the message. `manifest`: the manifest wasn't read (no answer, or not a manifest). `file`: a file didn't come. `decode`: one didn't
+ * decode (or the browser can't). `size`: one isn't the size the manifest gives. `list`: a picture this town draws isn't in it.
+ * `stall`: nothing arrived for `TOWN_PICTURES.stallMs`. (The town closing mid-load, `?paintall` and a build with no baked town aren't
+ * fallbacks: none reported.)
+ */
+export const TOWN_BAKED_FALLBACK = {
+  kind: "town-baked-fallback",
+  reasons: ["manifest", "file", "decode", "size", "list", "stall"],
+} as const;
+export type TownBakedFallback = (typeof TOWN_BAKED_FALLBACK.reasons)[number];
 
 /**
  * Chess Town's first visit paints on more cores (Nov 23, Eric: "It sounds like we can use more cores"; the app's town/paint-pool.ts).

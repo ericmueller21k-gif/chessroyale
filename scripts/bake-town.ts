@@ -14,13 +14,14 @@
  *   pictures only one town draws (an admins-first home; the fronts that fill its lot in a player's town) are files of their own
  *   (`.admin`, `.player`), so no device fetches what it never draws. Pictures with the same pixels are stored once.
  * - each sidekick's sheet, as it is (scripts/bake-sidekicks.ts made it), under its contents' name.
- * - manifest.json (`TownManifest`): each file, each picture's place, the roofs' and glows' pieces, the animations' frame times, the
- *   boxes' tops.
- * - order.json: each town's loading screen's pictures in its order, by their index in the manifest's `pictures` (the check that the
- *   baked pixels are the device's reads it: e2e/town-street.spec.ts).
+ * - manifest.<hash>.json (`TownManifest`, town/manifest.ts): each file, each picture's place, the roofs' and glows' pieces, the
+ *   animations' frame times, the boxes' tops. Named by its contents too (phase 1b): the build hands the app its name
+ *   (`__TOWN_PICTURES__`), so an app the service worker kept reads its own town, never a newer one's.
+ * - order.json: each town's loading screen's pictures in its order, by their index in the manifest's `pictures`, and the manifest's
+ *   name (a check's and a tool's way in: the app never reads it).
  *
- * `npm run build` runs it (packages/app/vite.config.ts). By hand: `npx tsx scripts/bake-town.ts [out]` prints each file's pictures,
- * pixels and bytes, and the totals.
+ * `npm run build` runs it, and the dev server as it starts (packages/app/vite.config.ts). By hand: `npx tsx scripts/bake-town.ts [out]`
+ * prints each file's pictures, pixels and bytes, and the totals.
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -29,43 +30,22 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import type * as Bake from "../packages/app/src/town/bake.ts";
+import { TOWNS, TOWN_PICTURES_DIR, type TownFile, type TownKind, type TownManifest } from "../packages/app/src/town/manifest.ts";
 import { png } from "./png.ts";
 
-const APP = fileURLToPath(new URL("../packages/app/", import.meta.url));
-/** Where the build serves the baked town from (under the app's public folder). */
-export const TOWN_PICTURES_DIR = "town-pictures";
-export const TOWNS = ["player", "admin"] as const;
-export type TownKind = (typeof TOWNS)[number];
+export { TOWNS, TOWN_PICTURES_DIR, type TownFile, type TownKind, type TownManifest };
 
-export interface TownFile {
-  /** Its name under /town-pictures/: its group (and the one town that draws it, if only one does), then its contents' hash. */
-  name: string;
-  /** `home:<id>`, `row:<street>:<facing>`, `park`, `colosseum`, `props`, or `sidekick:<id>` (a sheet as it is, not a page). */
-  group: string;
-  /** The towns that draw something on it. */
-  towns: TownKind[];
-  w: number;
-  h: number;
-  bytes: number;
-}
-export interface TownManifest {
-  v: 1;
-  files: TownFile[];
-  /** Each picture by name: its file (an index in `files`), x, y, width and height there. Names with the same pixels share a place. */
-  pictures: Record<string, [file: number, x: number, y: number, w: number, h: number]>;
-  /** As town/bake.ts `TownBake`. */
-  roofs: Bake.TownBake["roofs"];
-  glows: Bake.TownBake["glows"];
-  anims: Bake.TownBake["anims"];
-  tops: Bake.TownBake["tops"];
-  /** Each sidekick's sheet (its name in the app's SIDEKICK_SHEETS): its file. */
-  sheets: Record<string, number>;
-}
-/** Each town's loading screen's pictures, in its order: indexes into the manifest's `pictures` (its keys, in order). */
-export type TownOrder = Record<TownKind, number[]>;
+const APP = fileURLToPath(new URL("../packages/app/", import.meta.url));
+
+/** Each town's loading screen's pictures, in its order: indexes into the manifest's `pictures` (its keys, in order); and the manifest's name. */
+export type TownOrder = Record<TownKind, number[]> & { manifest: string };
 
 export interface BakeResult {
   manifest: TownManifest;
+  /** The manifest's file's name under /town-pictures/, by its contents (`manifest.<hash>.json`): the app's `__TOWN_PICTURES__`. */
+  manifestName: string;
+  /** Every source file the pictures were painted from (the bake's bundles' inputs, absolute paths): the dev server bakes again when one changes. */
+  inputs: string[];
   order: TownOrder;
   /** Each file's distinct pictures and their pixels (the printed table). */
   rows: { file: number; pictures: number; pixels: number }[];
@@ -74,13 +54,14 @@ export interface BakeResult {
   ms: { load: number; paint: number; pack: number; write: number; total: number };
 }
 
-/** The app's bake code (town/bake.ts) for one town, bundled for Node and loaded. */
-async function loadTown(admin: boolean, dir: string): Promise<typeof Bake> {
+/** The app's bake code (town/bake.ts) for one town, bundled for Node and loaded; and the source files it was bundled from. */
+async function loadTown(admin: boolean, dir: string): Promise<{ mod: typeof Bake; inputs: string[] }> {
   const out = await build({
     absWorkingDir: APP,
     entryPoints: ["src/town/bake.ts"],
     bundle: true,
     write: false,
+    metafile: true,
     format: "esm",
     platform: "node",
     target: "node20",
@@ -98,7 +79,7 @@ async function loadTown(admin: boolean, dir: string): Promise<typeof Bake> {
   });
   const file = join(dir, `bake-${admin ? "admin" : "player"}.mjs`);
   writeFileSync(file, out.outputFiles[0]!.contents);
-  return (await import(pathToFileURL(file).href)) as typeof Bake;
+  return { mod: (await import(pathToFileURL(file).href)) as typeof Bake, inputs: Object.keys(out.metafile.inputs).map((p) => join(APP, p)) };
 }
 
 const slug = (group: string) => group.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
@@ -119,8 +100,11 @@ export async function bakeTown(out: string = join(APP, "public", TOWN_PICTURES_D
   let pack: typeof Bake.packPictures;
   let pad = 0;
   let tLoad = 0;
+  let inputs: string[];
   try {
-    const mods = await Promise.all(TOWNS.map((t) => loadTown(t === "admin", tmp)));
+    const loaded = await Promise.all(TOWNS.map((t) => loadTown(t === "admin", tmp)));
+    const mods = loaded.map((l) => l.mod);
+    inputs = [...new Set(loaded.flatMap((l) => l.inputs))].sort();
     tLoad = performance.now() - t0;
     pack = mods[0]!.packPictures;
     pad = mods[0]!.ATLAS.pad;
@@ -234,15 +218,17 @@ export async function bakeTown(out: string = join(APP, "public", TOWN_PICTURES_D
     pictures[name] = [s.at[0], s.at[1], s.at[2], p.px.w, p.px.h];
   }
   const manifest: TownManifest = { v: 1, files, pictures, roofs: merge("roofs"), glows: merge("glows"), anims: merge("anims"), tops: merge("tops"), sheets };
+  const manifestText = JSON.stringify(manifest);
+  const manifestName = `manifest.${hashOf(manifestText).slice(0, 12)}.json`;
   const index = new Map(Object.keys(pictures).map((n, i) => [n, i]));
-  const order = Object.fromEntries(TOWNS.map((t, ti) => [t, towns[ti]!.order.map((n) => index.get(n)!)])) as TownOrder;
+  const order = { manifest: manifestName, ...Object.fromEntries(TOWNS.map((t, ti) => [t, towns[ti]!.order.map((n) => index.get(n)!)])) } as TownOrder;
   const tPack = performance.now() - t0 - tLoad - tPaint - tWrite;
 
   const tw = performance.now();
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   files.forEach((f, i) => writeFileSync(join(out, f.name), pngs[i]!));
-  writeFileSync(join(out, "manifest.json"), JSON.stringify(manifest));
+  writeFileSync(join(out, manifestName), manifestText);
   writeFileSync(join(out, "order.json"), JSON.stringify(order));
   tWrite += performance.now() - tw;
 
@@ -258,7 +244,7 @@ export async function bakeTown(out: string = join(APP, "public", TOWN_PICTURES_D
       TOWNS.map((t, ti) => [t, { names: towns[ti]!.pictures.size, files: files.filter((f) => f.towns.includes(t)).length, pixels: pixelsOf((f) => f.towns.includes(t)), bytes: bytesOf((f) => f.towns.includes(t)) }]),
     ) as BakeResult["totals"]["towns"],
   };
-  return { manifest, order, rows, totals, ms: { load: tLoad, paint: tPaint, pack: tPack, write: tWrite, total: performance.now() - t0 } };
+  return { manifest, manifestName, inputs, order, rows, totals, ms: { load: tLoad, paint: tPaint, pack: tPack, write: tWrite, total: performance.now() - t0 } };
 }
 
 /** The bake's report: a line a file (its group, who draws it, its pictures, pixels and bytes), then the totals and the time. */
@@ -273,7 +259,7 @@ export function report(r: BakeResult): string {
   const t = r.totals;
   lines.push(`all: ${t.files} files, ${t.names} pictures by name (${t.stored} stored: the same pixels once), ${mp(t.pixels).trim()} M pixels, ${(t.bytes / 1e6).toFixed(2)} MB`);
   for (const k of TOWNS) lines.push(`${k === "admin" ? "an admin" : "a player"}'s town: ${t.towns[k].files} files, ${t.towns[k].names} pictures, ${mp(t.towns[k].pixels).trim()} M pixels, ${(t.towns[k].bytes / 1e6).toFixed(2)} MB`);
-  lines.push(`manifest.json ${(JSON.stringify(r.manifest).length / 1024).toFixed(0)} KB; baked in ${(r.ms.total / 1000).toFixed(1)} s (bundling ${(r.ms.load / 1000).toFixed(1)}, painting ${(r.ms.paint / 1000).toFixed(1)}, packing ${(r.ms.pack / 1000).toFixed(1)}, PNGs and writing ${(r.ms.write / 1000).toFixed(1)})`);
+  lines.push(`${r.manifestName} ${(JSON.stringify(r.manifest).length / 1024).toFixed(0)} KB; baked in ${(r.ms.total / 1000).toFixed(1)} s (bundling ${(r.ms.load / 1000).toFixed(1)}, painting ${(r.ms.paint / 1000).toFixed(1)}, packing ${(r.ms.pack / 1000).toFixed(1)}, PNGs and writing ${(r.ms.write / 1000).toFixed(1)})`);
   return lines.join("\n");
 }
 

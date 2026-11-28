@@ -1,4 +1,4 @@
-import { OPS, TOWN_GL_FALLBACK, type TownGlFallback } from "@chessroyale/core";
+import { OPS, TOWN_BAKED_FALLBACK, TOWN_GL_FALLBACK, type TownBakedFallback, type TownGlFallback } from "@chessroyale/core";
 import { account } from "./account.ts";
 
 /**
@@ -100,6 +100,17 @@ export function reportTownFallback(why: TownGlFallback) {
   if (fellBack) return;
   fellBack = true;
   captureError(TOWN_GL_FALLBACK.kind, why);
+}
+
+let painted = false;
+/**
+ * The town didn't use the build's baked pictures and painted its own instead (Town.tsx `loadTown`, town/baked.ts; Nov 28): reported
+ * once a page with the first reason (TOWN_BAKED_FALLBACK), as the WebGL fallback is. Nothing shows: the town opens, only later.
+ */
+export function reportBakedFallback(why: TownBakedFallback) {
+  if (painted) return;
+  painted = true;
+  captureError(TOWN_BAKED_FALLBACK.kind, why);
 }
 
 /** A worker's error event (Stockfish's, Maia's, the sound worker's): reported as `worker:<name>`. */
