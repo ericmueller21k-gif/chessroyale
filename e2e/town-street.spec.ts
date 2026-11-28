@@ -233,6 +233,61 @@ test("a boss's line starts with its bubble there (Nov 28, the town's structure, 
   expect(errors).toEqual([]);
 });
 
+test("the screen's pixel ratio changes and comes back (a window dragged to another screen and back): the labels are made again between frames, the places the old ones left on the atlas are taken again, and your tag is drawn pixel for pixel as it was (Nov 28, the town's structure, phase 2)", { tag: "@phone-only" }, async ({ page }) => {
+  type P = { resets: number; atlas: { pages: number; unkept: number; reused: number; groups: { pages: number; pictures: number; px: number }[] }; service: { waiting: number; stuck: number; evicted: number; made: number } };
+  type W = { __townPaint: () => P; __townTags: () => { kind: string; x: number; y: number; w: number; h: number; made: number }[]; __townHold: (on: boolean) => void; __townHush: (on: boolean) => void; __townStill: () => void; __townBots: () => { moving: boolean }[] };
+  const errors = watchErrors(page);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  // Nothing moving, nobody talking, the picture service at rest; then the frames held, so the same frame is read before and after.
+  await page.evaluate(() => {
+    const w = window as unknown as W;
+    w.__townHush(true);
+    w.__townStill();
+  });
+  await expect.poll(() => page.evaluate(() => (window as unknown as W).__townBots().some((b) => b.moving)), { message: "the bots at rest", timeout: 30_000 }).toBe(false);
+  const paint = () => page.evaluate(() => (window as unknown as W).__townPaint());
+  const atRest = (what: string) => expect.poll(async () => (await paint()).service.waiting, { message: `${what}: the picture service at rest`, timeout: 30_000 }).toBe(0);
+  const ratio = () => page.evaluate(() => { const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas")!; return Math.round((cv.width / cv.clientWidth) * 100) / 100; });
+  await atRest("as the town opens");
+  await page.evaluate(() => (window as unknown as W).__townHold(true));
+  /** Your tag as the canvas has it: its pixels (two device pixels round it too), hashed, and the size its picture was made at. */
+  const yourTag = () =>
+    page.evaluate(() => {
+      const t = (window as unknown as W).__townTags().find((x) => x.kind === "you")!;
+      const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas")!;
+      const k = cv.width / cv.clientWidth;
+      const d = cv.getContext("2d")!.getImageData(Math.round(t.x * k) - 2, Math.round(t.y * k) - 2, Math.round(t.w * k) + 4, Math.round(t.h * k) + 4).data;
+      let h = 0x811c9dc5;
+      for (let i = 0; i < d.length; i++) h = Math.imul(h ^ d[i]!, 16777619);
+      return { hash: h >>> 0, bytes: d.length, made: t.made };
+    });
+  const before = await yourTag();
+  const p0 = await paint();
+  expect(before.made, "your tag's picture: one, made at 12 px").toBe(12);
+  expect(await ratio(), "a phone's canvas, two device pixels a CSS pixel").toBe(2);
+  // To a 1x screen (a little narrower: the town reads the ratio as its box changes): each label is made again at the new ratio as it's
+  // drawn there (the ones in this frame: your tag, the tags and the sky in view), the one it had drawn meanwhile.
+  const vp = page.viewportSize()!;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setDeviceMetricsOverride", { width: vp.width - 24, height: vp.height, deviceScaleFactor: 1, mobile: true });
+  await expect.poll(ratio, { message: "the canvas at 1x" }).toBe(1);
+  await atRest("at 1x");
+  const p1 = await paint();
+  expect(p1.service.made - p0.service.made, "pictures made again at 1x, your tag's among them").toBeGreaterThan(2);
+  // And back: made again at 2x, into the places the first ones left.
+  await cdp.send("Emulation.setDeviceMetricsOverride", { width: vp.width, height: vp.height, deviceScaleFactor: 3, mobile: true });
+  await expect.poll(ratio, { message: "the canvas at 2x again" }).toBe(2);
+  await atRest("back at 2x");
+  const p2 = await paint();
+  expect(await yourTag(), "your tag, pixel for pixel as before").toEqual(before);
+  expect(p2.service.made - p1.service.made, "pictures made again at 2x").toBeGreaterThan(2);
+  expect(p2.atlas.reused - p0.atlas.reused, "pictures placed where one let go had been (the 2x labels, where the first 2x ones were)").toBeGreaterThan(0);
+  expect({ pages: p2.atlas.pages, text: p2.atlas.groups[1]!.pages }, "the atlas as deep as it was, the text on its own pages, none more").toEqual({ pages: p0.atlas.pages, text: p0.atlas.groups[1]!.pages });
+  expect({ stuck: p2.service.stuck, evicted: p2.service.evicted, unkept: p2.atlas.unkept, resets: p2.resets }, "none waited for room, none was let go for it, no page started again").toEqual({ stuck: 0, evicted: 0, unkept: 0, resets: 0 });
+  expect(errors).toEqual([]);
+});
+
 test("a park table: a tap on the one ahead on your left walks you to a free stool and you sit; its card shows 'Ranked' (Nov 27: live) and 'Casual' greyed; a tap elsewhere closes it and you stand", async ({ page }) => {
   const errors = watchErrors(page);
   await openStreet(page);

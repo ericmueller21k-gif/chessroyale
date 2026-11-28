@@ -197,8 +197,8 @@ interface Page {
   entries: Entry[];
   /** Whose pictures it holds (`keep`'s group). */
   group: number;
-  /** The places pictures let go left free (`free`), each the full height of its shelf: the next picture that fits takes one. */
-  free: { x: number; y: number; w: number; h: number }[];
+  /** The places pictures let go left free (`free`): the next picture that fits takes one (`takeFree`). */
+  free: FreePlace[];
 }
 
 /** A source picture's place in the textures: which, where (texels), uploaded in which generation, and whether it changed. */
@@ -408,6 +408,45 @@ export function countPages(sizes: readonly (readonly [number, number])[], open: 
     if (s) s.x += W;
   }
   return pages.length - open.length;
+}
+
+/** A place on an atlas page a picture let go left free: its padding included, the full height of its shelf. */
+export interface FreePlace {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+/**
+ * (Pure: tests) Gives the place (x, y, w, h) back to `free`, a page's free places: joined to the free places right beside it on its
+ * shelf (the same y), so a row of small pictures let go is room for a wide one.
+ */
+export function giveFree(free: FreePlace[], x: number, y: number, w: number, h: number): void {
+  for (let k = free.length - 1; k >= 0; k--) {
+    const f = free[k]!;
+    if (f.y !== y || (f.x + f.w !== x && x + w !== f.x)) continue;
+    x = Math.min(x, f.x);
+    w += f.w;
+    free.splice(k, 1);
+  }
+  free.push({ x, y, w, h });
+}
+/**
+ * (Pure: tests) A place of `free` for a W x H picture (padding included): the first one as tall, or up to half as tall again (as a
+ * shelf is chosen: `fitShelf`), and wide enough. Its left end is taken (x, y and the shelf's height `h`), the rest stays free (a
+ * sliver no picture's padding fits in is dropped); null: none fits.
+ */
+export function takeFree(free: FreePlace[], W: number, H: number): { x: number; y: number; h: number } | null {
+  for (let i = 0; i < free.length; i++) {
+    const f = free[i]!;
+    if (f.h < H || f.h > H * 1.5 + 8 || f.w < W) continue;
+    const at = { x: f.x, y: f.y, h: f.h };
+    f.x += W;
+    f.w -= W;
+    if (f.w <= 2 * PAD) free.splice(i, 1);
+    return at;
+  }
+  return null;
 }
 
 /**
@@ -696,6 +735,8 @@ class GLPainter implements Painter {
   private sized = false;
   /** (`stats`) Pictures `keep` was handed that found no room on their group's pages: not on the GPU, so not drawn (`holds` says so). */
   private unkept = 0;
+  /** (`stats`) Pictures placed where another, let go, had been. */
+  private reuses = 0;
 
   reserve(group: number, px: number): void {
     this.spare[group] = px;
@@ -721,16 +762,7 @@ class GLPainter implements Painter {
       const i = pg.entries.indexOf(e);
       if (i >= 0) pg.entries.splice(i, 1);
       // (Its place, its padding included, the full height of its shelf; joined to a free place beside it.)
-      let x = e.x - PAD;
-      let w = e.w + 2 * PAD;
-      for (let k = pg.free.length - 1; k >= 0; k--) {
-        const f = pg.free[k]!;
-        if (f.y !== e.sy || (f.x + f.w !== x && x + w !== f.x)) continue;
-        x = Math.min(x, f.x);
-        w += f.w;
-        pg.free.splice(k, 1);
-      }
-      pg.free.push({ x, y: e.sy, w, h: e.sh });
+      giveFree(pg.free, e.x - PAD, e.sy, e.w + 2 * PAD, e.sh);
     } else if (!pg && e.tex?.t && e.tex.layer < 0 && e.gen === this.gen && !this.lost) this.gl.deleteTexture(e.tex.t);
     e.tex = null;
     e.page = null;
@@ -974,10 +1006,10 @@ class GLPainter implements Painter {
   }
 
   private shelf(pg: Page, e: Entry, W: number, H: number): boolean {
-    // (A place a picture let go left free, first: one as tall, or up to half as tall again, and wide enough.)
-    for (let i = 0; i < pg.free.length; i++) {
-      const f = pg.free[i]!;
-      if (f.h < H || f.h > H * 1.5 + 8 || f.w < W) continue;
+    // (A place a picture let go left free, first.)
+    const f = takeFree(pg.free, W, H);
+    if (f) {
+      this.reuses++;
       e.tex = pg.tex;
       e.page = pg;
       e.x = f.x + PAD;
@@ -985,9 +1017,6 @@ class GLPainter implements Painter {
       e.sy = f.y;
       e.sh = f.h;
       e.reused = true;
-      f.x += W;
-      f.w -= W;
-      if (f.w <= 2 * PAD) pg.free.splice(i, 1);
       pg.entries.push(e);
       return true;
     }
@@ -1007,9 +1036,10 @@ class GLPainter implements Painter {
   /**
    * (Tests and `?report`) The atlas: its pages made (16 MB each), how many are the town's own (group 0) and the share of their area
    * pictures take (padding included), and the same of the other groups' pages; pictures on the GPU, pictures handed over, pictures
-   * that found no room, own-texture ones and their pixels; and each group's pages, pictures and texels.
+   * that found no room, pictures placed where one let go had been, own-texture ones and their pixels; and each group's pages,
+   * pictures and texels.
    */
-  stats(): { pages: number; keptPages: number; keptFill: number; spareFill: number; kept: number; live: number; unkept: number; big: number; bigPx: number; groups: { pages: number; pictures: number; px: number }[] } {
+  stats(): { pages: number; keptPages: number; keptFill: number; spareFill: number; kept: number; live: number; unkept: number; reused: number; big: number; bigPx: number; groups: { pages: number; pictures: number; px: number }[] } {
     const groups: { pages: number; pictures: number; px: number }[] = [];
     const of = (g: number) => (groups[g] ??= { pages: 0, pictures: 0, px: 0 });
     const fill = (town: boolean) => {
@@ -1035,7 +1065,7 @@ class GLPainter implements Painter {
       if (!e.page && e.tex.layer < 0) ((big += 1), (bigPx += e.w * e.h));
     }
     for (let g = 0; g < groups.length; g++) of(g);
-    return { pages: this.cap, keptPages: this.pages.filter((p) => p.group === 0).length, keptFill: fill(true), spareFill: fill(false), kept, live: this.live.size, unkept: this.unkept, big, bigPx, groups };
+    return { pages: this.cap, keptPages: this.pages.filter((p) => p.group === 0).length, keptFill: fill(true), spareFill: fill(false), kept, live: this.live.size, unkept: this.unkept, reused: this.reuses, big, bigPx, groups };
   }
 
   /** Where the shader finds `tex` in `st`'s next draw: an atlas page's layer, or OWN (one texture of its own a draw: another one draws what `st` holds first). */

@@ -2197,6 +2197,9 @@ function startTown(
   const draw = (now: number, dt = 0) => {
     drawnAt = now;
     if (!dark()) r.draw(now, camX, camY, zoomCur, dt, heading);
+    // (What this draw asked the picture service for, someone's tag or outfit, the labels at a new pixel ratio: made and uploaded
+    // between frames, never in one. `pumpSoon`, below.)
+    if (r.svc.busy) pumpSoon();
     placeChips();
     placeCard();
     const h = town.you.walker.here();
@@ -2275,12 +2278,10 @@ function startTown(
     }
     FPS?.tick(now);
     raf = requestAnimationFrame(frame);
-    // (What this frame asked the picture service for, someone's tag or outfit: made and uploaded between frames, never in one.)
-    if (r.svc.busy) pumpSoon();
   };
   /**
-   * The picture service's slice between frames (Nov 28, the town's structure, phase 2; picture-service.ts): after each frame that
-   * leaves it work, in a task of its own once the frame is on its way to the screen, up to `picSliceMs` of making and uploading what
+   * The picture service's slice between frames (Nov 28, the town's structure, phase 2; picture-service.ts): after each draw that
+   * leaves it work (`draw`), in a task of its own once the frame is on its way to the screen, up to `picSliceMs` of making and uploading what
    * the frames asked for. Every frame, whatever the device has to spare: waiting for the browser to be idle, a busy phone (which
    * never is) took a ride half a minute to put on. With no frame coming (the town held, behind a room, the tab hidden) the slices
    * go on by a timer while there's more. Not under the loading card, whose own loop does it.
