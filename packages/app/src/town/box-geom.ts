@@ -1,6 +1,6 @@
 /**
- * The street town's boxes' roof faces' geometry and their light (moved from boxes.ts on Nov 23, unchanged, so a paint worker
- * (paint.worker.ts) can paint a roof without loading the town's art: boxes.ts re-exports all of it).
+ * The street town's boxes' roof faces' geometry and their light (moved from boxes.ts on Nov 23, unchanged, so a roof can be painted
+ * without loading the town's art: then by the device's paint workers, since Nov 28 by the build's bake; boxes.ts re-exports all of it).
  */
 import type { BoxInst } from "./boxes.ts";
 import type { Face, RoofTex, TownBox } from "./town-kit.ts";
@@ -11,8 +11,8 @@ export const SQ = 37;
 export const pxOf = (box: Pick<TownBox, "px">): number => box.px ?? SQ;
 
 /**
- * What a roof's geometry and painting read of a box's art and of the box (box-draw.ts `roofCuts`): a paint worker is sent just these
- * (paint-jobs.ts `roofCopy`). Typed by these lists, so code here reading anything else doesn't compile until it's added.
+ * What a roof's geometry and painting read of a box's art and of the box (box-draw.ts `roofCuts`). Typed by these lists, so code
+ * here reading anything else doesn't compile until it's added.
  */
 export const ROOF_BOX_KEYS = ["id", "roof", "roofPal", "body", "depth", "px", "taper"] as const;
 export type RoofBox = Pick<TownBox, (typeof ROOF_BOX_KEYS)[number]>;

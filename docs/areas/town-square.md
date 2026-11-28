@@ -1328,18 +1328,18 @@ frame rate stretches every walk), and checks the run still records as it presses
 **Waiting vs stalls (Nov 27; [decision](../decisions/2026-11-27-town-hitches-2.md)):** the panel splits "outside our code" into **waiting for the screen** (idle until the next refresh) and **stalls** (past it), worked out at the summary (`splitParts`), and adds the browser's long animation frames (`watchLongFrames`: other scripts by what ran them, style and layout; Chrome and Edge). **A busy town:** newcomers' tags are painted between frames (`queueTags`, an idle callback; one new tag a frame at most), chat lines render once (TownChat's `lineEls`). `@perf` "Chess Town busy": 55 others and a line every 250 ms against an empty town. **Squeezed:** a mouse device's box under `narrowAspect` (0.45) pauses under "Make the window wider to keep playing" (e2e `town-desktop.spec.ts`, "squeezed too narrow").
 **Rooms (Nov 11):** a room's own loop (`shops/ShopRoom.tsx`) records into the same run, its parts under the town's names (ceiling and what's past the walls: sky; floor: ground; sorting: placing; pieces and the fight's set: props; you, the boss, everyone else; glows and darks: lights; tags and bubbles: labels; the card: chips), each frame marked "in a room"; from a home's Go in until the room's black lifts the frames are "going in", from Go out until the town's zoom ends "going out" (`REC.door`, set by `TownScreen`). Two columns more: **Room** and **In/out** (Walk, Turn and Load are the town's own frames); a room's first frame is recorded with the wait before it (the room's art painting behind the black on a first visit), not dropped as a pause. The pill's seconds come from the recorder (`FrameRec.onSec`), so they count on inside a room too (Nov 11: they were set by the town's loop alone, and Eric saw the report "pausing" as he went in). Tests: the same unit file, "rooms, and going in and out"; `e2e/shop.spec.ts`, "?fps in a room" and "a room's report records while walking".
 **The loading screen (Nov 11; [decision](../decisions/2026-11-11-town-loading.md)):** the street town opens on "Loading Chess Town…"
-(`.town-loading`, the boss loading card's look, its bar real progress: half painting, half uploading; under the bar, the step it's on (Nov 14,
+(`.town-loading`, the boss loading card's look, its bar real progress: half loading, half uploading; under the bar, the step it's on (Nov 14,
 Eric: "what happened to it showing what it's downloading?"; `LOAD_STEPS` in `Town.tsx`, the boss card's `.boss-loading-note`): "Loading the
-town's pictures…" while it paints (and waits for the sidekicks' sheets), "Building the town…" while it uploads; `Town.tsx` `loadTown`,
-`f.loadSliceMs`, `f.loadPaintShare`, `f.loadSheetWaitMs`). It paints every picture (`render.ts` `warm`) and uploads them for good
+town's pictures…" while the build's baked files come in and each picture is put in its place, "Building the town…" while it uploads;
+`Town.tsx` `loadTown`, `f.loadSliceMs`, `f.loadPaintShare`). It loads every picture (`render.ts` `warm`; baked, below) and uploads them for good
 (`paint-gl.ts` `keep`, `kept`: tallest first, the atlas made once as deep as they need, plus 2 spare pages for tags, boards, the
-bubble, signs and text, the only ones that start again). Then the frames start. Measured headless at 1x: 4.5 s (painting 4.3,
-uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After it, 30 s of walking and turning: 0 painted,
+bubble, signs and text, the only ones that start again). Then the frames start. Measured then, painted on the device, headless at 1x:
+4.5 s (painting 4.3, uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After it, 30 s of walking and turning: 0 painted,
 0 uploads, 0 resets. A building in and out uploads nothing of the town. **The labels too (Nov 25; [decision](../decisions/2026-11-25-town-hitches.md)):**
 Eric's laptop's report showed 1,063 uploads in 15 s of walking, every worst frame one with uploads. The labels were made as they first
 showed at each size: a home's name at each size it came to, a sign at each scale, a tag at each size, a cloud, a table clock's every second,
-and the speech bubble every frame its speaker glided a fraction of a pixel. Now `makeLabels` (render.ts, after the fonts are in,
-`fontsIn`) makes and keeps every home's name at sizes 12 to 20 (`NAME_SIZES`; two rows, outline and white), every sign once at its font's
+and the speech bubble every frame its speaker glided a fraction of a pixel. Now `makeLabels` (render.ts, once its fonts are in or
+have failed: `labelFonts`) makes and keeps every home's name at sizes 12 to 20 (`NAME_SIZES`; two rows, outline and white), every sign once at its font's
 own pixels (drawn `s` times over, nearest), everyone's tag at sizes 8 to 12 (`TAG_SIZES`), the clouds and sun of the sky now, the clock's
 digits and the bubble's tail. The bubble is one picture a line (body, shadow and words; the last 8 kept), laid on whole device pixels.
 A picture drawn in its own font is never drawn again when another font loads (tags, names, the WebGL text). What's left to make while
@@ -1351,54 +1351,38 @@ in and out after it upload nothing, on a first visit and a second, Nov 25). **Th
 Eric's laptop at night: 1,211 uploads in 16.7 s of walking; every lit window's, front's, side's and lamp's glow was baked and uploaded as it
 first shone (the guard walked by day, when none shine). Now the loading screen bakes every glow, whatever the sky (`plan`'s "glow:" jobs),
 each glow's pieces on one sheet 2 px apart (`paint-jobs.ts` `glowPixels`, `GLOW_GAP`; drawn with a source rectangle: `light`, `lightT`),
-in the paint workers on a first visit and from the kept pages on a later one (`Manifest.glows`); the pawns' crate items are waited for
-(up to `loadSheetWaitMs`) and kept; the sky's sun and clouds are kept for every look. Headless at night, 30 s of walking: 1,145 uploads → 3
+as the build baked them (the manifest's `glows`, since Nov 28); the pawns' crate items are waited for
+(no time cap, Nov 28) and kept; the sky's sun and clouds are kept for every look. Headless at night, 30 s of walking: 1,145 uploads → 3
 (the bosses' bubbles). Load: about +0.4 s on a first visit at 1x, +0.75 s at 4x; +0.07 / +0.2 s on a later one; 14 atlas pages. A glow's lit
 pixels (`litOf`, the tests' `lightAt`) are worked out when first asked for. The guard spec walks across the town at `?sky=night&crowd=12`.
-**Kept between visits (Nov 23; [decision](../decisions/2026-11-23-town-keep-pictures.md)):** after a first visit's first frame its pictures are
-packed into PNG pages (a worker encodes them; 5.8 MB) and kept in IndexedDB (`town/keep-pictures.ts`, `TOWN_PICTURES`). A later visit with
-the same art and layout (`pictureKey`: the art's fingerprint, `render.ts` `pictureSig`) loads them instead of painting: 4x slowed,
-18.5 s → 5.9 s. **The art's fingerprint (Nov 28; [decision](../decisions/2026-11-28-town-art-key.md)):** the build bundles the code the
-pictures come from with all it uses (`packages/app/town-art.ts`, esbuild, tree-shaken) and hashes it: `__TOWN_ART__`. Not the build's
-commit, as before: every deploy threw the saved town away. A deploy that leaves the art alone now keeps it (after a deploy, 4x slowed:
-11.8 to 12.3 s → 5.6 to 6.7 s; a computer: 4.3 to 4.5 → 2.2 to 2.4 s); a changed house color paints again. Test: `town-art.test.ts`. **Uploaded whole (Nov 25; [decision](../decisions/2026-11-25-town-atlas-pages.md)):** the pages are packed as the
-atlas packs (`paint.ts` `ATLAS`: 2048 px, 2 px padding, a picture over 1024 px alone), so a later visit uploads each page as one atlas layer
-(`paint-gl.ts` `adopt`) instead of cutting 1,912 pictures out and uploading each. Each picture is a stand-in canvas, cut from its page only
-when something reads it (its 2D context: hit tests, statue masks; a 2D context drawing from it: the chips' and the large map's faces,
-`cutBeforeDraw`, Nov 25 round 2) or it must be uploaded alone (a lost context). The pages stay decoded
-until the town closes. Headless, repeat visit at 4x: 5.47 → 4.52 s to the first frame (a page upload is about 50 to 65 ms at 4x here).
-Anything odd paints as before and clears the entry. `?paintall` skips it.
-**Baked by the build, loaded as files (Nov 28, phases 1a and 1b; decisions: [the bake](../decisions/2026-11-28-town-bake.md), [the load](../decisions/2026-11-28-town-load-baked.md)):**
-the pictures' list is its own module, `town/pictures.ts` (`townWants`), and `npm run build` paints it in Node (`scripts/bake-town.ts`, `town/bake.ts`; by
+**Baked by the build, loaded as files (Nov 28, phase 1; decisions: [the bake](../decisions/2026-11-28-town-bake.md), [the load](../decisions/2026-11-28-town-load-baked.md), [no painting on the device](../decisions/2026-11-28-town-no-device-painting.md)):**
+the pictures' list is its own module, `town/pictures.ts` (`townWants`), and `npm run build` paints it in Node (`scripts/bake-town.ts`, `town/bake.ts`, `town/paint-jobs.ts`; by
 hand `npx tsx scripts/bake-town.ts`, which prints each file's cost) into `/town-pictures/`: a PNG a group's page (a home, a street's row, the park, the
-Colosseum, the props; `.player` / `.admin` what one town alone draws), the sidekicks' sheets, `manifest.<hash>.json` (`town/manifest.ts`), `order.json`.
-**Every visit loads them** (`town/baked.ts`, `loadTown`): the manifest by the name the build hands the app (`__TOWN_PICTURES__`), its town's pages fetched
-(`town/baked-files.ts`), decoded off the main thread, each picture a stand-in canvas by name (`takeBaked`, `plan`), each page uploaded whole onto the atlas's
-layers (`adopt`, `placePages`); frame counts and tops from the manifest. Nothing in the list is painted or kept on the device (but the sidekicks' sheets,
-still cut there). The service worker keeps the files across versions (`sw-template.js` `TOWN_FILE`). Home fetches them when idle (`fetchTownAhead`: by the
-names the build hands it, `__TOWN_PAGES__`, never reading the manifest; only while home shows no queue; once its worker answers the page; each file once a
-page; not on `saveData` or `homeFetchNotOn`'s slow connections; stopped, the file on its way too, as home closes). A file missing, `?paintall` or
-`TOWN_PICTURES.baked` off: the device paints, as the paragraphs here describe (until phase 1c). So does a load where no byte arrives for `stallMs` (15 s, the
-page showing). A fallback says why once a page (`reportBakedFallback`, `TOWN_BAKED_FALLBACK`); the town closing stops the fetching and decoding
-([the review's fixes](../decisions/2026-11-28-town-load-baked-fixes.md)). The dev server bakes when the town first asks, one bake at a time. Tests: `town-bake.test.ts`, `town-baked.test.ts`, `sw-versions.test.ts`, `e2e/town-street.spec.ts` ("the build's baked pictures…", "home fetches…").
-**Warm before it shows (Nov 28; [decision](../decisions/2026-11-28-town-load-smooth.md)):** the loading screen also waits for every rider it
-knows (yours, the bots') and keeps their frames and trail marks (`Rider.pictures`; "ride frame", "ride trail" in the report), works out each
-box's solid top (`warmTops`; kept between visits under the pictures' key, `brc.townTops`), then draws `loadWarmFrames` (3) frames under the
-card, each waited for on the GPU (`settle`), until 3 in a row take under `loadWarmSmoothMs`; no time cap (Eric, Nov 28: "load the town
-first so it doesn't lag"; only a device slow with everything loaded lifts after `loadWarmMaxFrames`). A first visit's pictures are kept
-under the card too, before the warm-up (`keepPictures`). Hooks: `__townPaint()`'s `topsMs`, `warmMs`. Test: `@perf` "Chess
-Town busy" (you ride the Chirp: its first walk uploads nothing). Hooks: `__townPaint().pictures`, `__townPictureSum()` (its `gpu`:
-what the atlas holds for each picture; `(true)`: each one's hash). Tests: `town-keep-pictures.test.ts`, `e2e/perf.spec.ts` ("a second
-visit…": canvas and GPU hashes the same on all three visits), `e2e/town-street.spec.ts` ("the town's loading screen…": a lost context on
-either visit gives back the same texels), `e2e/town-controls.spec.ts` ("the minimap…": its reload is a repeat visit; every chip's face and
-the map's portraits drawn).
-**Painted on more cores (Nov 23; [decision](../decisions/2026-11-23-town-paint-workers.md)):** a first visit's pictures are painted ahead by a
-pool of workers (`town/paint-pool.ts`, `paint.worker.ts`; the cores less one, at most 3, `TOWN_PAINT_WORKERS`) with the main thread's own
-code (`town/paint-jobs.ts`), their art sent once as JSON (a character's idle frames and parts, a roof's geometry: `box-geom.ts`); the main
-thread puts each worker's pixels on its canvas as before and paints what no worker has. Every picture is the same (`test/town-paint-workers.test.ts`;
-the perf spec's third visit, painted without workers, hashes the same). The parts' lazy grids stay on the main thread. 4x slowed: about
-1.8x faster to the first frame. No workers, or any failure: the main thread paints, as before. `?paintworkers=N` (0: none) compares;
-`?paintslow=K` (tests) slows the workers as CDP slows the page. Hook: `__townPaint().pictures` (`workers`, `byWorkers`, `whileWaiting`).
+Colosseum, the props, a sidekick's frames; `.player` / `.admin` what one town alone draws), `manifest.<hash>.json` (`town/manifest.ts`), `order.json`. The
+pages are packed as the atlas packs (`paint.ts` `ATLAS`: 2048 px, 2 px padding, a picture over 1024 px alone; `keep-pictures.ts` `packPictures`). The
+sidekicks' frames (phase 1c) are cut from their sheets (`town/sidekicks/<name>.png`, `scripts/bake-sidekicks.ts`), each a padded picture of its own,
+`sidekick:<sheet>:<animation>#<frame>`, by the sheet's name in `SIDEKICK_SHEETS` (so Rivet, whose art's id is another, shows in an admin's town).
+**Every visit loads them, and nothing else can make them** (`town/baked.ts`, `loadTown`): the manifest by the name the build hands the app
+(`__TOWN_PICTURES__`), its town's pages fetched (`town/baked-files.ts`), decoded off the main thread, each picture a stand-in canvas by name (`takeBaked`,
+`plan`), each page uploaded whole onto the atlas's layers (`adopt`, `placePages`); frame counts and tops from the manifest. A stand-in is empty until
+something reads it (its 2D context: hit tests, statue masks; a 2D context drawing from it: the chips' and the large map's faces, `cutBeforeDraw`); what
+the town reads later (each home's and park thing's first frame, each boss's and sidekick's) is cut under the card. **Memory:** once uploaded the decoded
+pages are let go (`Baked.release`), and a stand-in read after that gets its pixels back from the GPU (`Painter.read`). **A lost context:** the loading
+card comes back up, the files are fetched again (`reopen`) and everything is uploaded as on the loading screen (`restoreTown`, `onGpu`), then it draws.
+**No time caps:** the labels' fonts, the pawns' crate items and the rides are each waited for until in or failed; only nothing arriving for `stallMs`
+(15 s, the page showing) ends a wait (`settledOrStalled`; said once, `reportTownLate`, `TOWN_LOAD_LATE`). **A file that fails** is asked for again twice
+(`TOWN_PICTURES.retryMs`); then, or with no byte for `stallMs`, the box says "The town didn't load. Please retry." with Retry, said once
+(`reportBakedFallback`, `TOWN_BAKED_FALLBACK`): never a half town. The service worker keeps the files across versions (`sw-template.js` `TOWN_FILE`). Home
+fetches them when idle (`fetchTownAhead`: by the names the build hands it, `__TOWN_PAGES__`; only while home shows no queue; once its worker answers the
+page; each file once a page; not on `saveData` or `homeFetchNotOn`'s slow connections). The dev server bakes when the town first asks. Measured (phase
+1c, a player's town on the slowed phone, before → after): the tap to the first frame 4.9 to 5.2 s → 4.0 to 5.2 s, a first visit as a later one; our frame 15.0 → 15.0 ms; decoded pages 144.5 MB → 0, canvases 57.6 → 54.2 MB, textures 251.7 MB as before (454 → 306 MB in all). Hooks: `__townPaint().pictures` (`baked`, `files`, `bytes`, `open`), `__townPictureSum()` (`gpu`:
+what the atlas holds; `(true)`: each picture's hash). Tests: `town-bake.test.ts`, `town-baked.test.ts`, `sw-versions.test.ts`, `e2e/town-street.spec.ts`
+("the town loads the build's baked pictures…", "home fetches…", "the town's loading screen…": a lost context), `e2e/perf.spec.ts` ("a first visit and a second…").
+**Warm before it shows (Nov 28; [decision](../decisions/2026-11-28-town-load-smooth.md)):** the loading screen keeps every rider's frames and trail
+marks (`Rider.pictures`; "ride frame", "ride trail" in the report), then draws `loadWarmFrames` (3) frames under the card, each waited for on the GPU
+(`settle`), until 3 in a row take under `loadWarmSmoothMs`; no time cap (Eric, Nov 28: "load the town first so it doesn't lag"; only a device slow with
+everything loaded lifts after `loadWarmMaxFrames`). Hook: `__townPaint()`'s `warmMs`. Test: `@perf` "Chess Town busy" (you ride the Chirp: its first
+walk uploads nothing).
 **The music is no step (Nov 14; [decision](../decisions/2026-11-14-town-load-fast.md)):** until Nov 14 every boss theme was fetched from the
 bar's start beside the painting, and "Loading music…" waited up to 3 s more once the town was built (Nov 12, [decision](../decisions/2026-11-12-music-mono-preload.md));
 at 44 MB (stereo 192 kbps) Eric found the town "taking forever". Now `preloadMusic` starts `MUSIC.townPreloadAfterMs` (2 s) after the first

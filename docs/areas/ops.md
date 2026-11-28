@@ -468,9 +468,11 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
     each reason's row, with its latest device, is in `/admin/ops`'s error list. `/admin/ops` shows a line, and
     `npm run ops:report` prints one ("Town WebGL fallbacks (reloaded once, "retry", or "no-webgl2": can't run): 3 in 24 hours, 10 in 7 days (…)");
     never "Needs attention".
-  - **the town's baked pictures not used** (Nov 28): a page whose town painted its own pictures says why once
-    (`reportBakedFallback`), as the kind `town-baked-fallback` with its reason as the message (`TOWN_BAKED_FALLBACK`: `manifest`, `file`,
-    `decode`, `size`, `list`, `stall`). No count of its own: it's among the errors, a row a reason in `/admin/ops`'s error list.
+  - **the town's pictures not loaded** (Nov 28): a page whose town said "The town didn't load. Please retry." (nothing is painted on the
+    device since phase 1c) says why once (`reportBakedFallback`), as the kind `town-baked-fallback` with its reason as the message
+    (`TOWN_BAKED_FALLBACK`: `manifest`, `file`, `decode`, `size`, each after two retries; `list`, `stall`, `gpu`). And a town shown before
+    its fonts, crate items or rides were in (nothing of them for 15 s), as `town-load-late` (`TOWN_LOAD_LATE`: `fonts`, `items`, `rides`).
+    No count of their own: they're among the errors, a row a reason in `/admin/ops`'s error list.
   - the Durable Objects' own errors (kinds named `Class.method`) by class and entry point;
   - players' reports in the last 24 hours by kind, and the latest 5;
   - the engine server: on or off, searches used of today's budget (`engine_usage`, UTC day), its last answer and last

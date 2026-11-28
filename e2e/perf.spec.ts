@@ -598,13 +598,16 @@ function townRefJob(): number {
  * warm-up under the loading card and the box tops worked out there (about 1.5 s at 4x on a first visit; Eric, Nov 27: a couple of seconds
  * more loading is fine if it then plays smooth): 11.1 and 12.9 measured. docs/decisions/2026-11-28-town-load-smooth.md. Nov 28, later: 16,
  * for a first visit's pictures kept under the card (about 1 s at 4x; it was a hitch after the card lifted, Eric: "load the town first so it
- * doesn't lag"): 12.8 and 14.1 measured.
+ * doesn't lag"): 12.8 and 14.1 measured. Nov 28, phase 1c: 8. Nothing is painted or kept on the device any more (the build's baked
+ * files, the sidekicks' frames among them): 4.6 to 5.3 measured over 3 runs of both towns (5.9 in phase 1b's runs, on another machine);
+ * the largest of them all and a third. docs/decisions/2026-11-28-town-no-device-painting.md.
  */
-const TOWN_LOAD_REFS = 16;
+const TOWN_LOAD_REFS = 8;
 /** (Until Nov 28 `&paintslow=4` too, which slowed the paint workers as CDP slows the page: nothing is painted on the device now.) */
 const TOWN_SLOW = "/?sky=day";
-/** And its longest task (`townRefJob`s; Nov 23). */
-const TOWN_LONG_REFS = 2;
+/** And its longest task (`townRefJob`s; Nov 23: 2, when painting froze the loading bar for up to 1.8). Nov 28, phase 1c: 1; measured 0.5
+ * to 0.6 over 3 runs of both towns (the town's code starting, before its card shows; under the card, the warm-up's first frame). */
+const TOWN_LONG_REFS = 1;
 
 // (Nov 13: the street town is everyone's: a player's (a guest's here) and an admin's, both with the loading screen; before, a player's was the
 // old Canvas 2D town, timed to its first frame under 2.5 s.)
@@ -665,8 +668,8 @@ for (const who of ["a player's town", "an admin's town"] as const)
 /**
  * A visit's first frame, in reference jobs: every visit loads the build's baked files (Nov 28, the town's structure, phase 1), a first
  * one from the server and a later one from the service worker's copies. Phase 1c measured both again, the sidekicks' frames baked too
- * and nothing painted or kept on the device: a first visit __FIRST__, a later one __LATER__ (3 runs each); the budget is the larger and a
- * quarter, one for both: a first visit is a later one now. (History: 6 for a second visit with the first's pictures kept, Nov 23; 8
+ * and nothing painted or kept on the device: a first visit 5.1 to 5.6, a later one 3.8 to 5.8 (3 runs each); the budget is the largest
+ * and a third, one for both: a first visit is a later one now. (History: 6 for a second visit with the first's pictures kept, Nov 23; 8
  * for a first visit's baked files, phase 1b, when it measured 5.9 to 6.0.)
  */
 const TOWN_VISIT_REFS = 8;

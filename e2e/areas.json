@@ -86,7 +86,6 @@
     "packages/server/src/ledger.ts",
     "packages/app/index.html",
     "packages/app/vite.config.ts",
-    "packages/app/town-art.ts",
     "packages/app/sw-template.js",
     "packages/app/public/fonts/**",
     "packages/app/src/main.tsx",
