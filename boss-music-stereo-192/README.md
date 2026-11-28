@@ -162,3 +162,18 @@ boss is, and you can send it to the director to be wired into the stranger as hi
   nothing new: the files are plain MP3 and OGG like the others.
 - Checked on the built files: the audio is the master Eric approved (correlation 1.00000); the loop point is clean on
   the MP3 and the OGG (the step across it is a fifteenth of the largest step nearby).
+
+## Nov 28: the Stranger's theme replaced (`stranger`, both voices)
+
+`stranger-loop.mp3` / `.ogg` are new audio under the same names: one loop of **160.0 s** as before (no intro piece,
+pad 0.5, bpm 168), -16.6 LUFS, peak -1.2 dBFS. Only `lufs` changed in its `themes.json` entry (-16.4 to -16.6). Built
+by `python3 handoff.py --stereo --kbps 192 <folder> stranger` from `scripts/reel/music/song_ap.py` on
+`claude/trailer-v2` at f0f989b40. Eric, of this version: "this one is, I think this should be the new one. Go ahead and set
+it to the director to replace the old one."
+
+- What changed in the music: wherever the one sampled voice sings (the tune, its answers, the held chords), the
+  bank's choir's women now sing the same notes at the same level; the pair is as loud as the one voice was. Nothing
+  else differs from the Nov 27 file (commit 61f81d07a has that one).
+- Credits: nothing new. The choir is from the same FluidR3_GM bank already credited.
+- Checked on the built files: the audio is the file Eric approved (correlation 1.00000); the loop point is clean on
+  the MP3 and the OGG.
