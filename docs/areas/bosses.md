@@ -82,6 +82,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   the piece's start; after it, or a battle joined later, `dropAt` 0: his theme's loop alone. Tests: `app/test/birdie.test.ts`,
   `e2e/birdie.spec.ts` ("Birdie's fall").
 - **Banners and lines (Eric, Nov 5):** a power's banner shows your pawn on the right (the God King only for his save, LastStand); a boss's name is his small portrait plus his name, never his emoji (`BossTag`, the status line); the banner's name stays whole. [decision](../decisions/2026-11-05-banners-emoji-cards.md); rules in [eric.md](../rules/eric.md).
+- **One look for every power banner (Eric, Nov 28):** one face, the app's own Archivo, for the boss's name (on a dark plate), the
+  title and its line; the title on one or two lines of one size, fitted to its longest line in the words' share (`fitBanner` in
+  `PowerParts.tsx`, sizes in cqw, no layout); no per-tone size or face. [decision](../decisions/2026-11-28-banner-consistent.md).
 - **A boss can be rested** (`PAUSE_BOSS_<ID>`, [ops.md](ops.md) "Kill switches"): the boss menu hides him, a raid
   lobby picked for him is refused, and every match's pick skips him (`rosterWithout` in `boss.ts`, a lobby's or solo
   game's `bossesOff`). The Crowd's boss final meets another while his boss rests, and its vote card names none.
@@ -634,9 +637,9 @@ below):
   the split's, the lasso's and the showdown's 1.3 s and the darkness's 1.25 s are their tables' `bannerMs`); Wrangler's
   "DRAW!" from its beat to the moment's end (1.4 s). The banner's length is its band's: it slides in, holds, and is off
   by `--fb-ms`, which `FightBanner`'s and `PowerBanner`'s `ms` set (styles.css: `fb-band-in`, then `fb-band-out` timed
-  from it; the entrances inside it come in its first 0.6 s whatever its length). A power's big word fits its share of
-  the banner (`fitBigWord` in `PowerParts.tsx`: 42% of the banner's width, the words wrap at spaces, a word still too wide
-  is made smaller in the page's font; Nov 1, Eric: "MAMMOTH SLAM!" ran off a computer's board). The moments that grew a
+  from it; the entrances inside it come in its first 0.6 s whatever its length). A power's title fits its share of
+  the banner (`fitBanner` in `PowerParts.tsx`: 42% of the banner's width, one or two lines of one size; Nov 1, Eric: "MAMMOTH
+  SLAM!" ran off a computer's board; Nov 28, see "One look for every power banner"). The moments that grew a
   second for the longer banner are a second shorter again (`POWER_FX`: the rage warning 1.7 s, freeze 2.3, thaw 2.2, pie 2.3 (2.7 since Nov 12: the face pie's split), sparkler
   2.3, Hollow's extra move 2.2, toy block 2.3, saw cut 2.3, the showdown 6 s), Boingo's board turns a second sooner
   (`FUNHOUSE`, `SPIN`; the funhouse 5.2 s, each spin 2.6 s), "START!" makes the intro a second shorter, the phase change

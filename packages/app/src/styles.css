@@ -16483,7 +16483,10 @@ img.qicon {
   text-transform: none;
   text-align: center;
   text-wrap: balance;
-  text-shadow: 0 0 3px #0b0b1a, 2px 2px 0 #0b0b1a;
+  /* (The title's dark outline, so it reads on any tone's stripes.) */
+  -webkit-text-stroke: 3px #0b0b1a;
+  paint-order: stroke fill;
+  text-shadow: 2px 2px 0 #0b0b1a;
 }
 /* The rage meter in the boss bar: fills as the boss loses material; flashes for the warning. */
 .rage-meter {

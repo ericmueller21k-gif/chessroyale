@@ -1,8 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
-import { BOSS_BANNER, BANNER_PLUS_MS, DEFAULT_SETTINGS, SQUADS, bannerPlusMs, bossBannerMs, setBannerPlusSource, voteResultMs, type PowerEventKind } from "@chessroyale/core";
+import { BOSS_BANNER, BOSS_ROSTER, BANNER_PLUS_MS, DEFAULT_SETTINGS, SQUADS, bannerPlusMs, bossBannerMs, setBannerPlusSource, voteResultMs, type PowerEventKind } from "@chessroyale/core";
 import { CHANDY_FIRE_AT, ALFIL_BEATS, BLOCK, BOARD_SAW, BOSS_INTRO, BOUNCE, HOOPS_BEATS, HOPPER_BEATS, KING_COMMAND, KING_SUMMON, LAST_STAND, LIGHTS_OUT, POWER_BANNERS, POWER_FX, PULL, RECLUSE_FX, SAW_CUT, SHOWDOWN, SPLIT, START_FEN, bannerLeadMs, bannerWaitMs, bossIntroTimeline, bossShowMs, bossThinkMs, kingStrikeMs, lastStandMs, lightsOutTimeline, powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { WARN, PowerBanner, PowerMoment, momentAt, momentsOf } from "../src/components/BossPowers.tsx";
+import { fitBanner } from "../src/components/PowerParts.tsx";
 import { HOPPER_UI } from "../src/components/Hopper.tsx";
 import { SMUDGY_UI } from "../src/components/Smudgy.tsx";
 import { MOO_UI } from "../src/components/Moo.tsx";
@@ -39,6 +40,8 @@ import type { BossView } from "../src/game.ts";
  * RANDOM! keep 2.5 s. docs/decisions/2026-10-16-banner-timing.md.
  */
 const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+/** A text's width in ems without a canvas (Archivo Black's capitals run about 0.6 to 0.95 em; M and W the widest). */
+const roughEms = (text: string, _weight: string, spacing: number) => [...text].reduce((w, c) => w + (/[MW]/.test(c) ? 0.95 : /[ I!.]/.test(c) ? 0.35 : 0.72) + spacing, 0);
 
 /** Every power moment's view, by kind (the rage warning and each boss's). */
 const VIEWS: Partial<Record<PowerEventKind, { ui: MomentUi; boss: string; name: string }>> = {};
@@ -358,7 +361,7 @@ describe("every banner longer by BANNER_PLUS_MS (Eric, Oct 24), the same for all
 
 /**
  * Eric, Nov 5: a power's banner shows your pawn on the right, never the God King (only his save, LastStand, has him), and a
- * boss's name is drawn whole on its banner (PowerParts' fitBigWord; the strip is taller than the king-cut's). Guards by source:
+ * boss's name is drawn whole on its banner (PowerParts' fitBanner; the strip is taller than the king-cut's). Guards by source:
  * the DOM isn't rendered in these tests. e2e/boss-powers.spec.ts checks the rendered banner too.
  */
 describe("Eric, Nov 5: a power's banner shows your pawn, never the God King", () => {
@@ -379,10 +382,41 @@ describe("Eric, Nov 5: a power's banner shows your pawn, never the God King", ()
     expect(boss).not.toMatch(/\{boss\.icon\}/);
     expect(boss).toMatch(/<BossTag boss=\{boss\} \/> plays/);
   });
-  it("a boss's name stays on one line and fits the words' share of the strip (fitBigWord), and the strip is taller for the stack", () => {
-    expect(parts).toMatch(/nameWide > room/);
+  it("a boss's name stays on one line and fits the words' share of the strip (fitBanner), and the strip is taller for the stack", () => {
+    // (Every boss's name, as the banner shows it; its plate's padding is the 1.3 em.)
+    for (const b of BOSS_ROSTER) {
+      const name = b.name.replace(/^The /, "");
+      expect(fitBanner("PIE!", name, roughEms).nameSize * (roughEms(name.toUpperCase(), "800", 0.08) + 1.3), name).toBeLessThanOrEqual(42.01);
+    }
     expect(css).toMatch(/\.fight-banner\.power-cut \.fb-band \{\s*\/\*[^*]*\*\/\s*height: 44%;/);
-    expect(css).toMatch(/\.fight-banner\.power-cut \.kc-label \{\s*color: #fecaca;\s*white-space: nowrap;/);
+    expect(css).toMatch(/\.fight-banner\.power-cut \.kc-label \{[^}]*white-space: nowrap;/);
+  });
+});
+
+/**
+ * Eric, Nov 28 (the Stranger's STORM OF TWO WORLDS! on his phone): "All the words look different… his name looks weird… the worlds is,
+ * like, bigger than the rest." One face for the name, the title and its line; the title on one or two lines of one size, each fitting.
+ */
+describe("Eric, Nov 28: every power banner has one look", () => {
+  it("the title: at most two lines, the whole title in order, one size for all of them, each line inside the words' share", () => {
+    for (const title of ["STORM OF TWO WORLDS!", "END OF THE LINE!", "MAMMOTH SLAM!", "CAMOUFLAGE!", "PIE!", "SUPER FREEZE!"]) {
+      const fit = fitBanner(title, "Stranger", roughEms);
+      expect(fit.lines.length, title).toBeLessThanOrEqual(2);
+      expect(fit.lines.join(" ")).toBe(title);
+      expect(fit.size).toBeLessThanOrEqual(8);
+      for (const line of fit.lines) expect(fit.size * (roughEms(line, "italic 900", 0.02) + 0.15), line).toBeLessThanOrEqual(42.01);
+    }
+    expect(fitBanner("STORM OF TWO WORLDS!", "Stranger", roughEms).lines).toEqual(["STORM OF", "TWO WORLDS!"]);
+    // (One size: set once on the title; no line, tone or "long" variant sizes it again.)
+    expect(css).not.toMatch(/\.kc-line \{[^}]*font-size/);
+    expect(css).not.toMatch(/\.fight-banner\.power-cut[^{]*\.(kc-text|fb-text) \{[^}]*(font-size|letter-spacing)/);
+    expect(css).not.toMatch(/power-cut\.long/);
+  });
+  it("one face (the app's Archivo) for the name, the title and the line under it", () => {
+    expect(css).toMatch(/\.fight-banner\.power-cut \.kc-words \{[^}]*font-family: Archivo, system-ui, sans-serif;/);
+    for (const part of ["kc-label", "kc-text", "fb-sub"]) expect(css, part).toMatch(new RegExp(`\\.fight-banner\\.power-cut \\.${part} \\{[^}]*font-family: inherit;`));
+    // (No tone gives a part a face of its own.)
+    expect(css).not.toMatch(/\.fight-banner\.power-cut\.[^{]*\.(kc-label|kc-text|fb-text|fb-sub) \{[^}]*font-family/);
   });
 });
 
