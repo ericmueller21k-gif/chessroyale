@@ -17,6 +17,7 @@ import { OwnBoard } from "../board/OwnBoard.tsx";
 import { RankEmblem } from "../components/RankEmblem.tsx";
 import { MatchMenu, SwitchRow } from "../components/MatchMenu.tsx";
 import { SettingsScreen } from "../screens/Settings.tsx";
+import { applyTheme } from "../theme.ts";
 import { skinCss, skinOf, skinVars, type Skin } from "./town-shop-skins.ts";
 import { RANKS, RIM, ROLES, STYLES, piecesCss, rankOf, setClass, type RankSet, type StyleId } from "./rank-pieces.ts";
 
@@ -329,7 +330,10 @@ body.rp-sheet { background: #1d2230; color: #eef1f6; font-family: system-ui, san
 
 function App() {
   if (view === "settings") return <SettingsScreen onBack={() => {}} onFaq={() => {}} />;
-  if (view === "menu") return <Menu />;
+  if (view === "menu") {
+    applyTheme();
+    return <Menu />;
+  }
   document.body.classList.add("rp-sheet");
   if (view === "kq") return <KingQueen />;
   if (view === "closeup") return <Closeup />;
