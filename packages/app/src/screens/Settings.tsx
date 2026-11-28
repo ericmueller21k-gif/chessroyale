@@ -288,6 +288,10 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
       <section class="fd-section">
         <h2 class="fd-label">BOARD</h2>
         <BoardColorsChoice />
+        {/* MOCKUP ONLY (rank-pieces-mockup): the switch's row, wired to nothing. */}
+        <Toggle title="Always default board and pieces" checked={new URLSearchParams(location.search).get("plain") === "1"} onChange={() => {}}>
+          Show the default board and pieces everywhere, even your own.
+        </Toggle>
         <Toggle
           title="Animations"
           checked={anim}
