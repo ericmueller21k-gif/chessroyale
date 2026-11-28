@@ -35,6 +35,7 @@ import { renderFrame, type Character } from "../../characters/sprite.ts";
 import { mirrorFor } from "../../characters/sprite-kit.ts";
 import { artFacing } from "../../characters/sprites.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../../test-switches.ts";
+import { setHooks } from "../../window-hooks.ts";
 import { newPt, newView, proj, setView, type CamPair } from "../camera.ts";
 import { SHOP_FEEL, TOWN_FEEL, type CamSet } from "../feel.ts";
 import { F as RF, FPS, P as RP, REC } from "../frame-report.ts";
@@ -5252,20 +5253,7 @@ function startRoom(
       alpha: Object.fromEntries(sceneFigs.map((p) => [p.name, p.a ?? 1])),
     };
   };
-  const hooks = window as unknown as { __shopStill?: typeof hookStill; __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide; __shopIntro?: typeof hookIntro; __shopCrew?: typeof hookCrew; __shopElves?: typeof hookElves; __shopLook?: typeof hookLook; __shopZebra?: typeof hookZebra; __shopBackDiff?: typeof hookBackDiff };
-  hooks.__shopZebra = hookZebra;
-  hooks.__shopLook = hookLook;
-  hooks.__shopElves = hookElves;
-  hooks.__shopAt = hookAt;
-  hooks.__shopCrew = hookCrew;
-  hooks.__shopIntro = hookIntro;
-  hooks.__shopRide = hookRide;
-  hooks.__shopCam = hookCam;
-  hooks.__shopBench = hookBench;
-  hooks.__shopStill = hookStill;
-  hooks.__shopBackDiff = hookBackDiff;
-  // (Birdie's split-flap board: what it says, as its flaps will stand.)
-  (window as unknown as { __shopFlaps?: () => { title: string; rows: string[] } | null }).__shopFlaps = () => art.flaps?.board.text() ?? null;
+  const offHooks = setHooks({ __shopZebra: hookZebra, __shopLook: hookLook, __shopElves: hookElves, __shopAt: hookAt, __shopCrew: hookCrew, __shopIntro: hookIntro, __shopRide: hookRide, __shopCam: hookCam, __shopBench: hookBench, __shopStill: hookStill, __shopBackDiff: hookBackDiff, __shopFlaps: (): { title: string; rows: string[] } | null => art.flaps?.board.text() ?? null });
 
   run();
   draw(performance.now()); // the first frame, before the fade lifts
@@ -5349,18 +5337,9 @@ function startRoom(
       cv.removeEventListener("pointerup", onUp);
       cv.removeEventListener("pointercancel", onCancel);
       cv.removeEventListener("wheel", onWheel);
-      delete hooks.__shopAt;
-      delete hooks.__shopCam;
-      delete hooks.__shopLook;
-      delete hooks.__shopBench;
-      delete hooks.__shopStill;
-      delete hooks.__shopBackDiff;
+      offHooks();
       gb?.dispose();
       gb = null;
-      delete hooks.__shopRide;
-      delete hooks.__shopIntro;
-      delete hooks.__shopCrew;
-      delete hooks.__shopZebra;
     },
   };
 }

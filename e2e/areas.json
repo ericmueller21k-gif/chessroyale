@@ -161,6 +161,8 @@
     "e2e/ci-select.d.mts",
     "e2e/perf-probe.js",
     "e2e/perf-probe.d.ts",
+    "e2e/mem-probe.js",
+    "e2e/mem-probe.d.ts",
     "packages/app/src/characters/tower-banter.ts"
   ],
   "areas": {
@@ -724,7 +726,7 @@
       "specs": ["e2e/friends.spec.ts", "e2e/global-chat.spec.ts", "e2e/home-layout.spec.ts", "e2e/live-window.spec.ts"]
     },
     "the town square (/town)": {
-      "paths": ["packages/app/src/town/**", "packages/app/src/stale.ts", "packages/app/src/characters/sidekicks/**", "packages/app/src/characters/ginger-intro.ts", "packages/app/src/characters/dash-intro.ts"],
+      "paths": ["packages/app/src/window-hooks.ts", "packages/app/src/town/**", "packages/app/src/stale.ts", "packages/app/src/characters/sidekicks/**", "packages/app/src/characters/ginger-intro.ts", "packages/app/src/characters/dash-intro.ts"],
       "specs": ["e2e/town.spec.ts", "e2e/town-street.spec.ts", "e2e/town-rows.spec.ts", "e2e/town-fixed.spec.ts", "e2e/town-controls.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts", "e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/colosseum.spec.ts", "e2e/shop.spec.ts", "e2e/boss-challenge.spec.ts", "e2e/town-afk.spec.ts", "e2e/town-leave.spec.ts", "e2e/town-ranked.spec.ts"]
     },
     "away in the town (the zzz, out to home after 10 minutes, the server's town presence)": {
