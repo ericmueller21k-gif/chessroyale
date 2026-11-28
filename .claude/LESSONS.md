@@ -491,3 +491,8 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - No JSX at module level: Preact writes each vnode's place into it, so a constant vnode keeps the last screen it showed in alive.
   - A screen that holds big pictures lets go of its refs as it closes; a heavy flow (a battle and back) gets a memory number on a
     slowed phone (`e2e/mem-probe.js`, the tower's @perf test), and a leak is found by its retaining path, not by guessing.
+
+- **Tests that assumed something of a random position** (Nov 28: Squads' Cheat lines "always 3", the Relay replay's "a quiet move"):
+  - A position the bots reached at random may have any number and kind of legal moves (in check: two replies; every move a capture). A
+    test that needs a move prefers the kind it wants and falls back to any legal one, and names the position if none fits; a count of
+    lines or arrows is `min(n, legal moves)`. A fixed, scripted position is the only place to rely on a move's kind.
