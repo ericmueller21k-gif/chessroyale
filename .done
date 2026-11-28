@@ -1,0 +1,6 @@
+Review of town phase 1c (PR #1050, head a6ee42c1) done: REVIEW.md on this branch.
+Blockers: none. Should-fix: 1 (e2e/perf.spec.ts:771 polls __townPaint().pictures.saved, gone in 1c: both "Chess Town busy" @perf tests
+now fail after 90 s; CI leaves @perf out). Nits: 6 (a failure doesn't abort the other fetches; a WebGL-failed page still fetches and
+decodes every file; the three waits get 15 s each; no createImageBitmap says "retry"; a lost context in a room can end the visit
+offline; the decision note's length). Ran: typecheck (green), the town unit tests (41 passed), the bake and a padding check (3,870
+pictures clear). No browser, no e2e. Not reached: iOS Safari.
