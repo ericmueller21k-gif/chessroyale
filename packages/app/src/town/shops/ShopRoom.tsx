@@ -153,6 +153,13 @@ export interface RoomArt {
   people?: Readonly<Record<string, { readonly ch: Character; readonly anims: readonly string[] }>>;
   scene?: "zebra-front" | "zebra-back";
   /**
+   * Someone seated at a table that stands up (`upright`) and is drawn after them, nearer: their part higher than the table's top (`top`,
+   * the room's px over their foot) is drawn again just after the table (row `z`), so the table hides only their lap, never their head
+   * and shoulders, as a table really would (Rolling Dough's back room, Don at its head: Eric, Nov 27, "his head gets covered up").
+   * Only while they're on their seat (`at`).
+   */
+  overTable?: { readonly who: string; readonly at: readonly [number, number]; readonly z: number; readonly top: number };
+  /**
    * Only these pieces go see-through over you (its near wall and its door), though it has a floor's shape, or has none (the walk-up's
    * box rooms, Nov 13) (Rolling Dough's rooms: the
    * table and its board, the counter and the lamps stay solid; Eric, Nov 11, saw the table and its board ghosted as "artifacts"). Without
@@ -348,6 +355,7 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
         pools: m.SHOP_ZEBRA_BACK_POOLS,
         floor: m.SHOP_ZEBRA_BACK_FLOOR,
         upright: ["table"],
+        overTable: { who: "don", at: m.SHOP_ZEBRA_BACK_SEATS.kingpin.at, z: m.SHOP_ZEBRA_BACK_TABLE_ROW, top: m.SHOP_ZEBRA_BACK_TABLE_TOP },
         people: {
           don: { ch: d.BOSS_ZEBRA, anims: ["sitListen", "sitTalk", "sitScoff", "sitRelax", "idle"] },
           "crew-c": { ch: c.NPC_ZEBRA_CREW_C, anims: CREW },
@@ -2423,7 +2431,8 @@ function startRoom(
     const s = (pt.k / SQ) * fg.k;
     const y = pt.y - fg.up * (pt.k / SQ);
     const a = fg.a ?? 1;
-    if (fg.w < 100 && fg.up === 0 && fg.h > 60 && a >= 1) shadows(pt.x, pt.y, pt.k, fg.w * s * 0.45);
+    // (Not under a seated figure's top part, drawn again over a table: its foot below what's drawn. RoomArt `overTable`.)
+    if (fg.w < 100 && fg.up === 0 && fg.h > 60 && fg.fy <= fg.h && a >= 1) shadows(pt.x, pt.y, pt.k, fg.w * s * 0.45);
     if (fg.elf) {
       // (The art's: an ellipse 16 x 4 of the room's pixels, #140c04 at 45%, under its feet on the floor, a step or the deck.)
       g.fillStyle = "#140c04";
@@ -2522,8 +2531,11 @@ function startRoom(
       }
     }
   };
+  /** (Tests) A seated figure's top part drawn over its table in the last frame (RoomArt `overTable`): its frame, its rows, its row. */
+  let overDrawn: { img: CanvasImageSource & { width: number; height: number }; rows: number; z: number } | null = null;
   /** Rolling Dough's people where they stand this frame, into `crewFigs` (each by its row among the pieces). */
   const collectPeople = (now: number) => {
+    overDrawn = null;
     if (!pf) return;
     if (setup) setup.figs(now, sceneFigs, carriedNow);
     else if (front) {
@@ -2541,6 +2553,13 @@ function startRoom(
       const img = an.frames[p.frame]!;
       const ch = art.people![p.name]!.ch;
       Object.assign(crewFigs[crewN++]!, { img, elf: false, sx: 0, sy: 0, w: img.width, h: img.height, fx: ch.foot[0], fy: ch.foot[1], k: 1, c: p.c, r: p.r, z: p.r, flip: p.flip, up: p.up ?? 0, a: p.a ?? 1 });
+      // (Seated at the table, which stands nearer and is drawn after him: his part over its top again, just after it. RoomArt `overTable`.)
+      const o = art.overTable;
+      const cut = o ? ch.foot[1] - o.top + (p.up ?? 0) : 0;
+      if (o && p.name === o.who && Math.abs(p.c - o.at[0]) < 0.01 && Math.abs(p.r - o.at[1]) < 0.01 && cut > 0 && crewN < CREW_MAX) {
+        Object.assign(crewFigs[crewN++]!, { img, elf: false, sx: 0, sy: 0, w: img.width, h: Math.min(img.height, cut), fx: ch.foot[0], fy: ch.foot[1], k: 1, c: p.c, r: p.r, z: o.z, flip: p.flip, up: p.up ?? 0, a: p.a ?? 1 });
+        overDrawn = { img, rows: Math.min(img.height, cut), z: o.z };
+      }
     }
     if (!setArt) return;
     // (The back room's set, kept before his table until it's picked up: the stools and the table on the floor, the board on the table.)
@@ -5251,7 +5270,21 @@ function startRoom(
       // (The walk-out: whether it's on, the set's things still kept, and what's carried where, how solid.)
       out: walkOut ? { kept: keptNow.slice(), carried: carriedNow.map((q) => ({ item: q.item, at: [q.c, q.r], a: q.a ?? 1 })) } : null,
       alpha: Object.fromEntries(sceneFigs.map((p) => [p.name, p.a ?? 1])),
+      // (Don's part drawn over his table, seated: its rows from his frame's top, and where in them his drawing starts (its first row with
+      // a pixel), so a test reads how much of him shows over the table. RoomArt `overTable`.)
+      over: overDrawn ? { z: overDrawn.z, rows: overDrawn.rows, from: firstRow(overDrawn.img) } : null,
     };
+  };
+  /** (Tests) The first row of a picture with a pixel in it. */
+  const firstRow = (img: CanvasImageSource & { width: number; height: number }): number => {
+    const c = document.createElement("canvas");
+    c.width = img.width;
+    c.height = img.height;
+    const q = c.getContext("2d")!;
+    q.drawImage(img, 0, 0);
+    const d = q.getImageData(0, 0, c.width, c.height).data;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3]! > 0) return y;
+    return c.height;
   };
   const offHooks = setHooks({ __shopZebra: hookZebra, __shopLook: hookLook, __shopElves: hookElves, __shopAt: hookAt, __shopCrew: hookCrew, __shopIntro: hookIntro, __shopRide: hookRide, __shopCam: hookCam, __shopBench: hookBench, __shopStill: hookStill, __shopBackDiff: hookBackDiff, __shopFlaps: (): { title: string; rows: string[] } | null => art.flaps?.board.text() ?? null });
 

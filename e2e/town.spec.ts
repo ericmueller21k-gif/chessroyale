@@ -1395,6 +1395,8 @@ interface RideSeen {
     at: [number, number];
     stepMs: number;
     marks: { side: number; back: number; front: number; drops: number };
+    /** Your destination's gold ring drawn in the last frame (on foot only: Eric, Nov 27). */
+    ring: boolean;
     /** ride-sound.ts `rideSoundState`. */
     sound: { ride: string | null; live: number; loop: unknown[] | null; level: number; rate: number; boings: number; boingsLive: number; decoded: string[] };
   };
@@ -1499,6 +1501,7 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
         const m = r.you.marks;
         for (const k of ["side", "back", "front"] as const) if (m[k]) w.__marksSeen.add(k);
         if (m.drops) w.__marksSeen.add("drops");
+        if (r.you.ring) w.__marksSeen.add("ring");
       }
       requestAnimationFrame(look);
     };
@@ -1563,7 +1566,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // Side (0) walking left and right, mirrored to face its walk; back (1) up and front (2) down, as drawn (never mirrored).
   expect(steps).toEqual(expect.arrayContaining(["move:0:1", "move:0:-1", "move:1:1", "move:2:1", "idle:0:-1", "idle:1:1", "idle:2:1"]));
   expect(steps.filter((s) => /^\w+:[12]:-1$/.test(s))).toEqual([]);
-  // Its trail: Chirp's prints on the squares you left, pointing each way you went; never the droplets while it rides.
+  // Its trail: Chirp's prints on the squares you left, pointing each way you went; never the droplets while it rides, and never the
+  // destination's gold ring (Eric, Nov 27: "only when we're not on anything"): taps and the walk hook alike.
   const marks = await page.evaluate(() => [...(window as unknown as { __marksSeen: Set<string> }).__marksSeen]);
   expect(marks.sort()).toEqual(["back", "front", "side"]);
   // Nothing while you stand: the last prints fade (in 600 ms) and none come.
