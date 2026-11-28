@@ -182,6 +182,7 @@ export function CoinStrip({ xp, none, api }: { xp: XpGrant | null | undefined; n
           const end = endAt(n);
           const landed = new Array<boolean>(n).fill(false);
           let lastClink = -Infinity;
+          let owed = 0;
           let shown = -1;
           let raf = 0;
           let live = true;
@@ -201,16 +202,21 @@ export function CoinStrip({ xp, none, api }: { xp: XpGrant | null | undefined; n
               shown = v;
               setCount(v);
             }
-            // (A clink as each coin lands, at most every clinkGapMs: a frame can pass several landings.)
+            // (A clink for each coin as it lands, at most every clinkGapMs: a frame can pass several landings, so a landing the gap holds
+            // back is owed, never dropped, and plays on a later frame. Nov 28: a slow frame then a quick one came under the gap and lost a
+            // coin's clink, 4 for 5, a flake on #1027.)
             for (let i = 0; i < n; i++) {
               if (landed[i] || t < i * C.coinGapMs + C.fallMs) continue;
               landed[i] = true;
-              if (now - lastClink >= C.clinkGapMs) {
-                lastClink = now;
-                play("clawCoin");
-              }
+              owed++;
             }
-            if (t < end) {
+            if (owed > 0 && now - lastClink >= C.clinkGapMs) {
+              lastClink = now;
+              owed--;
+              play("clawCoin");
+            }
+            // (Running on past the end only while a clink is owed: the cascade comes after the last.)
+            if (t < end || owed > 0) {
               raf = requestAnimationFrame(frame);
               return;
             }
