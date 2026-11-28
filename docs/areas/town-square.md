@@ -274,8 +274,8 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   tiny pieces standing on it (the back ranks' shapes, the pawns in front). Who sits decides what it shows (`tableStates` in
   `world.ts`): **two people, not you, play** (white and black in turn, a step or three forward each, captures fading out,
   back to the start after `tableMoves` moves; a black clock floating over the board counts the game's time); **one, not
-  you, waits** (a soft green ring pulses on the ground under the free stool); otherwise the pieces stand set up. You at a
-  table aren't playing or searching yet (Casual and Ranked come with the tables' matchmaking). While nothing on a board
+  you, waits** (a soft green ring pulses on the ground under the free stool); otherwise the pieces stand set up (a ranked game there:
+  its two players seated, so it plays). While nothing on a board
   moves and the camera holds still, its slab, board and pieces are one cached picture (`boardCache`): frame rates as main.
   (Canvas 2D only since Nov 25: WebGL draws the board as it is, as it does while you walk, as the cached picture was an upload each
   time the camera came to rest. The clock's digits are one picture made on the loading screen, each second drawn from it.)
@@ -284,13 +284,16 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   boards: twice the table and more, skewed), it's worked out a little farther off and drawn at the picture's place and
   scale.
 - **Sitting at a table** (slice 6): a tap on a table or a stool walks you to its free stool nearer you (`destFor`'s
-  `table`; both taken: beside it) and opens its card (no title, Eric, Oct 27): **"Casual"** and **"Ranked"** greyed,
-  "Coming soon" (matchmaking for the park is the next job); at a table where two others play, **"Spectate"** greyed,
-  "Coming soon" (Eric, Oct 27: watching their game, once real games are played there). A person sits (`seated`) when stopped on a stool meaning to (`Person.sit`:
+  `table`; both taken: beside it) and opens its card (no title, Eric, Oct 27): **"Ranked"** (below) and **"Casual"** greyed,
+  "Coming soon"; at a table where two bots play, **"Spectate"** greyed, "Coming soon"; where a ranked game is played, "Ann vs Bo" and
+  **"Spectate"** (below). A person sits (`seated`) when stopped on a stool meaning to (`Person.sit`:
   always for bots, for you while the table's card is open after a tap on it): drawn from `sitCut` of its height up, resting
   on the stool's seat (`sitSeat`), facing the board, with no shadow of its own. Closing the card (a tap elsewhere) or walking
   on stands you up. Bots head for a free stool now and then (`botSitChance`, `botSitReach`) and may stay a while
   (`botStaySeated`).
+- **Ranked at the tables** (Nov 27, [decision](../decisions/2026-11-27-town-ranked-tables.md)): Ranked sits you there and opens the 1 v 1 search over the town (App's `townSearch`, `.dv-town-search`; it holds the away clock and the keys); Cancel: still seated. A beat says your seat (`seat`: [table, stool]); others see you seated. Paired, the server seats the game at the table of the one who searched from the town (then the longer search; `server/src/town-tables.ts`, the hub's `townMatch`, before the pair hears the code, one deadline a batch: `seatWaitMs`), both players there for everyone (`applyTables`: `match:CODE:k`, named, their look) and walking nowhere else, until the game ends (`tellTown`; a late `townMatch` after that seats nothing) or `TOWN_TABLES.matchMaxMinutes` (90). Only the park's `TOWN_TABLES.parkTables` (12) are seats.
+- **Watching one** (Nov 27): a tap on the table or a player at it: "Ann vs Bo", **Spectate**: the game's spectator view (`DuelWatch`, `NetDuel(code, true)`, `/ws?watch=1`: a town table's game only, `watchersMax`), Back to town where you stood (the same visit: no second "entered" line, beats' `floor`).
+  Watching needs an account ([decision](../decisions/2026-11-28-town-watch-account.md)): a guest's Spectate is greyed, "Make a free account to watch.". A refused watch (a guest 4003, a full game 4029: `WATCH_REFUSED`) is a socket closed at once with why; the watch screen shows it and stops. A watcher's one short hello is answered; anything else closes its socket unread (`watchMessageMax`). The game's own end page reads **"Back to town"** (Play again: the search again from the stool): you sit on your stool (seat "6.0", nobody across). Tests: e2e `town-ranked.spec.ts`; unit `server/test/town-tables.test.ts`, `town-afk.test.ts`.
 
 - **The statues** (`town/houses/statues.ts`; Oct 26, `docs/decisions/2026-10-26-town-square-statues.md` and
   `-statues-2.md`): the marble statue (the Hidden Boss in stone: his own picture, `RECLUSE`'s idle without the book,

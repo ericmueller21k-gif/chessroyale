@@ -91,7 +91,8 @@ export type DuelClientMessage =
   | { t: "sync" };
 
 export type DuelServerMessage = (
-  | { t: "welcome"; you: Color; game: DuelView; v: number; test?: boolean }
+  /** `watch`: a watcher's (`/ws?watch=1`, the town's spectator view, Nov 27): `you` means nothing; it hears the game, never a chat or an outcome. */
+  | { t: "welcome"; you: Color; game: DuelView; v: number; test?: boolean; watch?: true }
   /** The game in full (a phase change, a sync). */
   | { t: "game"; game: DuelView }
   | { t: "picks"; picks: Record<Color, DuelZone | null> }

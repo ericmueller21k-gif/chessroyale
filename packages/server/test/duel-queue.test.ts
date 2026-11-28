@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CAPACITY, rankView } from "@chessroyale/core";
+import { CAPACITY, TOWN_TABLES, rankView } from "@chessroyale/core";
 import type { DuelPlayerView } from "@chessroyale/chess/duel";
 import { Matchmaker, type DuelPlayAnswer } from "../src/matchmaker.ts";
 import { PAIR_BY_RATING, QueueCore, queueName, type QueueConfig } from "../src/queue.ts";
@@ -212,6 +212,10 @@ class TestMatchmaker extends Matchmaker {
     this.holdMs = 60;
     if (q) this.q = q;
   }
+  /** How long an ask waits for its seat from now on. */
+  hold(ms: number) {
+    this.holdMs = ms;
+  }
 }
 
 function matchmaker(ns: unknown, q?: QueueCore) {
@@ -273,6 +277,51 @@ describe("the Matchmaker's 1 v 1 queue", () => {
     expect(bob).toMatchObject({ searching: true });
     expect("delayMs" in bob).toBe(false);
     expect(D.made.size).toBe(0);
+  });
+
+  it("a search begun at a town's table (Nov 27): the game is made with the town's flag, and the town is told the pair, the longer search first, before either hears the code", async () => {
+    const events: string[] = [];
+    const D = duels();
+    const created: Record<string, unknown>[] = [];
+    const ns = {
+      idFromName: (n: string) => n,
+      get: (code: string) => ({
+        ...(D.ns as { get: (c: string) => object }).get(code),
+        async create(c: string, players: { w: DuelPlayerView; b: DuelPlayerView }, opts: Record<string, unknown>) {
+          created.push(opts);
+          events.push("created");
+          return (D.ns as { get: (c: string) => { create: (...a: unknown[]) => Promise<boolean> } }).get(code).create(c, players, opts);
+        },
+      }),
+    };
+    const live = {
+      idFromName: (n: string) => n,
+      get: () => ({
+        async players() {
+          return 2;
+        },
+        async townMatch(code: string, order: { uid: string; pawn: string }[]) {
+          events.push(`town ${order.map((s) => `${s.uid}:${s.pawn}`).join(",")}`);
+          return true;
+        },
+      }),
+    };
+    const store = new Map<string, unknown>();
+    const ctx = { storage: { get: async (k: string) => store.get(k), put: async (k: string, v: unknown) => void store.set(k, v) }, blockConcurrencyWhile: <T>(fn: () => Promise<T>) => fn() };
+    const mm = new TestMatchmaker(ctx as unknown as DurableObjectState, { DUELS: ns, LIVE: live } as never);
+    const first = await mm.duelNext(null, { ...info("ann", 1500), town: true, pawn: "black" });
+    const bob = await mm.duelNext(null, info("bob", 1500));
+    events.push("code");
+    expect("code" in bob && bob.code).toBeTruthy();
+    expect(created[0]).toMatchObject({ town: true });
+    expect(events).toEqual(["created", "town ann:black,bob:white", "code"]);
+    expect("code" in (await mm.duelNext(ticketOf(first)))).toBe(true);
+    // (Neither from a table: no flag, the town never asked.)
+    const D2 = duels();
+    const mm2 = matchmaker(D2.ns);
+    await mm2.duelNext(null, info("cy", 1500));
+    await mm2.duelNext(null, info("di", 1500));
+    expect(D2.made.size).toBe(1);
   });
 
   it("each player's ask answered with the game's code tells the game, once (ranked's leave rules: a no-show is a dodge only then)", async () => {
@@ -446,5 +495,107 @@ describe("the Matchmaker's 1 v 1 queue", () => {
     const second = await mm.duelNext(null, info("bob", 1500));
     expect(second).toMatchObject({ searching: true });
     expect(D.made.size).toBe(0);
+  });
+});
+
+describe("the town's tables in the 1 v 1 queue (#1027's review: S2, S4, N1)", () => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  /** A matchmaker whose games are made at once and whose town's hub answers `townMatch` as `townMatch` does; when each game was made. */
+  function townQueue(townMatch: (code: string, order: { uid: string }[]) => Promise<boolean>) {
+    const D = duels();
+    const made: number[] = [];
+    const ns = {
+      idFromName: (n: string) => n,
+      get: (code: string) => {
+        const g = (D.ns as { get: (c: string) => { create: (...a: unknown[]) => Promise<boolean>; delivered: (uid: string) => Promise<void> } }).get(code);
+        return { delivered: g.delivered, create: async (...a: unknown[]) => (made.push(Date.now()), g.create(...a)) };
+      },
+    };
+    const LIVE = { idFromName: (n: string) => n, get: () => ({ players: async () => 2, townMatch }) };
+    const store = new Map<string, unknown>();
+    const ctx = { storage: { get: async (k: string) => store.get(k), put: async (k: string, v: unknown) => void store.set(k, v) }, blockConcurrencyWhile: <T>(fn: () => Promise<T>) => fn() };
+    return { D, made, mm: new TestMatchmaker(ctx as unknown as DurableObjectState, { DUELS: ns, LIVE } as never) };
+  }
+  const hung = () => new Promise<boolean>(() => {});
+
+  it("S2: a hub that never answers holds a batch up seatWaitMs once, not once for each town pair in it (before: three pairs, 4.5 s)", async () => {
+    const { made, mm } = townQueue(hung);
+    mm.hold(10_000);
+    const t0 = Date.now();
+    // (Three pairs in one batch, by rating, each with a player from a table.)
+    const asks = [1000, 2000, 3000].flatMap((r) => [mm.duelNext(null, { ...info(`a${r}`, r), town: true }), mm.duelNext(null, info(`b${r}`, r))]);
+    const answers = await Promise.all(asks);
+    expect(answers.every((a) => "code" in a)).toBe(true);
+    expect(made).toHaveLength(3);
+    expect(Date.now() - t0).toBeLessThan(TOWN_TABLES.seatWaitMs + 700);
+    expect(made[2]! - made[0]!).toBeLessThan(TOWN_TABLES.seatWaitMs + 300);
+  });
+
+  it("S4: Cancel pressed while the pair is being seated waits for the seating and answers the game (the Worker calls it off for them: never a dodge)", async () => {
+    const { D, mm } = townQueue(hung);
+    const first = await mm.duelNext(null, { ...info("ann", 1500), town: true });
+    mm.hold(5000);
+    const annAsk = mm.duelNext(ticketOf(first));
+    const bobAsk = mm.duelNext(null, info("bob", 1500));
+    await sleep(200);
+    // (Before: {} at once, and Ann's held ask was then handed the game: her no-show a dodge, for pressing Cancel.)
+    const cancelled = await mm.cancel(ticketOf(first));
+    const [a, b] = await Promise.all([annAsk, bobAsk]);
+    expect(cancelled.code).toBeTruthy();
+    expect("code" in a && a.code).toBe(cancelled.code);
+    expect("code" in b && b.code).toBe(cancelled.code);
+    expect(D.made.size).toBe(1);
+  });
+
+  it("S4: Cancel during a seating that fails: once the pair is put back, out of line, never paired after; the other is paired anew", async () => {
+    const D = duels();
+    let fail = true;
+    const ns = {
+      idFromName: (n: string) => n,
+      get: (code: string) => {
+        const g = (D.ns as { get: (c: string) => { create: (...a: unknown[]) => Promise<boolean>; delivered: (uid: string) => Promise<void> } }).get(code);
+        return { delivered: g.delivered, create: async (...a: unknown[]) => (await sleep(100), fail ? ((fail = false), Promise.reject(new Error("reset"))) : g.create(...a)) };
+      },
+    };
+    const mm = matchmaker(ns);
+    const first = await mm.duelNext(null, info("ann", 1500));
+    // (Bob pairs with Ann: their game's opening is slow, then fails.)
+    const bobAsk = mm.duelNext(null, info("bob", 1500));
+    await sleep(30);
+    // (Before: {} at once, and the failed seating then put Ann back in line, to be paired after all.)
+    expect(await mm.cancel(ticketOf(first))).toEqual({});
+    await bobAsk;
+    await mm.duelNext(null, info("cy", 1500));
+    await sleep(400);
+    const games = [...D.made.values()].map((g) => [g.w.uid, g.b.uid].sort().join(","));
+    expect(games).toEqual(["bob,cy"]);
+  });
+
+  it("S4 (re-review R1): Cancel answers once its own pair is placed, not after the matchmaker's whole run (town pairs batch after batch)", async () => {
+    const { made, mm } = townQueue(hung);
+    const first = await mm.duelNext(null, { ...info("ann", 1500), town: true });
+    mm.hold(30_000);
+    const annAsk = mm.duelNext(ticketOf(first));
+    const bobAsk = mm.duelNext(null, info("bob", 1500));
+    await sleep(200);
+    let cancelAt = 0;
+    const cancelled = mm.cancel(ticketOf(first)).then((a) => ((cancelAt = Date.now()), a));
+    // (A town pair arrives during each batch, so the run goes on: before, Cancel waited for all of it, past the game's join window.)
+    for (let i = 0; i < 4 && !cancelAt; i++) {
+      void mm.duelNext(null, { ...info(`x${i}`, 3000 + i * 500), town: true });
+      void mm.duelNext(null, info(`y${i}`, 3000 + i * 500));
+      await sleep(TOWN_TABLES.seatWaitMs - 100);
+    }
+    expect((await cancelled).code).toBeTruthy();
+    await Promise.all([annAsk, bobAsk]);
+    expect(cancelAt - made[0]!).toBeLessThan(TOWN_TABLES.seatWaitMs + 300);
+  }, 20_000);
+
+  it("N1: the town seats a pair at the table of the one who searched from it first, whoever searched longer", async () => {
+    const told: string[][] = [];
+    const { mm } = townQueue(async (_code, order) => (told.push(order.map((s) => s.uid)), true));
+    const first = await mm.duelNext(null, info("ann", 1500));
+    await Promise.all([mm.duelNext(ticketOf(first)), mm.duelNext(null, { ...info("bob", 1500), town: true })]);
+    expect(told).toEqual([["bob", "ann"]]);
   });
 });

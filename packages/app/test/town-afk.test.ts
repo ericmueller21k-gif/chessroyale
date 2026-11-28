@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ITEM_COLORS, TOWN_AFK, cleanLook } from "@chessroyale/core";
 import { AWAY_LIMITS, AwayClock, GuestTime, readAwaySwitch, readGuestSwitch } from "../src/town/afk.ts";
-import { applyHere } from "../src/town/here-net.ts";
-import { START, createTown, taken, tick, walkable, type Town } from "../src/town/world.ts";
+import { applyHere, applyTables } from "../src/town/here-net.ts";
+import { START, TABLES, Walker, createTown, matchAt, seated, tableStates, taken, tick, walkable, type Town } from "../src/town/world.ts";
 
 const S = 1000;
 
@@ -206,5 +206,46 @@ describe("a guest's town time (Eric, on #542: \"like 30 seconds\", then make an 
     expect(readGuestSwitch("off")).toBeNull();
     expect(readGuestSwitch("3")).toBe(3 * S);
     for (const bad of ["x", "-1", "99999", ""]) expect(readGuestSwitch(bad)).toBeUndefined();
+  });
+});
+
+describe("ranked games at the park's tables (Nov 27; here-net.ts applyTables)", () => {
+  const game = (table: number, code = "ABCDE") => ({ code, table, seats: [{ uid: "ann", name: "Ann", pawn: "black" as const }, { uid: "bo", name: "Bo", look: null }] });
+
+  it("each player is a pawn seated on their stool (stool 0 west), in their pawn color, named; the table shows a game; the walkers' list leaves them be", () => {
+    const t = createTown(0);
+    const { came, dressed } = applyTables(t, [game(3)], 0);
+    const tb = TABLES[3]!;
+    const [ann, bo] = [0, 1].map((k) => t.people.find((p) => p.id === `match:ABCDE:${k}`)!);
+    expect(came).toEqual([ann, bo]);
+    expect(dressed).toEqual([ann, bo]);
+    expect([ann!.walker.here(), bo!.walker.here()]).toEqual(tb.stools);
+    expect([seated(ann!), seated(bo!)]).toEqual([tb, tb]);
+    expect([ann!.name, ann!.uid, ann!.match, "sprite" in ann!.look ? null : ann!.look.side]).toEqual(["Ann", "ann", "ABCDE", "dark"]);
+    expect(tableStates(t.people)[3]!.kind).toBe("playing");
+    expect(matchAt(t, tb)).toEqual({ code: "ABCDE", vs: "Ann vs Bo" });
+    expect(taken(t, tb.stools[0]!.c, tb.stools[0]!.r, null)).toBe(true);
+    // (The walkers' list, without them: they stay.)
+    expect(applyHere(t, [], 0).gone).toEqual([]);
+    expect(ann!.home).toBe(false);
+  });
+
+  it("whoever stood on (or was walking to) one of its stools steps off beside it, you too (stood up); no longer listed, they leave", () => {
+    const t = createTown(0);
+    const tb = TABLES[3]!;
+    t.you.walker = new Walker(tb.stools[1]!, 100, true);
+    t.all[0] = t.you.walker;
+    t.you.sit = true;
+    const { you } = applyTables(t, [game(3)], 0);
+    expect(you).toBe(true);
+    expect(t.you.sit).toBe(false);
+    const g = t.you.walker.goal();
+    expect(g).not.toEqual(tb.stools[1]);
+    expect(Math.abs(g.c - tb.stools[1]!.c) + Math.abs(g.r - tb.stools[1]!.r)).toBeLessThanOrEqual(3);
+    // Over: gone (not drawn, off the stools), the table free.
+    const { gone } = applyTables(t, [], 0);
+    expect(gone.map((p) => p.id).sort()).toEqual(["match:ABCDE:0", "match:ABCDE:1"]);
+    expect(taken(t, tb.stools[0]!.c, tb.stools[0]!.r, null)).toBe(false);
+    expect(matchAt(t, tb)).toBeNull();
   });
 });

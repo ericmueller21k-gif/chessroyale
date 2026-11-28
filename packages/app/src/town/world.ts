@@ -837,6 +837,11 @@ export interface Person {
   remote?: boolean;
   /** Away (no input for TOWN_AFK.zzzAfterSec): a "zzz" floats over the pawn (render.ts). Yours too. */
   zzz?: boolean;
+  /**
+   * Playing a ranked 1 v 1 at a park table (the server's: here-net.ts `applyTables`, Nov 27): its game's code. Seated on its stool for as
+   * long as the game lasts, whether or not they're in the town; a tap on them is a tap on their table (its card offers to watch).
+   */
+  match?: string;
 }
 
 /** Whether a person sits at a chess table now: stopped on one of its stools, meaning to sit. Its table, or null. */
@@ -926,22 +931,22 @@ function lcg(seed: number): () => number {
 }
 
 /**
- * Where you land back in the town after a game with a bot: the table (its index in TABLES), your stool (0 west, 1
- * east) and the bot (its index in BOTS), who sits on the other.
+ * Where you land back in the town after a game at a table: the table (its index in TABLES), your stool (0 west, 1 east) and the bot
+ * (its index in BOTS), who sits on the other; null after a ranked game found from the table (Nov 27): nobody across.
  */
 export interface Seat {
   table: number;
   stool: 0 | 1;
-  bot: number;
+  bot: number | null;
 }
-/** A seat as the address carries it ("6.0.3"), and back (null: not one). */
-export const seatText = (s: Seat): string => `${s.table}.${s.stool}.${s.bot}`;
+/** A seat as the address carries it ("6.0.3"; a ranked game's "6.0"), and back (null: not one). */
+export const seatText = (s: Seat): string => `${s.table}.${s.stool}${s.bot === null ? "" : `.${s.bot}`}`;
 export function seatOf(text: string | null | undefined): Seat | null {
-  const m = /^(\d+)\.([01])\.(\d+)$/.exec(text ?? "");
+  const m = /^(\d+)\.([01])(?:\.(\d+))?$/.exec(text ?? "");
   if (!m) return null;
   const table = Number(m[1]);
-  const bot = Number(m[3]);
-  return table < TABLES.length && bot < TOWN_BOTS.length ? { table, stool: Number(m[2]) as 0 | 1, bot } : null;
+  const bot = m[3] === undefined ? null : Number(m[3]);
+  return table < TABLES.length && (bot === null || bot < TOWN_BOTS.length) ? { table, stool: Number(m[2]) as 0 | 1, bot } : null;
 }
 
 /**
@@ -955,7 +960,7 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
   const table = seat ? TABLES[seat.table]! : null;
   // (Back from a boss's challenge: where you stood as you challenged it, facing the way you faced: Pokémon-gym style.)
   const yours = table ? table.stools[seat!.stool]! : stand ? { c: wrapI(stand.c), r: wrapI(stand.r) } : START;
-  const theirs = table ? table.stools[1 - seat!.stool]! : null;
+  const theirs = table && seat!.bot !== null ? table.stools[1 - seat!.stool]! : null;
   const you: Person = { id: "you", name: "", look: { side: "light", tint: null, wear: null }, you: true, walker: new Walker(yours, f.youStepMs, true, f.walkEase), sit: !!seat, bot: null, waved: -Infinity, home: false, came: -Infinity, leaves: Infinity, going: false, trip: null, due: false };
   if (stand && !table) {
     you.walker.facing = stand.facing;
@@ -971,16 +976,16 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
     const j = Math.floor(rnd() * (i + 1));
     [order[i], order[j]] = [order[j]!, order[i]!];
   }
-  if (seat) order.unshift(...order.splice(order.indexOf(seat.bot), 1));
+  if (seat && seat.bot !== null) order.unshift(...order.splice(order.indexOf(seat.bot), 1));
   const out = new Set(order.slice(0, outN));
   // The bots out stand around you in the park, apart (`freeSpot`).
   const bots: Person[] = [];
   for (const [i, b] of TOWN_BOTS.entries()) {
     // (Back from a game: the bot you played sits across from you.)
-    const sq = seat && i === seat.bot ? theirs! : out.has(i) ? freeSpot(rnd, yours, 3, [...(theirs ? [theirs] : []), ...bots.filter((o) => !o.home).map((o) => o.walker.here())]) : START;
+    const sq = seat && theirs && i === seat.bot ? theirs : out.has(i) ? freeSpot(rnd, yours, 3, [...(theirs ? [theirs] : []), ...bots.filter((o) => !o.home).map((o) => o.walker.here())]) : START;
     bots.push({ id: `bot:${bots.length}`, name: botLabel(b), look: b.look, you: false, walker: new Walker(sq, f.botStepMs, true), sit: true, bot: b, waved: -Infinity, home: !out.has(i), came: -Infinity, leaves: Infinity, going: false, trip: null, due: false });
   }
-  const met = seat ? bots[seat.bot]! : null;
+  const met = seat && seat.bot !== null ? bots[seat.bot]! : null;
   const t: Town = {
     people: [you, ...bots],
     you,
@@ -1684,6 +1689,22 @@ export function meetSeat(t: Town): Seat | null {
   const h = t.you.walker.here();
   const stool = m.table.stools.findIndex((s) => s.c === h.c && s.r === h.r);
   return stool < 0 ? null : { table: m.table.i, stool: stool as 0 | 1, bot: TOWN_BOTS.indexOf(m.bot.bot) };
+}
+
+/**
+ * The ranked game at a table now (Nov 27: its two players seated there, here-net.ts `applyTables`): its code and who's playing ("Ann vs
+ * Bo", west stool first; a guest, told no names: "A ranked game"). Null: none.
+ */
+export function matchAt(t: Town, table: Table): { code: string; vs: string } | null {
+  let code: string | null = null;
+  const names = ["", ""];
+  for (const p of t.people) {
+    if (!p.match || p.home || stoolAt(p.walker.c, p.walker.r) !== table) continue;
+    code = p.match;
+    const k = table.stools.findIndex((s) => s.c === wrapI(p.walker.c) && s.r === wrapI(p.walker.r));
+    if (k >= 0) names[k] = p.name;
+  }
+  return code ? { code, vs: names[0] && names[1] ? `${names[0]} vs ${names[1]}` : "A ranked game" } : null;
 }
 
 /** The bot sitting at a table with nobody else there (but you, across from it), or null. */

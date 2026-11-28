@@ -96,6 +96,7 @@ const SquadsScreen = game.screen("SquadsScreen");
 // (A piece inside the match screen, so nothing shows until the chunk is here; in a match it always is.)
 const DashTap = game.screen("DashTap", null);
 const DuelFront = game.screen("DuelFront");
+const DuelWatch = game.screen("DuelWatch");
 /** Solo play (solo.ts: the match runner, chess.js's whole game, the boss rules): loaded as play is near, or as it starts. */
 const solo = lazyGroup(() => import("./solo.ts"));
 const FaqScreen = lazyGroup(() => import("./screens/Faq.tsx")).screen("FaqScreen");
@@ -765,6 +766,8 @@ export function App() {
   };
   /** Out of the 1 v 1 queue or game: home. */
   const leaveDuel = () => {
+    duelTown.current = null;
+    setTownSearch(null);
     duelQueue?.cancel();
     setDuelQueue(null);
     setDuelAway(false);
@@ -852,6 +855,116 @@ export function App() {
   };
   setRanked1v1Starter(() => startDuel());
 
+  // ---------------- Ranked at the town's tables (Eric, Nov 27; docs/areas/town-square.md, "Ranked at the tables") ----------------
+
+  /** The 1 v 1 search begun at a town table, up over the town: the seat ("6.0") you sit on meanwhile. Null: none. */
+  const [townSearch, setTownSearch] = useState<string | null>(null);
+  /** The game found from (or the bot game chosen over) a town table: the seat its end screen's "Back to town" puts you back on. */
+  const duelTown = useRef<string | null>(null);
+  /**
+   * A table's Ranked: the 1 v 1 search (the same queue, pools and ranks as PLAY's), over the town (Eric: "it just does an overlay"); the
+   * town stays, you seated. Found: the game's screen as ever (the town left), and the server seats you both at that table for everyone
+   * else in the town (server live-hub.ts townMatch). A search already going elsewhere is this one now.
+   */
+  const townRanked = (seat: string) => {
+    unlockAudio();
+    if (mustSignInToPlayOnline()) {
+      setShowTown(false);
+      setTownSeat(null);
+      setTownStand(null);
+      history.replaceState(null, "", "/");
+      return chooseGuest(false);
+    }
+    duelQueue?.cancel();
+    duel?.dispose();
+    setDuel(null);
+    setError(null);
+    const q = new DuelQueue(undefined, true);
+    q.subscribe(() => {
+      const s = q.state;
+      if (s.kind === "found") {
+        duelTown.current = seat;
+        setTownSearch(null);
+        joinDuel(s.code);
+      } else if (s.kind === "refused" && s.banned) {
+        setTownSearch(null);
+        setDuelQueue(null);
+        showBanNotice();
+      } else if (s.kind === "refused" && s.signIn) {
+        setTownSearch(null);
+        setDuelQueue(null);
+        setShowTown(false);
+        chooseGuest(false);
+      }
+    });
+    setDuelQueue(q);
+    setDuelAway(false);
+    setTownSearch(seat);
+    void q.start();
+  };
+  /** The search's Cancel over the town (or the town left under it): out of the queue, still seated where you were. */
+  const cancelTownSearch = () => {
+    duelQueue?.cancel();
+    setDuelQueue(null);
+    setTownSearch(null);
+  };
+  // (The town left some other way while its search was up, a back gesture or the away rule: the search goes with it.)
+  useEffect(() => {
+    if (!showTown && townSearch && !duel) cancelTownSearch();
+  }, [showTown]);
+  /** "Play a bot (unranked)" over the town: the bot game, then back to your stool. */
+  const townBot = () => {
+    const seat = townSearch;
+    setTownSearch(null);
+    botDuel();
+    duelTown.current = seat;
+  };
+  /** Out of a game begun at a town table (its "Back to town", or Play again: the search again from the same stool). */
+  const backFromTownDuel = (again: boolean) => {
+    const seat = duelTown.current;
+    duelTown.current = null;
+    duel?.dispose();
+    setDuel(null);
+    setDuelQueue(null);
+    setDuelAway(false);
+    setTownSeat(seat);
+    setTownStand(null);
+    setShowTown(true);
+    history.replaceState(null, "", "/town");
+    if (again && seat) townRanked(seat);
+  };
+  /** Watching a ranked game from the town (its table's Spectate): the game, and where you stood to come back to. */
+  const [watching, setWatching] = useState<{ session: NetDuel; stand: Stand } | null>(null);
+  const watchingRef = useRef(watching);
+  watchingRef.current = watching;
+  const watchFromTown = (code: string, stand: Stand) => {
+    const d = new NetDuel(code, true);
+    d.connect();
+    setWatching((old) => {
+      old?.session.dispose();
+      return { session: d, stand };
+    });
+  };
+  /** The town opening now is back from a Spectate (read once by the town as it opens: the same visit, no "entered" line; #1027, N9). */
+  const townFromWatch = useRef(false);
+  const fromWatchOnce = () => {
+    const back = townFromWatch.current;
+    townFromWatch.current = false;
+    return back;
+  };
+  /** Leaving the spectator view: back to the town where you stood. */
+  const backFromWatch = () => {
+    const w = watchingRef.current;
+    if (!w) return;
+    townFromWatch.current = true;
+    w.session.dispose();
+    setWatching(null);
+    setTownSeat(null);
+    setTownStand(w.stand);
+    setShowTown(true);
+    if (location.pathname !== "/town") history.replaceState(null, "", "/town");
+  };
+
   // ---------------- A town bot's game (docs/areas/town-square.md, "Playing a bot") ----------------
 
   /** The game with a town bot on now: its seat to come back to (null: none). */
@@ -934,11 +1047,18 @@ export function App() {
   };
   const backToTownRef = useRef(backToTown);
   backToTownRef.current = backToTown;
+  const backFromWatchRef = useRef(backFromWatch);
+  backFromWatchRef.current = backFromWatch;
   useEffect(() => {
     const onPop = () => {
       // (A page layer's own step (PageLayer.tsx: the inventory, the town's pages on a computer): back closes it, and nothing under it moves.)
       if (layerTakesPop()) return;
       if (townSkip.current) return void (townSkip.current = false);
+      // (Watching a game from the town: back is Back to town.)
+      if (watchingRef.current) {
+        backFromWatchRef.current();
+        return void history.pushState(TOWN_STEP, "", `/town${location.search}`);
+      }
       // The phone's or the browser's back in Chess Town (not at a table's game): it has gone back already, so Stay puts the
       // town's address back and Leave goes home (the front door, as the town's back button does).
       if (!townGame.current && townLive.current.show) {
@@ -2216,7 +2336,7 @@ export function App() {
   const leavesKey = `${leaves}|${profile?.leaves?.dodged?.at ?? ""}`;
   const leavesShown = !notice && leaves && !leavesDismissed.has(leavesKey) ? leaves : null;
   // Ranked 1 v 1: the search and the versus moment (one stage, in the home screen's frame, as every queue), then the game.
-  if ((duel || (duelQueue && !duelAway)) && !match && !squads) {
+  if ((duel || (duelQueue && !duelAway && !townSearch)) && !match && !squads) {
     const overlayD = profileOpen && (
       <div class="fd-overlay">
         <FrontFrame>
@@ -2235,15 +2355,18 @@ export function App() {
           onCancel={leaveDuel}
           onBot={botDuel}
           onAway={duelGoAway}
-          onHome={townGame.current ? () => backToTown() : leaveDuel}
+          onHome={townGame.current ? () => backToTown() : duelTown.current ? () => backFromTownDuel(false) : leaveDuel}
           onAgain={
             townGame.current
               ? () => backToTown()
-              : () => {
-                  leaveDuel();
-                  startDuel();
-                }
+              : duelTown.current
+                ? () => backFromTownDuel(true)
+                : () => {
+                    leaveDuel();
+                    startDuel();
+                  }
           }
+          town={!!duelTown.current}
         />
         {overlayD}
         {sideConfirm}
@@ -2370,6 +2493,8 @@ export function App() {
       </PageLayer>
     );
   };
+  // Watching a ranked game from the town (its table's Spectate, Nov 27): the town is left meanwhile; Back to town puts you where you stood.
+  if (!match && watching) return <DuelWatch session={watching.session} onBack={backFromWatch} />;
   if (!match && showTown) {
     // A player's profile from the town chat's menu: over the town, which stays as it was underneath (Back closes it). With a page layer
     // open (a computer's), in the layer instead (your profile's "View public profile", a name in the chat beside it).
@@ -2390,9 +2515,13 @@ export function App() {
           seat={townSeat}
           stand={townStand}
           tower={towerBack}
+          fromWatch={fromWatchOnce}
           onBossChallenge={challengeFromTown}
           onHiddenFight={hiddenFight}
           onPlayBot={playTownBot}
+          onRanked={townRanked}
+          onWatchGame={(code, stand) => watchFromTown(code, stand)}
+          searching={!!townSearch && !!duelQueue}
           onColosseum={() => {
             setShowTown(false);
             setTownSeat(null);
@@ -2438,6 +2567,22 @@ export function App() {
           }}
         />
         {overlayT}
+        {/* A table's Ranked (Nov 27): the 1 v 1 search over the town, you seated under it; Cancel closes it, still seated. */}
+        {townSearch && duelQueue && (
+          <div class="dv-town-search" role="dialog" aria-label="Finding an opponent">
+            <DuelFront
+              queue={duelQueue}
+              session={null}
+              frame={(stage) => <div class="dv-town-box">{stage}</div>}
+              onCancel={cancelTownSearch}
+              onBot={townBot}
+              onAway={cancelTownSearch}
+              onHome={cancelTownSearch}
+              onAgain={cancelTownSearch}
+              town
+            />
+          </div>
+        )}
         {townAsk && (
           <LeaveTownConfirm
             dest={townAsk.dest}

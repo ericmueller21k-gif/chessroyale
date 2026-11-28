@@ -70,7 +70,7 @@ import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
 import { rideMoving, rideSoundState, rideStep, warmRideSound } from "../ride-sound.ts";
-import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_ITEM_FRAMES, TOWN_PICTURES, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_ITEM_FRAMES, TOWN_PICTURES, WATCH_GUEST, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { APP_VERSION, reportTownFallback } from "../problems.ts";
@@ -78,7 +78,7 @@ import { domPageIO, domSaveIO, idbShelf, pictureKey, restore, save, type Restore
 import { domPaintPool, workerCount, type PaintPool } from "./paint-pool.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { PARK, TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, homeNear, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
+import { PARK, TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, homeNear, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, matchAt, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Table, type Target } from "./world.ts";
 import { afterFail, lossWatch } from "./gl-fail.ts";
 import { guestLimitMs, watchAway, watchGuest } from "./here-net.ts";
 import { FdButton } from "../components/FrontDoor.tsx";
@@ -115,6 +115,12 @@ export interface Card {
   confirm: boolean;
   /** A table where two others are playing: its card offers to watch their game (Eric, Oct 27), not a seat. */
   watch?: boolean;
+  /**
+   * A table where a ranked 1 v 1 is being played (Nov 27; here-net.ts `applyTables`): its game's code (Spectate opens its spectator
+   * view) and who's playing ("Ann vs Bo").
+   */
+  match?: string;
+  vs?: string;
   /** A table where a bot waits alone: its index in the people (its card's first button plays it). */
   bot?: number;
   /** A bot's card: no table has both stools free (Play greyed, "Tables are full"). */
@@ -182,6 +188,9 @@ export function TownScreen({
   onBossChallenge,
   onHiddenFight,
   onPlayBot,
+  onRanked,
+  onWatchGame,
+  searching = false,
   onColosseum,
   seat = null,
   stand = null,
@@ -189,6 +198,7 @@ export function TownScreen({
   onAway,
   onSignIn,
   tower = null,
+  fromWatch,
   pages,
 }: {
   /**
@@ -198,6 +208,11 @@ export function TownScreen({
   pages?: TownPages;
   /** Back from a Battle Tower floor's match (PR 11b): the town opens straight in the tower, in the floor room or (a free leave) the lobby. */
   tower?: TowerBack | null;
+  /**
+   * Whether this town opens back from a table's Spectate (read once, as it opens; App.tsx's `backFromWatch`): the same visit, as a tower
+   * floor's return is, so no second "has entered the town" line (the director's call on #1027's review, N9).
+   */
+  fromWatch?: () => boolean;
   onBack: () => void;
   /** Leaving the town for another screen (the back button, a guest's chat sign-up): the app's "Leave Chess Town?" first (LeaveTown.tsx). */
   askLeave: (dest: string, go: () => void) => void;
@@ -214,6 +229,15 @@ export function TownScreen({
   /** The Hidden Boss's room's four go in (hidden-net.ts): the summoning has played to black; into his fight with your pass and seat. */
   onHiddenFight?: (lobby: string, pass: string, seat: number, stand: Stand | null) => void;
   onPlayBot?: (game: BotGameAsk) => void;
+  /**
+   * A table's Ranked (Eric, Nov 27): you sit at that table (`seat`: "6.0", the table and your stool) and the 1 v 1 search opens over the
+   * town (App.tsx's town search); Cancel there closes it, you still seated.
+   */
+  onRanked?: (seat: string) => void;
+  /** A table's Spectate on a ranked game there: its spectator view; `stand`: where you stood, to come back to. */
+  onWatchGame?: (code: string, stand: Stand) => void;
+  /** The 1 v 1 search from a table is up over the town: it holds the away clock (as a challenge does) and keeps the keys from the town. */
+  searching?: boolean;
   onColosseum?: () => void;
   seat?: string | null;
   /** Back from a boss's challenge: where you stood as you challenged it (you start there, facing the same way). */
@@ -284,6 +308,19 @@ export function TownScreen({
   }, [gated]);
   const awayOut = useRef(() => {});
   awayOut.current = () => (onAway ?? onBack)();
+  /** The 1 v 1 search from a table is up over the town (App's): not idle presence, and no key walks you off your stool under it. */
+  const searchingNow = useRef(searching);
+  searchingNow.current = searching;
+  useLayoutEffect(() => {
+    if (!searching) return;
+    const stopKeys = (e: KeyboardEvent) => {
+      if (!(e.target instanceof Element && e.target.closest(".dv-town-search"))) e.stopImmediatePropagation();
+    };
+    addEventListener("keydown", stopKeys, true);
+    return () => removeEventListener("keydown", stopKeys, true);
+  }, [searching]);
+  const tableAsk = useRef<(a: TableAsk) => void>(() => {});
+  tableAsk.current = (a) => (a.kind === "ranked" ? onRanked?.(a.seat) : onWatchGame?.(a.code, a.stand));
   /** A boss's challenge (shops/challenge.ts), where it is: "town" when there's none. */
   const flow = useRef<ChallengeFlow>("town");
   /** Whether no challenge is under way (`flow` is "town"), as drawn: the town chat's "Go to the tower" shows greyed meanwhile (finding 6). */
@@ -1035,7 +1072,7 @@ export function TownScreen({
     const door = direct ? HOMES.find((h) => h.id === (spotIn ?? "tower"))?.door : undefined;
     if (direct) fadeTo(1, 0);
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
-      const b = TOWN_BOTS[s.bot]!;
+      const b = TOWN_BOTS[s.bot!]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
     }, (id, x, y, challenge, clerk) => void goIn(id, x, y, challenge, clerk), stand ?? back?.stand ?? (door ? { c: door.c, r: door.r, facing: 1, view: 0 } : null), () => step("cancel"), (share, step) => {
       if (share === null) {
@@ -1061,7 +1098,7 @@ export function TownScreen({
       broken = true;
       setLoading(false);
       setBroken(why);
-    }, direct);
+    }, (a) => tableAsk.current(a), direct);
     ctl.current = t;
     if (direct) {
       loaded = true;
@@ -1085,13 +1122,14 @@ export function TownScreen({
     const stopAway = watchAway({
       town: t.town,
       shop: () => shopIn.current,
-      busy: () => flow.current !== "town" || summoning.current || !!shopCtl.current?.busy?.(),
+      busy: () => flow.current !== "town" || summoning.current || searchingNow.current || !!shopCtl.current?.busy?.(),
       loading: () => !loaded && !broken,
       onState: (st) => void (t.town.you.zzz = st === "zzz"),
       onOut: () => awayOut.current(),
       onOthers: t.others,
-      // (Back from a tower floor's match: the same visit, no "entered the town" line: Eric, Nov 22.)
-      floor: !!tower,
+      onTables: t.tables,
+      // (Back from a tower floor's match: the same visit, no "entered the town" line: Eric, Nov 22. Back from a Spectate too: #1027, N9.)
+      floor: !!tower || !!fromWatch?.(),
     });
     return () => {
       gone.current = true;
@@ -1378,22 +1416,35 @@ export function TownScreen({
             )}
             {card?.kind === "table" && !card.watch && (
               <>
-                {/* A bot waiting alone here: play it, first (Casual and Ranked, the tables' matchmaking, still to come). */}
+                {/* A bot waiting alone here: play it, first. Then Ranked (Eric, Nov 27): you sit here and the 1 v 1 search opens over the
+                    town. Casual still to come. */}
                 {bot && (
                   <button type="button" class="town-btn primary" onClick={() => ctl.current?.playSeated()}>
                     {playAtTableText(bot)}
                   </button>
                 )}
-                <button type="button" class="town-btn" disabled>
-                  Casual
+                <button type="button" class={bot ? "town-btn" : "town-btn primary"} onClick={() => ctl.current?.ranked()}>
+                  Ranked
                 </button>
                 <button type="button" class="town-btn" disabled>
-                  Ranked
+                  Casual
                 </button>
                 <div class="town-soon">Coming soon</div>
               </>
             )}
-            {card?.kind === "table" && card.watch && (
+            {/* A ranked game at this table (Nov 27): who's playing, and Spectate (its spectator view; back to the town where you stood).
+                Watching needs an account (the director's call on #1027's review, S6): a guest's Spectate shows greyed, with why. */}
+            {card?.kind === "table" && card.match && (
+              <>
+                <p class="town-sub town-vs">{card.vs}</p>
+                <button type="button" class="town-btn primary" disabled={!account().profile?.user.signedIn} onClick={() => ctl.current?.watch()}>
+                  Spectate
+                </button>
+                {!account().profile?.user.signedIn && <div class="town-soon">{WATCH_GUEST}</div>}
+              </>
+            )}
+            {/* Two bots playing here: not a game you can watch. */}
+            {card?.kind === "table" && card.watch && !card.match && (
               <>
                 <button type="button" class="town-btn" disabled>
                   Spectate
@@ -1616,6 +1667,8 @@ function startTown(
   onLoading: (share: number | null, step?: LoadStep) => void = () => {},
   /** The street town can't run here (no WebGL 2), or didn't load again after its reload (gl-fail.ts): the town's box says so. */
   onFail: (why: TownBroken) => void = () => {},
+  /** A table's Ranked (you sit there and search) or Spectate (a ranked game there): TownScreen's `onRanked` and `onWatchGame`. */
+  onTableAsk: (a: TableAsk) => void = () => {},
   /**
    * Straight into a building (Nov 27, Eric: "it needs its own unique load"): back from a tower floor, or the last town spot (spot.ts).
    * The street isn't loaded (none of its pictures painted, kept or uploaded) until `wake()`, as you go out to it.
@@ -2379,6 +2432,13 @@ function startTown(
     const rc = box.getBoundingClientRect();
     return { x: e.clientX - rc.left, y: e.clientY - rc.top };
   };
+  /** A table's card as it opens: a ranked game there (Spectate), two others playing (Spectate greyed), a bot waiting, or free. */
+  const tableCard = (table: Table): Card => {
+    const m = matchAt(town, table);
+    if (m) return { kind: "table", i: table.i, confirm: false, watch: true, match: m.code, vs: m.vs };
+    const wb = waitingBot(town, table);
+    return { kind: "table", i: table.i, confirm: false, watch: tableStates(town.people)[table.i]!.kind === "playing", ...(wb ? { bot: town.people.indexOf(wb) } : {}) };
+  };
   /** What a tap on `hit` means: its key (the same thing at down and up), where you'd walk, and the card it opens. */
   const plan = (hit: Hit | null): { key: string; dest: Sq | null; card: Card | null; statue: number } | null => {
     if (!hit) return null;
@@ -2396,13 +2456,12 @@ function startTown(
       key = "coliseum";
       target = { kind: "coliseum" };
       c = { kind: "coliseum", i: HOMES.length, confirm: false };
-    } else if (hit.kind === "table" || (hit.kind === "square" && (tableAt(hit.c, hit.r) || stoolAt(hit.c, hit.r)))) {
-      // A chess table (or one of its stools): to its nearest free stool, to sit; and its card.
-      const table = hit.kind === "table" ? hit.table : (tableAt(hit.c, hit.r) ?? stoolAt(hit.c, hit.r))!;
+    } else if (hit.kind === "table" || (hit.kind === "square" && (tableAt(hit.c, hit.r) || stoolAt(hit.c, hit.r))) || (hit.kind === "person" && hit.person.match && seated(hit.person))) {
+      // A chess table (or one of its stools, or a player in a ranked game there): to its nearest free stool, to sit; and its card.
+      const table = hit.kind === "table" ? hit.table : hit.kind === "person" ? seated(hit.person)! : (tableAt(hit.c, hit.r) ?? stoolAt(hit.c, hit.r))!;
       key = `table:${table.i}`;
       target = { kind: "table", table };
-      const wb = waitingBot(town, table);
-      c = { kind: "table", i: table.i, confirm: false, watch: tableStates(town.people)[table.i]!.kind === "playing", ...(wb ? { bot: town.people.indexOf(wb) } : {}) };
+      c = tableCard(table);
     } else if (hit.kind === "square") {
       // (Nov 12, Eric: "more grace": its plot, or the row right in front of a home (its door's), is that home, by its door: homeNear.)
       const home = homeNear(hit.c, hit.r);
@@ -2631,7 +2690,7 @@ function startTown(
     if (kind === "square") return testSwitchesAllowed() && Array.isArray(id) && r.squareAt(id[0]!, id[1]!, out) ? out : null;
     // (Round 4: where a tap on the square reaches it, clear of whatever stands over its middle on screen.)
     if (kind === "tap-square") return testSwitchesAllowed() && Array.isArray(id) && r.tapSquareAt(id[0]!, id[1]!, out) ? out : null;
-    if (kind === "player") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.uid === id), out) ? out : null;
+    if (kind === "player") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.uid === id && !p.home), out) ? out : null;
     if (kind === "bot") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.bot === TOWN_BOTS[Number(id)]), out) ? out : null;
     if (kind === "table") return testSwitchesAllowed() && r.tapPoint("table", Number(id), out) ? out : null;
     if (kind === "lamp") return testSwitchesAllowed() && r.lampAt(Number(id), out) ? out : null;
@@ -2824,6 +2883,9 @@ function startTown(
         pawn: isSprite(p.look) ? null : p.look.side === "dark" ? "black" : "white",
         dressed: r.botArt.has(p.id) || r.riders.has(p.id),
         tag: tagged.has(i),
+        // (Nov 27: seated at a table (its number), and the ranked game it's in there, if any.)
+        table: seated(p)?.i ?? null,
+        match: p.match ?? null,
       }));
   };
   // (Nov 27, `item`: your item's loop as the last frame drew it: how many frames it has, the one drawn (-1: the still alone), each patch's
@@ -3110,7 +3172,7 @@ function startTown(
   /** The street's load (`loadTown`): under way or done; null while it waits for `wake` (`defer`). */
   let woken: Promise<void> | null = loading && !defer ? loadTown() : null;
 
-  return {
+  const api = {
     /**
      * The street loaded, if it waited (`defer`): its loading card up until it's done (the screen's `onLoading`). Resolves at once when
      * it's loaded already, or is loading.
@@ -3136,6 +3198,21 @@ function startTown(
         dressPerson(p);
       }
     },
+    /**
+     * The ranked games at the tables put in the town (here-net.ts `applyTables`): as `others`, and a table's card open where one has just
+     * sat down offers to watch it. Stood up off one's stool (`you`): as any walk of yours (a game you were walking to with a bot is off).
+     */
+    tables: (left: Person[], dressed: Person[], came: Person[], you: boolean) => {
+      if (you) {
+        cancelMeet(town);
+        town.you.sit = false;
+      }
+      api.others(left, dressed, came);
+      if (card?.kind === "table" && !card.match && (came.length || you)) {
+        const now = tableCard(TABLES[card.i]!);
+        if (now.match) setCard(now);
+      } else if (card?.kind === "table" && card.match && left.some((p) => p.match === card!.match)) setCard(tableCard(TABLES[card.i]!));
+    },
     zoom: setZoom,
     recenter: () => {
       leaveClose();
@@ -3156,6 +3233,28 @@ function startTown(
       meet(town, m);
       follow = true;
       glide = null;
+    },
+    /**
+     * A table's Ranked (Eric, Nov 27): you sit on its stool you're on (or walking to) and the 1 v 1 search opens over the town; the card
+     * closes, you stay seated. Nothing if you're not at one of its stools (both were taken: you stand beside it).
+     */
+    ranked: () => {
+      if (card?.kind !== "table" || card.match) return;
+      const table = TABLES[card.i]!;
+      const g = town.you.walker.goal();
+      const stool = table.stools.findIndex((s) => s.c === g.c && s.r === g.r);
+      if (stool !== 0 && stool !== 1) return;
+      setCard(null);
+      cancelMeet(town);
+      town.you.sit = true;
+      onTableAsk({ kind: "ranked", seat: seatText({ table: table.i, stool, bot: null }) });
+    },
+    /** A table's Spectate on a ranked game there: its spectator view, to come back to where you stand. */
+    watch: () => {
+      if (card?.kind !== "table" || !card.match) return;
+      const code = card.match;
+      setCard(null);
+      onTableAsk({ kind: "watch", code, stand: standOf(town.you.walker) });
     },
     /** A table's "Play <bot>": you sit across from the bot waiting there (on your way, or there already); then the game. */
     playSeated: () => {
@@ -3316,8 +3415,11 @@ function startTown(
       detach();
     },
   };
+  return api;
 }
 
+/** What a table's card asks the town's screen for (Nov 27): to search from that seat ("6.0"), or to watch the ranked game there. */
+type TableAsk = { kind: "ranked"; seat: string } | { kind: "watch"; code: string; stand: Stand };
 /** A building the town can open you straight into (spot.ts): one of this town's homes with a room; never the Hidden Boss's (his stairs' way up asks the server). */
 const canStartIn = (home: string): boolean => home !== "recluse" && HOMES.some((h) => h.id === home) && !!shopOf(home as HomeId);
 /** Where this account's last town spot is kept on this device (a guest's own id too). */

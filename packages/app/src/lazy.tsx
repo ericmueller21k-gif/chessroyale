@@ -19,12 +19,16 @@ export function lazyGroup<M>(load: () => Promise<M>) {
   const screen = <K extends keyof M>(name: K, fallback: preact.JSX.Element | null = <div class="screen" />): M[K] => {
     function Lazy(props: object) {
       const [, loaded] = useReducer((n: number) => n + 1, 0);
+      const Screen = mod?.[name] as ComponentType<object> | undefined;
+      // (Drawn without it: drawn again once it's here, even if it came between that drawing and this effect, which runs after the paint.
+      // Asking whether it's here yet only now left the fallback up for good: the ranked game found from a town table while the chunk was
+      // still loading, an empty screen, #1027, Nov 27.)
+      const drawnWithout = !Screen;
       useEffect(() => {
         let live = true;
-        if (!mod) void preload().then(() => live && loaded(0));
+        if (drawnWithout) void preload().then(() => live && loaded(0));
         return () => void (live = false);
       }, []);
-      const Screen = mod?.[name] as ComponentType<object> | undefined;
       return Screen ? <Screen {...props} /> : fallback;
     }
     return Lazy as M[K];

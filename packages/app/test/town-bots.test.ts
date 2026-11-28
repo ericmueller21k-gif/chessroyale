@@ -610,9 +610,19 @@ describe("town square: the bots take turns (Oct 28, Eric: ten out, one goes home
 });
 
 describe("town square: back from a game with a bot", () => {
-  it("a seat as the address carries it, and back; anything else is none", () => {
-    for (const s of [{ table: 0, stool: 0, bot: 0 }, { table: 9, stool: 1, bot: 5 }] as const) expect(seatOf(seatText(s))).toEqual(s);
-    for (const bad of [null, "", "6.2.1", "12.0.1", "1.0.20", "a.b.c", "1.0"]) expect(seatOf(bad)).toBeNull();
+  it("a seat as the address carries it, and back (a ranked game's, Nov 27: nobody across, \"1.0\"); anything else is none", () => {
+    for (const s of [{ table: 0, stool: 0, bot: 0 }, { table: 9, stool: 1, bot: 5 }, { table: 1, stool: 0, bot: null }] as const) expect(seatOf(seatText(s))).toEqual(s);
+    expect(seatText({ table: 1, stool: 0, bot: null })).toBe("1.0");
+    for (const bad of [null, "", "6.2.1", "12.0.1", "1.0.20", "a.b.c", "1.", "1.0."]) expect(seatOf(bad)).toBeNull();
+  });
+
+  it("back from a ranked game found at a table (Nov 27): you sit on your stool there, nobody across, every bot where it would be", () => {
+    const t = createTown(0, undefined, { table: 3, stool: 1, bot: null }, BOTS.length);
+    const tb = TABLES[3]!;
+    expect(t.you.walker.here()).toEqual(tb.stools[1]);
+    expect(seated(t.you)).toBe(tb);
+    expect(t.people.some((p) => !p.you && p.walker.here().c === tb.stools[0]!.c && p.walker.here().r === tb.stools[0]!.r)).toBe(false);
+    expect(t.leave).toBeNull();
   });
 
   it("you sit on your stool at that table, the bot across, its card closed; after a short while it gets up and wanders off", () => {

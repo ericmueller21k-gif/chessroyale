@@ -1,4 +1,4 @@
-import { BOSS_BRAIN, ENGINE_MAX_ELO, ENGINE_MIN_ELO, RANKED_1V1, RESIDENTS, botLook, rankView, type DuelZone, type ItemLook, type RankView } from "@chessroyale/core";
+import { BOSS_BRAIN, ENGINE_MAX_ELO, ENGINE_MIN_ELO, RANKED_1V1, RESIDENTS, WATCH_REFUSED, botLook, rankView, type DuelZone, type ItemLook, type RankView } from "@chessroyale/core";
 import { applyMove, toSan, type ClientMessage, type HumanUciEngine } from "@chessroyale/chess";
 import {
   DUEL_PROTOCOL,
@@ -117,6 +117,9 @@ export interface DuelSession {
 }
 
 const wsBase = () => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
+
+/** A refused watch's line when its close came without the server's reason. */
+const watchRefusedLine = (code: number) => (code === WATCH_REFUSED.full ? "Too many are watching this game." : "This game can't be watched.");
 const sideOf = (moves: readonly string[]): Color => (moves.length % 2 === 0 ? "w" : "b");
 
 /** Your own side as the screens show it: your account's name, look and 1 v 1 rank. */
@@ -173,7 +176,14 @@ export class NetDuel implements DuelSession {
     seats: () => ["w", "b"],
   });
 
-  constructor(readonly code: string) {}
+  /**
+   * `watch`: only watching (the town's spectator view, Nov 27: `/ws?watch=1`): anyone's game, heard as both players hear it; nothing
+   * here is ever sent to it but the hello (the server answers nothing else from a watcher).
+   */
+  constructor(
+    readonly code: string,
+    readonly watch = false,
+  ) {}
 
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);
@@ -191,7 +201,7 @@ export class NetDuel implements DuelSession {
   connect() {
     if (this.closed) return;
     this.offsetAt = null;
-    const ws = new WebSocket(`${wsBase()}/api/1v1/game/${this.code}/ws`);
+    const ws = new WebSocket(`${wsBase()}/api/1v1/game/${this.code}/ws${this.watch ? "?watch=1" : ""}`);
     this.ws = ws;
     let opened = false;
     ws.onopen = () => {
@@ -203,6 +213,9 @@ export class NetDuel implements DuelSession {
     ws.onclose = (e) => {
       if (this.closed) return;
       if (e.code === 4000) return this.goneNow("That game has ended.");
+      // (A refused watch, #1027's review, S5: a guest, a full game, or one not from the town. Its reason on the watch screen, and no more
+      // tries: before, the refusal said nothing and it tried again for as long as the game lasted.)
+      if (this.watch && (e.code === WATCH_REFUSED.full || e.code === WATCH_REFUSED.notAllowed)) return this.goneNow(e.reason || watchRefusedLine(e.code));
       const again = () => {
         if (this.closed) return;
         this.retryTimer = setTimeout(() => this.connect(), Math.min(8000, 500 * 2 ** this.retry++));
@@ -232,7 +245,7 @@ export class NetDuel implements DuelSession {
     this.closed = true;
     // (Left an aborted game before its outcome came, e.g. Abort then Home at once: a dodge may still be on its way to being recorded,
     // so your profile, home's note and line, is read again a moment later.)
-    if (this.view?.end?.result === "aborted" && !this.outcome) setTimeout(() => void refreshProfile().catch(() => undefined), 2000);
+    if (!this.watch && this.view?.end?.result === "aborted" && !this.outcome) setTimeout(() => void refreshProfile().catch(() => undefined), 2000);
     if (this.retryTimer) clearTimeout(this.retryTimer);
     document.removeEventListener("visibilitychange", this.onVisible);
     this.chat.dispose();
@@ -244,6 +257,7 @@ export class NetDuel implements DuelSession {
   }
 
   private send(msg: DuelClientMessage) {
+    if (this.watch && msg.t !== "hello") return;
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
 
@@ -807,8 +821,14 @@ export class DuelQueue {
   private stopped = false;
   private listeners = new Set<() => void>();
 
-  /** `resume`: carry on with a search saved before a reload (its ticket, its wait). */
-  constructor(resume?: SavedQueue | null) {
+  /**
+   * `resume`: carry on with a search saved before a reload (its ticket, its wait). `town`: begun at a town's park table (Nov 27): the
+   * first ask says so (`town=1`), and once paired the town seats the pair at that table (server live-hub.ts townMatch).
+   */
+  constructor(
+    resume?: SavedQueue | null,
+    private readonly town = false,
+  ) {
     const t = testParams();
     // (A resumed search keeps its own, where the test switches are allowed: the address may have lost them.)
     this.test = resume && testSwitchesAllowed() ? { ...resume.test } : {};
@@ -845,6 +865,7 @@ export class DuelQueue {
     const q = new URLSearchParams();
     for (const k of ["pool", "clock"]) if (this.test[k]) q.set(k, this.test[k]!);
     if (this.ticket) q.set("ticket", this.ticket);
+    else if (this.town) q.set("town", "1");
     const s = q.toString();
     return s ? `?${s}` : "";
   }

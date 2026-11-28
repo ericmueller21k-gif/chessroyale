@@ -4470,6 +4470,40 @@ export const TOWN_AFK = {
 } as const;
 
 /**
+ * Ranked at the park's tables (Eric, Nov 27; docs/areas/town-square.md, "Ranked at the tables"): a 1 v 1 found from a table is shown
+ * at that table while it lasts, its two players seated there, and anyone in the town can watch it (server town-tables.ts).
+ */
+export const TOWN_TABLES = {
+  /**
+   * A table's match is let go after this long whatever its game says (a lost "it's over"): past the longest real game (rapid 10+5, its
+   * vote and overlay), so a lost word holds a table and hides its two from the town's walkers for at most this long (#1027's review, N3).
+   */
+  matchMaxMinutes: 90,
+  /** The most watchers one 1 v 1 takes at once (its spectator view). */
+  watchersMax: 50,
+  /**
+   * The longest message a watcher may send (characters): its hello is about 30. Anything longer, a second hello or anything but a hello
+   * closes its socket unread (#1027's review, S1: anyone can watch, so nothing a watcher sends may cost the players' clocks).
+   */
+  watchMessageMax: 100,
+  /** The park's chess tables (the app's TABLES, town/world.ts; a test there checks they agree): a beat may name only these (N4). */
+  parkTables: 12,
+  /** The longest a pair found from a table waits for the town to seat them before they hear their game's code (ms; matchmaker.ts). */
+  seatWaitMs: 1500,
+  /** How often a Cancel pressed while its pair is being seated looks again whether the seating is done (ms; matchmaker.ts, R1). */
+  cancelPollMs: 25,
+} as const;
+
+/**
+ * A refused watch (the town's spectator view, `?watch=1`): its socket opens and closes at once with one of these codes and its reason
+ * (#1027's review, S5: a refused upgrade carries no reason); the app shows the reason and stops trying. `notAllowed`: a guest (S6), or a
+ * game not found from the town; `full`: TOWN_TABLES.watchersMax watching already.
+ */
+export const WATCH_REFUSED = { notAllowed: 4003, full: 4029 } as const;
+/** Watching needs an account (the director's call on #1027's review, S6): a guest's refused watch, and the table card's greyed Spectate. */
+export const WATCH_GUEST = "Make a free account to watch.";
+
+/**
  * Chat moderation (docs/decisions/2026-10-16-chat-moderation.md; docs/areas/chat.md): a moderator's chat bans and how
  * long their decisions are kept. Chat is preset lines only; the free text players see is display names, which the
  * server's filter checks (server/src/text-filter.ts).

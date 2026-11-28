@@ -171,7 +171,7 @@ test("Smudgy's Art Gallery: a tap walks you to its door square (19, 16); from th
   expect(errors, "no page or console errors").toEqual([]);
 });
 
-test("a park table: a tap on the one ahead on your left walks you to a free stool and you sit; its card shows 'Casual' and 'Ranked' greyed; a tap elsewhere closes it and you stand", async ({ page }) => {
+test("a park table: a tap on the one ahead on your left walks you to a free stool and you sit; its card shows 'Ranked' (Nov 27: live) and 'Casual' greyed; a tap elsewhere closes it and you stand", async ({ page }) => {
   const errors = watchErrors(page);
   await openStreet(page);
   await expect(canvas(page)).toHaveAttribute("data-sit", "0");
@@ -182,7 +182,8 @@ test("a park table: a tap on the one ahead on your left walks you to a free stoo
   const cv = (await canvas(page).boundingBox())!;
   const card = page.getByRole("dialog", { name: "Chess table", exact: true });
   await expect(card).toBeVisible();
-  for (const name of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name, exact: true })).toBeDisabled();
+  await expect(card.getByRole("button", { name: "Ranked", exact: true })).toBeEnabled();
+  await expect(card.getByRole("button", { name: "Casual", exact: true })).toBeDisabled();
   await expect.poll(async () => (await you(page)).join(","), { message: "you walk to a stool", timeout: 5000 }).toMatch(/^(18|20),31$/);
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
   const stool = (await you(page)).join(",");
