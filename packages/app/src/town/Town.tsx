@@ -3089,7 +3089,8 @@ function startTown(
         made = null;
       }
       baked = made;
-      Object.assign(pictures, { baked: !!made, bakedMs: performance.now() - t0, files: made?.files ?? 0, bytes: made?.bytes ?? 0 });
+      // (`saved` null: with the baked town this visit keeps nothing of its own.)
+      Object.assign(pictures, { baked: !!made, bakedMs: performance.now() - t0, files: made?.files ?? 0, bytes: made?.bytes ?? 0, ...(made ? { saved: null } : {}) });
       // (A build with no baked town, `TOWN_PICTURES.baked` off:) the pictures as the last visit painted them, if they're kept and the
       // town's art is what it was (keep-pictures.ts, Nov 23; by the art's fingerprint since Nov 28, not the build's commit, so a deploy that
       // leaves the art alone keeps them): then none is painted. (Not in the dev server, whose code changes under the same name; nor on a 2D
