@@ -26533,6 +26533,20 @@ body.mo-on .mm-scrim {
 }
 
 /* The sound report (Settings → Testing, admins). */
+/* An admin's Battle Tower floor (Settings, testing): the number and Set side by side; the line below keeps its height. */
+.tower-jump-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tower-jump-row input {
+  flex: 1;
+  min-width: 0;
+}
+.tower-jump-line {
+  min-height: 1.4em;
+  margin: 6px 0 0;
+}
 .sound-report-text {
   width: 100%;
   box-sizing: border-box;

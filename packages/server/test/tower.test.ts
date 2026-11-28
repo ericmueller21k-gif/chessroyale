@@ -3,7 +3,7 @@ import { BATTLE_TOWER, finishFloor, floorSettings, newRun, pauseVariable, startF
 import { createGuest, createSession, ensureSchema, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { handleAccountApi } from "../src/api.ts";
-import { finishTowerFloor, newTowerRun, runOf, startTowerFloor, stopTower, towerState, towerUnlocks, type TowerRunView } from "../src/tower.ts";
+import { finishTowerFloor, newTowerRun, runOf, runToFloor, startTowerFloor, stopTower, towerState, towerUnlocks, type TowerRunView } from "../src/tower.ts";
 import { memoryDb } from "./memory-db.ts";
 
 // (The engine server is a Container, which needs the Workers runtime: the match rooms import it.)
@@ -734,5 +734,80 @@ describe("the API", () => {
     const all = Object.fromEntries(POOL.slice(1).map((b) => [pauseVariable(`boss:${b}`), "1"]));
     const made = await call(d1, cookie, "/api/tower/run", {}, all);
     expect((made.body.run as TowerRunView).bosses).toEqual([POOL[0]]);
+  });
+});
+
+describe("an admin's jump to a floor (Eric, Nov 28: \"punch in a number ... it goes to that level\")", () => {
+  const ENV = { ADMIN_EMAILS: "eric@example.com", TEST_SWITCHES: "1" };
+  const ADMIN_POOL = towerPool(undefined, undefined, { unfinished: true, admin: true });
+  const call = async (d1: unknown, cookie: string, path: string, body?: unknown) => {
+    const init = body === undefined ? { headers: { cookie } } : { method: "POST", body: JSON.stringify(body), headers: { cookie } };
+    const res = (await handleAccountApi(new Request(`https://hunchess.com${path}`, init), { DB: d1, ...ENV } as never))!;
+    return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+  };
+  const who = async (sql: Sql, email: string) => {
+    const u = await signedIn(sql, email, Date.now());
+    return { id: u.id, cookie: `hc_session=${await createSession(sql, u.id, Date.now())}` };
+  };
+  const jump = (d1: unknown, cookie: string, floor: unknown) => call(d1, cookie, "/api/tower/admin/floor", { floor });
+
+  it("admins only, by the server's list: a player (even with test switches on) is answered 404 and nothing is written", async () => {
+    const { sql, d1 } = await world();
+    const ann = await who(sql, "ann@example.com");
+    expect(await jump(d1, ann.cookie, 9)).toEqual({ status: 404, body: { message: "Not found" } });
+    expect(await rows(sql, ann.id)).toEqual([]);
+  });
+
+  it("sets the admin's solo run to fight that floor next: a climb's deal from its own seed, lives full, nothing under way; the clerk's GET reads it; bests, unlocks and the party copy untouched", async () => {
+    const { sql, d1 } = await world();
+    const eric = await who(sql, "eric@example.com");
+    // (A climb with a floor lost and a best of 3: floors 1-3 won, floor 4 lost.)
+    await call(d1, eric.cookie, "/api/tower/run", {});
+    for (const outcome of ["won", "won", "won", "lost"]) {
+      const fight = ((await call(d1, eric.cookie, "/api/tower/floor/start", {})).body.fight as { id: string }).id;
+      expect((await call(d1, eric.cookie, "/api/tower/floor/finish", { fight, outcome })).status).toBe(200);
+    }
+    await sql.run("INSERT INTO tower_runs (id, user_id, kind, seed, floor, met, members, status, started_at, updated_at) VALUES ('p1', ?, 'party', 7, 3, '{}', ?, 'open', 1, 1)", eric.id, JSON.stringify({ run: "r", uids: [eric.id] }));
+    const before = { best: await sql.all("SELECT * FROM tower_best"), unlocks: await sql.all("SELECT * FROM boss_unlocks"), party: await sql.all("SELECT * FROM tower_runs WHERE kind = 'party'") };
+    const seed = (await sql.first<{ seed: number }>("SELECT seed FROM tower_runs WHERE user_id = ? AND kind = 'solo'", eric.id))!.seed;
+    for (const floor of [9, 2, BATTLE_TOWER.floors]) {
+      const set = await jump(d1, eric.cookie, floor);
+      expect(set).toMatchObject({ status: 200, body: { message: `Floor ${floor} is next: talk to the clerk.`, floor, run: { kind: "solo", floor, fight: null, lives: BATTLE_TOWER.lives, lost: [] } } });
+      const row = (await rows(sql, eric.id)).find((r) => r.kind === "solo")!;
+      expect(row).toMatchObject({ floor, status: "open", fight: null });
+      let core = newRun(seed, ADMIN_POOL);
+      while (core.floors.length < floor) core = finishFloor(core, "won", ADMIN_POOL);
+      expect(JSON.parse(row.met)).toEqual({ floors: core.floors, deck: core.deck, decks: core.decks });
+      expect(((await call(d1, eric.cookie, "/api/tower")).body.runs as { solo: TowerRunView }).solo).toMatchObject({ floor, bosses: core.floors[floor - 1], lives: BATTLE_TOWER.lives });
+    }
+    expect({ best: await sql.all("SELECT * FROM tower_best"), unlocks: await sql.all("SELECT * FROM boss_unlocks"), party: await sql.all("SELECT * FROM tower_runs WHERE kind = 'party'") }).toEqual(before);
+    expect(before.best).toEqual([expect.objectContaining({ kind: "solo", floor: 3 })]);
+    // (And the floor plays: its start is that floor.)
+    await jump(d1, eric.cookie, 9);
+    expect((await call(d1, eric.cookie, "/api/tower/floor/start", {})).body).toMatchObject({ floor: 9, settings: floorSettings(runToFloor(seed, 9, ADMIN_POOL)!) });
+  });
+
+  it("with no open solo run, makes one at that floor; anyone else's run is never touched", async () => {
+    const { sql, d1 } = await world();
+    const eric = await who(sql, "eric@example.com");
+    const ann = await who(sql, "ann@example.com");
+    await call(d1, ann.cookie, "/api/tower/run", {});
+    const anns = await rows(sql, ann.id);
+    expect(await jump(d1, eric.cookie, 12)).toMatchObject({ status: 200, body: { floor: 12, run: { floor: 12, lives: BATTLE_TOWER.lives } } });
+    expect(await rows(sql, eric.id)).toEqual([expect.objectContaining({ kind: "solo", floor: 12, status: "open", fight: null })]);
+    expect(await rows(sql, ann.id)).toEqual(anns);
+    expect(await sql.all("SELECT * FROM tower_best")).toEqual([]);
+  });
+
+  it("refuses while a floor is under way, saying so, and sets nothing; a floor out of range or not a whole number is a bad request", async () => {
+    const { sql, d1 } = await world();
+    const eric = await who(sql, "eric@example.com");
+    await call(d1, eric.cookie, "/api/tower/run", {});
+    const fight = (await call(d1, eric.cookie, "/api/tower/floor/start", {})).body.fight;
+    const held = await rows(sql, eric.id);
+    expect(await jump(d1, eric.cookie, 9)).toMatchObject({ status: 409, body: { message: "Floor 1 is under way. Finish or leave it first.", fight, run: { floor: 1 } } });
+    expect(await rows(sql, eric.id)).toEqual(held);
+    for (const bad of [0, BATTLE_TOWER.floors + 1, 2.5, "9", null]) expect((await jump(d1, eric.cookie, bad)).status).toBe(400);
+    expect(await rows(sql, eric.id)).toEqual(held);
   });
 });

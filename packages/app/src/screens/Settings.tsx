@@ -20,6 +20,8 @@ import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
 import { musicOn, onMusicChange, setMusicOn } from "../music.ts";
 import { useAccount } from "./Profile.tsx";
 import { setThemePref, useTheme, type ThemePref } from "../theme.ts";
+import { BATTLE_TOWER } from "@chessroyale/core";
+import { towerApi } from "../tower.ts";
 
 /** A setting you switch on or off: a title, what it does, and the switch. */
 function Toggle({ title, checked, disabled, onChange, children }: { title: string; checked: boolean; disabled?: boolean; onChange: (on: boolean) => void; children?: ComponentChildren }) {
@@ -199,6 +201,42 @@ function SoundReport() {
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * The Battle Tower floor (admins; Eric, Nov 28: "give me something where I can punch in a number, and whatever number is there, it goes
+ * to that level on the Battle Tower"): a floor from 1 to the top and Set, which makes it your solo climb's next floor, lives full (server
+ * tower.ts setTowerFloor, admins only there too). Its line keeps its space, so nothing moves when it says what happened.
+ */
+function TowerFloorJump() {
+  const [floor, setFloor] = useState("9");
+  const [busy, setBusy] = useState(false);
+  const [line, setLine] = useState("");
+  const n = Number(floor);
+  const ok = Number.isInteger(n) && n >= 1 && n <= BATTLE_TOWER.floors;
+  const set = async () => {
+    setBusy(true);
+    setLine("");
+    const a = await towerApi.adminFloor(n);
+    setBusy(false);
+    setLine(a.ok ? `Floor ${a.body.floor} is next: talk to the clerk.` : (a.body.message ?? "That didn't work. Try again."));
+  };
+  return (
+    <div class="tower-jump">
+      <div class="fd-field">
+        <span>Battle Tower floor (1 to {BATTLE_TOWER.floors}): your solo climb goes on from it, lives full</span>
+        <span class="tower-jump-row">
+          <input type="number" inputMode="numeric" min={1} max={BATTLE_TOWER.floors} step={1} value={floor} aria-label="Battle Tower floor" onInput={(e) => setFloor(e.currentTarget.value)} />
+          <button type="button" class="fd-btn small primary" disabled={!ok || busy} onClick={() => void set()}>
+            Set
+          </button>
+        </span>
+      </div>
+      <p class="fd-note tower-jump-line" role="status">
+        {line}
+      </p>
     </div>
   );
 }
@@ -448,6 +486,7 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
           <Toggle title="Eval bar" checked={false} disabled onChange={() => undefined}>
             Off for now: the engine's winning chances in a bar beside the board, shown on no screen.
           </Toggle>
+          <TowerFloorJump />
           <SoundReport />
           {/* (Auto chess, the demo, shelved: Eric, Oct 19. Testers only; its screen is /autochess.) */}
           {onAutoChess && (
