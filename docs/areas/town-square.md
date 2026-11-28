@@ -112,8 +112,8 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
 - **WebGL (Oct 30; docs/decisions/2026-10-30-town-webgl.md; the street town's only drawing since Nov 6,
   docs/decisions/2026-11-06-street-webgl-only.md).** It draws the same picture with WebGL 2 in a few draw calls a frame instead of hundreds of canvas calls. `paint-gl.ts` stands in for the part of the 2D
   context render.ts uses (state, transforms, save and restore, paths, clips, strokes, shadows, text, images) and batches the
-  frame into textured and solid triangles: textures from the canvases render.ts already makes, packed into 2048 px atlas
-  pages (layers of one array texture) and uploaded again only when render.ts calls `changed` (a tag or a table's board drawn again); clips that are upright
+  frame into textured and solid triangles: textures from the pictures it's handed (`keep`), packed into 2048 px atlas
+  pages (layers of one array texture) and uploaded between frames only (`kept`): nothing is uploaded as it's drawn, and a picture not on the GPU is left out (Nov 28, phase 2: "The picture service", below); clips that are upright
   rectangles cut on the CPU, other shapes a stencil bit each; a stroke's shadow (the table's ring, the pressed square's glow)
   worked out per pixel; the far band's softening in one shader pass (no scratch canvases); lights and their cuts in one
   blend; text and the bubble drawn once into canvases. One shader in three builds (solid; with textures; with the soft
@@ -250,10 +250,10 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   more kinds of square (`groundAt`: paving and grass), drawn with the board's in the same color-sorted fills. Tables, trees,
   benches and the fountain are solid (`walkable`); stools, paths and grass are walked on. Each picture is made once (a
   `FrameCache` per kind) and drawn as one item sorted with the people, a little behind whoever stands on its row.
-- **Name tags** (Oct 28): each drawn once per name, size and **kind** (`TagKind`: you, a pawn's "bot", a boss's "sidekick"; its pill, its soft
-  shadow and its name, at the device's pixels; `TagCache` in `tags.ts` is the cache's keyed lookup and its least-lately-used eviction, tested
-  without a canvas) and stamped each frame (`drawTag`, `tagArtOf` in `render.ts`; about 64 kept, the least lately used
-  making way; drawn again when a web font loads); a fading tag stamps its shadow, pill and name one over the other, as
+- **Name tags** (Oct 28): one picture a name and **kind** (`TagKind`: you, a pawn's "bot", a boss's "sidekick"; its pill, its soft
+  shadow and its name, at the device's pixels), made at 12 px by the picture service (Nov 28, phase 2: `tagPic`, `paintTag` in `render.ts`;
+  until then one for each of its five sizes) and stamped each frame, scaled by the GPU to its size, 8 to 12 (`drawTag`; made again when
+  its font loads or the pixel ratio changes); a fading tag stamps its shadow, pill and name one over the other, as
   they were drawn before. The things are sorted far to near in place (`sortFarFirst`, nothing allocated).
   - **Colors** (`TAG_STYLE`): a pawn's pill white (`rgba(255,255,255,.92)`) with dark ink, yours gold (`rgba(255,215,106,.96)`), **the 14 boss
     sidekicks' blue** (`rgba(29,78,216,.96)`, `#1d4ed8`) **with white text**: 6.7:1 with white, still over 6 over the lightest backdrop (WCAG AA is
@@ -1332,16 +1332,16 @@ frame rate stretches every walk), and checks the run still records as it presses
 Eric: "what happened to it showing what it's downloading?"; `LOAD_STEPS` in `Town.tsx`, the boss card's `.boss-loading-note`): "Loading the
 town's pictures…" while the build's baked files come in and each picture is put in its place, "Building the town…" while it uploads;
 `Town.tsx` `loadTown`, `f.loadSliceMs`, `f.loadPaintShare`). It loads every picture (`render.ts` `warm`; baked, below) and uploads them for good
-(`paint-gl.ts` `keep`, `kept`: tallest first, the atlas made once as deep as they need, plus 2 spare pages for tags, boards, the
-bubble, signs and text, the only ones that start again). Then the frames start. Measured then, painted on the device, headless at 1x:
+(`paint-gl.ts` `keep`, `kept`: tallest first, the atlas made once as deep as they need; since Nov 28, phase 2, what the device makes itself
+is on pages of its own with room to spare, and no page ever starts again). Then the frames start. Measured then, painted on the device, headless at 1x:
 4.5 s (painting 4.3, uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After it, 30 s of walking and turning: 0 painted,
 0 uploads, 0 resets. A building in and out uploads nothing of the town. **The labels too (Nov 25; [decision](../decisions/2026-11-25-town-hitches.md)):**
 Eric's laptop's report showed 1,063 uploads in 15 s of walking, every worst frame one with uploads. The labels were made as they first
 showed at each size: a home's name at each size it came to, a sign at each scale, a tag at each size, a cloud, a table clock's every second,
-and the speech bubble every frame its speaker glided a fraction of a pixel. Now `makeLabels` (render.ts, once its fonts are in or
-have failed: `labelFonts`) makes and keeps every home's name at sizes 12 to 20 (`NAME_SIZES`; two rows, outline and white), every sign once at its font's
-own pixels (drawn `s` times over, nearest), everyone's tag at sizes 8 to 12 (`TAG_SIZES`), the clouds and sun of the sky now, the clock's
-digits and the bubble's tail. The bubble is one picture a line (body, shadow and words; the last 8 kept), laid on whole device pixels.
+and the speech bubble every frame its speaker glided a fraction of a pixel. Now `askAhead` (render.ts, once its fonts are in or
+have failed: `labelFonts`) asks the picture service for every home's name (one picture, made at 20 px and scaled to 12 to 20; two rows, outline and white), every sign once at its font's
+own pixels (drawn `s` times over, nearest), everyone's tag (one, made at 12 px), the clouds and sun of every hour, the tables' pieces, the clock's
+digits and the bubble's tail. The bubble is one picture a line (body, shadow and words), made ahead of its line, laid on whole device pixels.
 A picture drawn in its own font is never drawn again when another font loads (tags, names, the WebGL text). What's left to make while
 walking: someone arriving later (their tag's sizes, once) and a boss's new line (one picture). About 55 ms more on the loading screen;
 one more atlas page at 1.25x, two at 3x (16 MB each). The town's 2D pictures are made in memory (`paint.ts`
@@ -1402,7 +1402,7 @@ The `?townsolo` test switch makes every start the early one at bar 77 (log `musi
 closing (Town.tsx's cleanup, the Hidden Boss's summoning) ends it and lets its pieces go. Tests: `packages/app/test/music.test.ts`
 ("the town's own theme", its "in memory" block), the e2e above (the theme first, its source started in the street).
 
-**Painting ahead (Nov 11):** each frame `planBoxes` paints, nearest first, the pictures of the boxes in reach: always the faced quarter's roofs and the sides' and backs' pictures (and shaded steps), mid-turn the next quarter's roofs (`boxBakeMs`, 1.5 ms); standing still, also the fronts' shaded frames and the other quarters' roofs (`boxBakeStillMs`, 4 ms, while the view is at rest). Before, a first look round painted hundreds of them as they showed. [Decision](../decisions/2026-11-11-town-frame-report.md). (Since the loading screen, it finds nothing left to paint.)
+**The picture service (Nov 28, phase 2; [decision](../decisions/2026-11-28-town-picture-service.md); `town/picture-service.ts`):** the one door for what the device still makes (tags, names, bubbles, signs, pawns, outfits, rides, the sky, the statues' close-ups and quotes). The frame only asks (`svc.ask(group, key, stamp, make)`: the picture if it's ready, else null, and it's left out); a slice between frames makes and uploads (`pump`, `feel.ts` `picSliceMs` 3 ms, when the browser is idle; under the loading card until nothing waits). The painter uploads nothing as it draws and makes no picture of its own (its text and shadowed-fill canvases are gone), so a picture that didn't come through the door isn't drawn. The text and the looks have atlas pages of their own (`PIC_GROUP`, `picRoom`): a full group lets go the picture least lately asked for (never one held, or asked for in this frame or the last); a place freed is the next picture's. A boss's next line is picked ahead (`world.ts` `bossNextLine`) and it talks once its bubble is made (`lineReady`). `planBoxes` paints nothing ahead any more (every roof and wall is the build's), and a roof or glow that isn't baked is an error on the loading screen, not a picture made in a frame. Measured (slowed phone): text 8.67 M pixels → 1.29 M, the atlas 15 pages → 14. Hooks: `__townPaint()`'s `service` and `atlas.groups`, `__townTags()`'s `size` and `made`, `__townNames()`, `__townCam()`'s `speechWanted` and `speechBubble`; the report's "Between frames" count. Tests: `test/town-picture-service.test.ts`; e2e town-street ("a boss's line starts with its bubble there", the loading screen's roam), `@perf` "Chess Town busy".
 
 ## The feel: `town/feel.ts`
 
@@ -1451,7 +1451,7 @@ noted wherever a slice changed one.
 
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load, and on a computer the frame round it), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
   clock, the statues' close-up, the backend and its fallbacks), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, the street town's `street.ts`, `turn.ts`, `boxes.ts`, `box-draw.ts` (and the art's `town-kit.ts`, `buildings.ts`, `home-boxes.ts`, `dressing.ts`), `paint.ts` (the drawing layer; Canvas 2D),
-  `paint-gl.ts` (its WebGL 2 backend), `you-look.ts`, `rides.ts`, `ride-cells.ts` (the rides' views measured, generated), `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
+  `paint-gl.ts` (its WebGL 2 backend), `picture-service.ts` (the one door for the pictures the device makes), `you-look.ts`, `rides.ts`, `ride-cells.ts` (the rides' views measured, generated), `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
   (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index),
   `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated), `CardIcons.tsx` (the card's crossed swords and
   rating bars, inline SVG), `shops/` (inside a shop: `shops.ts` which homes and the crate's words and the buy stub, `room.ts` the room's
