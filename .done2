@@ -1,0 +1,5 @@
+#1027 CI fix (3186c7bc). Retry cause, an app race: lazy.tsx checked for the chunk only in its after-paint effect; Bo's match was found while it loaded, so /1v1/CODE stayed an empty screen. It now redraws whenever it was first drawn without the chunk.
+Try 1 (walk-up 10 s ran out): no trace kept for it; walkUpTo now waits for the state (taps again, 15 s a try, 45 s in all), not one 10 s window.
+Proof: before the fix, 2/2 failed at :115 with the CPU 6× slower; after, 2/2 pass at 6×, 6/6 (both tests ×3) at 4× on the phone, and 2/2 on the computer at 4×.
+Checks changed: town-ranked.spec walkUpTo (one tap + 10 s poll → retapping toPass 45 s); CPU_THROTTLE env added to into() (off unless set). No guard tests touched.
+Lane: targeted. lazy.tsx is shared by every lazy screen, so the PR's e2e run may run more specs. Typecheck clean. CI not waited on, as briefed.
