@@ -73,7 +73,7 @@ import { rideMoving, rideSoundState, rideStep, warmRideSound } from "../ride-sou
 import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_ITEM_FRAMES, TOWN_PICTURES, WATCH_GUEST, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
-import { APP_VERSION, reportTownFallback } from "../problems.ts";
+import { reportTownFallback } from "../problems.ts";
 import { domPageIO, domSaveIO, idbShelf, pictureKey, restore, save, type Restored, type Shelf } from "./keep-pictures.ts";
 import { domPaintPool, workerCount, type PaintPool } from "./paint-pool.ts";
 import type { TownGlFallback } from "@chessroyale/core";
@@ -1567,6 +1567,9 @@ export const GATE_YOUNG = "Accounts are for players 13 and older.";
  * sidekicks' sheets downloaded (`TOWN_FEEL.loadPaintShare` of the bar); "building": the pictures put on the GPU for good. (The music
  * is no step since Nov 14: it comes after the first frame.)
  */
+/** The town's art's fingerprint (vite.config.ts's `__TOWN_ART__`, made by packages/app/town-art.ts): the kept pictures' key (`loadTown`). */
+declare const __TOWN_ART__: string | undefined;
+const TOWN_ART = typeof __TOWN_ART__ === "string" ? __TOWN_ART__ : "dev";
 const LOAD_STEPS = { pictures: "Loading the town's pictures…", building: "Building the town…" } as const;
 type LoadStep = keyof typeof LOAD_STEPS;
 
@@ -2035,7 +2038,13 @@ function startTown(
   let cardX = NaN;
   let cardY = NaN;
   let cardA = NaN;
+  /** Each chip on the page: the place it shows now (null: hidden), the place whose face is on its canvas, and which of the renderer's
+   * chips (the nearest places, in order) it shows this frame (-1: none): `placeChips`. */
   const chipPlace: (Place | null)[] = chipEls.map(() => null);
+  const chipDrawn: (Place | null)[] = chipEls.map(() => null);
+  const chipFrom: number[] = chipEls.map(() => -1);
+  /** (Tests, `hookPaint`) How many times a chip's face has been drawn. */
+  let chipFaces = 0;
   // ---- The close-up on a statue: which (its index in STATUES; -1: none, also once the glide out ends), whether the
   // camera is gliding in (or out), how far (0 to 1, linear in time), and a tap on a statue that sent you walking (the
   // close-up comes when you stop). The quote: ms since it began to render in (-1: not showing), and how much is left as
@@ -2263,27 +2272,49 @@ function startTown(
   };
   document.addEventListener("visibilitychange", onVisibility);
 
-  // ---- The chips: moved only when they move; a boss's face drawn into its chip when the chip changes home.
+  // ---- The chips: moved only when they move. A place keeps the chip it had (Nov 28), so its face is drawn when it takes one, not each
+  // time the nearest places change order or one has no room for a frame: about 8 clears and redraws a second while walking until then,
+  // each chip being the n-th nearest's. A place back after a frame or two away finds its face still on its chip's canvas.
   function placeChips() {
-    for (let i = 0; i < chipEls.length; i++) {
-      const el = chipEls[i];
+    const n = chipEls.length;
+    // Which of the renderer's chips each of ours shows this frame: first each place to the chip that has its face, then the rest to
+    // the chips left, in order.
+    for (let e = 0; e < n; e++) chipFrom[e] = -1;
+    for (let i = 0; i < r.chips.length; i++) {
+      const pl = r.chips[i]!.place;
+      const e = pl ? chipDrawn.indexOf(pl) : -1;
+      if (e >= 0) chipFrom[e] = i;
+    }
+    for (let i = 0, e = 0; i < r.chips.length; i++) {
+      const pl = r.chips[i]!.place;
+      if (!pl || chipDrawn.includes(pl)) continue;
+      while (e < n && chipFrom[e]! >= 0) e++;
+      if (e < n) chipFrom[e] = i;
+    }
+    for (let e = 0; e < n; e++) {
+      const el = chipEls[e];
       if (!el) continue;
-      const c = r.chips[i]!;
-      if (c.place !== chipPlace[i]) {
-        chipPlace[i] = c.place;
-        el.style.display = c.place ? "" : "none";
-        if (!c.place) el.querySelector("button")!.removeAttribute("aria-label");
+      const c = chipFrom[e]! >= 0 ? r.chips[chipFrom[e]!]! : null;
+      const place = c?.place ?? null;
+      if (place !== chipPlace[e]) {
+        chipPlace[e] = place;
+        el.style.display = place ? "" : "none";
+        if (!place) el.querySelector("button")!.removeAttribute("aria-label");
         else {
-          el.style.setProperty("--town-chip", c.place.color);
+          el.style.setProperty("--town-chip", place.color);
           const face = el.querySelector("button")!;
-          face.setAttribute("aria-label", `Go to ${c.place.name}`);
-          const { img, box } = r.chipFace(c.place);
-          drawFace(face.querySelector("canvas")!, img, box);
-          chipXY[i]!.x = chipXY[i]!.a = NaN; // (placed below: NaN is never "close enough")
+          face.setAttribute("aria-label", `Go to ${place.name}`);
+          if (chipDrawn[e] !== place) {
+            chipDrawn[e] = place;
+            const { img, box } = r.chipFace(place);
+            drawFace(face.querySelector("canvas")!, img, box);
+            chipFaces++;
+          }
+          chipXY[e]!.x = chipXY[e]!.a = NaN; // (placed below: NaN is never "close enough")
         }
       }
-      if (!c.place) continue;
-      const xy = chipXY[i]!;
+      if (!c || !place) continue;
+      const xy = chipXY[e]!;
       if (!(Math.abs(xy.x - c.x) <= 0.3 && Math.abs(xy.y - c.y) <= 0.3)) {
         el.style.transform = `translate3d(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px, 0)`;
         xy.x = c.x;
@@ -2972,7 +3003,7 @@ function startTown(
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 }, tagsQueued: r.tagsQueued };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0, art: TOWN_ART }, tagsQueued: r.tagsQueued, chipFaces };
   };
   /** (Tests) A hash of every picture the loading screen kept, their pixels in order: a later visit's must be the first's. */
   const hookPictureSum = (each = false) => {
@@ -3023,10 +3054,11 @@ function startTown(
     const tick = () => new Promise<void>((go) => requestAnimationFrame(() => go()));
     // (Whatever goes wrong here, the town opens: what wasn't made is made as it shows, as before.)
     try {
-      // The pictures as the last visit on this build painted them, if they're kept (keep-pictures.ts; Nov 23): then none is painted.
+      // The pictures as the last visit painted them, if they're kept and the town's art is what it was (keep-pictures.ts, Nov 23; by the
+      // art's fingerprint since Nov 28, not the build's commit, so a deploy that leaves the art alone keeps them): then none is painted.
       // (Not in the dev server, whose code changes under the same name; nor on a 2D painter, which never loads; nor with `?paintall`.)
       const shelf = painter.keep && !import.meta.env.DEV && !TOWN_ASKED.paintAll ? idbShelf() : null;
-      const key = pictureKey(APP_VERSION, import.meta.url, r.pictureSig());
+      const key = pictureKey(TOWN_ART, r.pictureSig());
       const from = (kept = await restore(shelf, key, domPageIO(art2d)));
       if (!alive) from?.close();
       // (Its pages uploaded whole, each picture where its page has it: none cut out or uploaded alone; Nov 25. Kept until the town

@@ -70,7 +70,7 @@ function firstVisit() {
   for (const c of list.slice(203)) P.add(c);
   return { P, list, keptByPainter };
 }
-const KEY = pictureKey("abc123", "/assets/Town-x.js", "layout");
+const KEY = pictureKey("abc123", "layout");
 
 describe("Chess Town's kept pictures (keep-pictures.ts)", () => {
   it("packs pictures as the WebGL atlas holds them (Nov 25): pages no bigger than its, the padding clear round each, a big one alone", () => {
@@ -172,8 +172,8 @@ describe("Chess Town's kept pictures (keep-pictures.ts)", () => {
     // Storage that throws (private mode), another build's entry, entries that don't read as one: paints, cleared.
     const cases: [string, unknown, PageIO?, object?][] = [
       ["storage throws", entry, undefined, { read: true }],
-      ["an older build's", { ...entry, manifest: { ...m, key: pictureKey("old", "/assets/Town-x.js", "layout") } }, undefined],
-      ["another layout's (an admin's town)", { ...entry, manifest: { ...m, key: pictureKey("abc123", "/assets/Town-x.js", "admin layout") } }, undefined],
+      ["other art's (a deploy that changed the town's art)", { ...entry, manifest: { ...m, key: pictureKey("old", "layout") } }, undefined],
+      ["another layout's (an admin's town)", { ...entry, manifest: { ...m, key: pictureKey("abc123", "admin layout") } }, undefined],
       ["not an entry", "garbage", undefined],
       ["another version (Nov 23's, packed without the atlas's padding)", { ...entry, manifest: { ...m, v: 1 } }, undefined],
       ["a page bigger than the atlas's", { ...entry, manifest: { ...m, pages: m.pages.map((v, i) => (i === 0 ? ATLAS.page + 2 : v)) } }, undefined],
@@ -221,11 +221,10 @@ describe("Chess Town's kept pictures (keep-pictures.ts)", () => {
     expect(await save(shelf, KEY, later, saveIO)).toBeNull();
   });
 
-  it("is keyed by the app's version, the town's code and its layout", () => {
-    const k = pictureKey("v1", "/assets/Town-a.js", "x|y");
-    expect(pictureKey("v2", "/assets/Town-a.js", "x|y")).not.toBe(k);
-    expect(pictureKey("v1", "/assets/Town-b.js", "x|y")).not.toBe(k);
-    expect(pictureKey("v1", "/assets/Town-a.js", "x|z")).not.toBe(k);
-    expect(pictureKey("v1", "/assets/Town-a.js", "x|y")).toBe(k);
+  it("is keyed by the town's art (the build's fingerprint of it, not the build's commit: Nov 28) and its layout", () => {
+    const k = pictureKey("art1", "x|y");
+    expect(pictureKey("art2", "x|y")).not.toBe(k);
+    expect(pictureKey("art1", "x|z")).not.toBe(k);
+    expect(pictureKey("art1", "x|y")).toBe(k);
   });
 });
