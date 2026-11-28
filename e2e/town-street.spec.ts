@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { expect, type Page, type Route } from "@playwright/test";
 import { RECLUSE_MUSIC } from "@chessroyale/core";
 import { asAdmin, tapInTown, test, townHeld, townTap } from "./helpers.ts";
+import { ALL_HOMES } from "../packages/app/src/town/world.ts";
 
 /**
  * The street town, round 2: the layout (Nov 5; docs/decisions/2026-11-05-street-town-layout.md), in an admin's town only
@@ -428,7 +429,7 @@ test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of 
 });
 
 test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking across the town at night among the bots and a crowd's tags (Nov 26), a full turn and zooming in and out paint nothing new, upload nothing (Nov 25) and start no atlas page again, on a first visit and a second (its pictures kept)", { tag: "@phone-only" }, async ({ page }) => {
-  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number; uploadsBy: [string, number][] } | null } | null; __townYou: () => { moving: boolean } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number }; pictures: { kept: boolean; saved: number | null | undefined } } };
+  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number; uploadsBy: [string, number][] } | null } | null; __townYou: () => { moving: boolean } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townPaint: () => { chipFaces: number; loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number }; pictures: { kept: boolean; saved: number | null | undefined } } };
   const errors = watchErrors(page);
   const bar = page.locator(".town-loading").getByRole("progressbar", { name: "Loading Chess Town" });
   // The bar's share as it shows (sampled every frame until it goes): it only goes up. And the step named under it (Nov 14), each new one.
@@ -501,7 +502,13 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
     expect(s.bakes, `${visit}: pictures painted after the loading screen`).toBe(0);
     expect(s.uploads, `${visit}: pictures uploaded after the loading screen (${(s.uploadsBy ?? []).map(([k, n]) => `${k} ${n}`).join(", ")})`).toBe(0);
     expect(s.resets, `${visit}: atlas pages started again`).toBe(0);
-    expect((await page.evaluate(() => (window as unknown as R).__townPaint())).resets).toBe(0);
+    const after = await page.evaluate(() => (window as unknown as R).__townPaint());
+    expect(after.resets).toBe(0);
+    // (Nov 28) The chips' faces: each place's drawn once, on a canvas of its own, however often the chips changed places on the way
+    // (until then a chip's one canvas was cleared and drawn again at every change: 151 times on a walk like this one, where 15 places
+    // had a chip). Every home and the Colosseum, at most.
+    expect(after.chipFaces, `${visit}: chips' faces drawn`).toBeGreaterThan(4);
+    expect(after.chipFaces, `${visit}: chips' faces drawn, one a place at most`).toBeLessThanOrEqual(ALL_HOMES.length + 1);
   };
   // (Nov 25) The context lost and back: every picture on screen uploaded again (on the second visit, each cut from its kept page as it
   // is): what the GPU holds for each the same as before.

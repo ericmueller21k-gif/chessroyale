@@ -103,6 +103,8 @@ import "./town.css";
 import { chunk, setPlace, takePlace } from "../stale.ts";
 
 const CHIPS = TOWN_FEEL.maxChips;
+/** A chip's face's canvas, in pixels a side (twice its size on the page). */
+const CHIP_FACE_PX = 92;
 
 /**
  * The card open over a boss, a home, the Colosseum, a chess table or a person (`i`: its index in HOMES, the bosses being in
@@ -1458,9 +1460,8 @@ export function TownScreen({
               <div class="town-chip-rot">
                 <div class="town-chip-arrow" />
               </div>
-              <button type="button" class="town-chip-face" onClick={() => ctl.current?.chip(i)}>
-                <canvas width={92} height={92} />
-              </button>
+              {/* (Its face: its place's canvas, put here by `placeChips`.) */}
+              <button type="button" class="town-chip-face" onClick={() => ctl.current?.chip(i)} />
             </div>
           ))}
         </div>
@@ -2038,12 +2039,12 @@ function startTown(
   let cardX = NaN;
   let cardY = NaN;
   let cardA = NaN;
-  /** Each chip on the page: the place it shows now (null: hidden), the place whose face is on its canvas, and which of the renderer's
-   * chips (the nearest places, in order) it shows this frame (-1: none): `placeChips`. */
+  /** Each chip on the page: the place it shows now (null: hidden), the place whose face it holds, and which of the renderer's chips
+   * (the nearest places, in order) it shows this frame (-1: none): `placeChips`. */
   const chipPlace: (Place | null)[] = chipEls.map(() => null);
   const chipDrawn: (Place | null)[] = chipEls.map(() => null);
   const chipFrom: number[] = chipEls.map(() => -1);
-  /** (Tests, `hookPaint`) How many times a chip's face has been drawn. */
+  /** (Tests, `hookPaint`) How many chips' faces have been drawn: one a place, at most (`chipFaceFor`). */
   let chipFaces = 0;
   // ---- The close-up on a statue: which (its index in STATUES; -1: none, also once the glide out ends), whether the
   // camera is gliding in (or out), how far (0 to 1, linear in time), and a tap on a statue that sent you walking (the
@@ -2272,12 +2273,26 @@ function startTown(
   };
   document.addEventListener("visibilitychange", onVisibility);
 
-  // ---- The chips: moved only when they move. A place keeps the chip it had (Nov 28), so its face is drawn when it takes one, not each
-  // time the nearest places change order or one has no room for a frame: about 8 clears and redraws a second while walking until then,
-  // each chip being the n-th nearest's. A place back after a frame or two away finds its face still on its chip's canvas.
+  // ---- The chips: moved only when they move. Each place's face is drawn once, on a canvas of its own, the first time it has a chip
+  // (Nov 28; `chipFaceFor`), and a chip shows its place's canvas. And a place keeps the chip it had, so chips change places only as places
+  // come and go, not each time the nearest places change order or one has no room for a frame. (Until then each chip was the n-th
+  // nearest's, its one canvas cleared and drawn again at every change: 151 times on an 11 s walk across the town; now 18 at most, ever.)
+  const chipFaceOf = new Map<Place, HTMLCanvasElement>();
+  const chipFaceFor = (place: Place): HTMLCanvasElement => {
+    let c = chipFaceOf.get(place);
+    if (!c) {
+      c = document.createElement("canvas");
+      c.width = c.height = CHIP_FACE_PX;
+      const { img, box } = r.chipFace(place);
+      drawFace(c, img, box);
+      chipFaceOf.set(place, c);
+      chipFaces++;
+    }
+    return c;
+  };
   function placeChips() {
     const n = chipEls.length;
-    // Which of the renderer's chips each of ours shows this frame: first each place to the chip that has its face, then the rest to
+    // Which of the renderer's chips each of ours shows this frame: first each place to the chip that holds its face, then the rest to
     // the chips left, in order.
     for (let e = 0; e < n; e++) chipFrom[e] = -1;
     for (let i = 0; i < r.chips.length; i++) {
@@ -2306,9 +2321,7 @@ function startTown(
           face.setAttribute("aria-label", `Go to ${place.name}`);
           if (chipDrawn[e] !== place) {
             chipDrawn[e] = place;
-            const { img, box } = r.chipFace(place);
-            drawFace(face.querySelector("canvas")!, img, box);
-            chipFaces++;
+            face.replaceChildren(chipFaceFor(place));
           }
           chipXY[e]!.x = chipXY[e]!.a = NaN; // (placed below: NaN is never "close enough")
         }
