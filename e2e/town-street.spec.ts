@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { expect, type Page, type Route } from "@playwright/test";
-import { RECLUSE_MUSIC } from "@chessroyale/core";
-import { asAdmin, tapInTown, test, townHeld, townTap } from "./helpers.ts";
+import { RECLUSE_MUSIC, TOWN_BAKED_FALLBACK, TOWN_PICTURES } from "@chessroyale/core";
+import { asAdmin, leaveQueue, pickMode, tapInTown, test, townHeld, townTap } from "./helpers.ts";
 import { ALL_HOMES } from "../packages/app/src/town/world.ts";
 
 /**
@@ -557,9 +557,26 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
  * this town's files when idle, before any visit to the town; they're in the worker's cache then, each under its contents' name, and the
  * town loads them.
  */
-test("home fetches Chess Town's baked pictures when idle and the service worker keeps them (Nov 28): every file of a player's town in its cache before the town opens; then the town loads them", { tag: "@phone-only" }, async ({ page }) => {
+test("home fetches Chess Town's baked pictures when idle and the service worker keeps them (Nov 28): none while its queue shows; then every file of a player's town in the worker's cache before the town opens; then the town loads them", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/");
+  const pngs: string[] = [];
+  page.on("request", (r) => void (/\/town-pictures\/[^/]+\.png$/.test(r.url()) && pngs.push(r.url())));
+  // Home with its queue showing (50 v 50's lobby, people only so it waits; a boss battle's lobby, a match loading and a 1 v 1's search
+  // are the same: home's frame with the queue in it): the network is the match's, and none is fetched ahead however long it shows (the
+  // review of phase 1b, S1). The worker is answering the page by then (a first visit: after its own files are in), which is what the
+  // fetch waits for, never a time (S4).
+  await page.addInitScript(() => localStorage.setItem("brc.matchmaking", "botsoff"));
+  await page.goto(`/?nolanding&pool=bk${Math.random().toString(36).slice(2, 9)}`);
+  await pickMode(page, "50 v 50");
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Keep me in the queue" }).waitFor();
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 60_000 });
+  // (The moment home's own effects take to stop, then everything from here on.)
+  await page.waitForTimeout(500);
+  pngs.length = 0;
+  await page.waitForTimeout(TOWN_PICTURES.homeFetchAfterMs + 3000);
+  expect(pngs, "fetched ahead while the queue showed").toEqual([]);
+  await leaveQueue(page);
   await page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).first().waitFor({ timeout: 60_000 });
   // The files this town draws from (the manifest, by the name order.json gives; not the sidekicks' sheets, which the town doesn't read from here).
   const kept = () =>
@@ -572,11 +589,13 @@ test("home fetches Chess Town's baked pictures when idle and the service worker 
       for (const name of want) if (await caches.match(`/town-pictures/${name}`)) n++;
       return { want: want.length, kept: n, admins: (await Promise.all(m.files.filter((f) => !f.towns.includes("player")).map((f) => caches.match(`/town-pictures/${f.name}`)))).filter(Boolean).length };
     });
-  // (Home's fetch starts TOWN_PICTURES.homeFetchAfterMs after it shows, a file at a time.)
-  await expect.poll(async () => (await kept()).kept, { timeout: 60_000, intervals: [1000] }).toBeGreaterThan(30);
+  // (Home's fetch starts TOWN_PICTURES.homeFetchAfterMs after it shows, a file at a time, each through the worker: all of them kept.)
+  await expect.poll(async () => ((k) => k.want - k.kept)(await kept()), { message: "files of a player's town, and the manifest, not in the worker's cache yet", timeout: 60_000, intervals: [1000] }).toBe(0);
   const all = await kept();
-  expect(all.kept, "every file of a player's town, and the manifest, in the worker's cache").toBe(all.want);
+  expect(all.want).toBeGreaterThan(30);
   expect(all.admins, "none of an admin's town's own files").toBe(0);
+  // (Each once at most: home never asks again for a file this page has read.)
+  expect(new Set(pngs).size, "each page fetched ahead once").toBe(pngs.length);
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
   const pictures = await page.evaluate(() => (window as unknown as { __townPaint: () => { pictures: { baked: boolean; files: number } } }).__townPaint().pictures);
@@ -599,6 +618,42 @@ test.describe(() => {
       type P = { __townPictureSum: () => { n: number; hash: string; gpu: string | null }; __townPaint: () => { pictures: { baked: boolean; files: number; bytes: number; workers: number; byWorkers: number; saved: number | null | undefined }; atlas: { unkept: number } } };
       const errors = watchErrors(page);
       if (kind === "admin") await asAdmin(page);
+      // (The town this device saved before the build baked its pictures, and its tops: cleared once a baked load is in. S5.)
+      const saved = () =>
+        page.evaluate(
+          () =>
+            new Promise<{ pictures: boolean; tops: boolean }>((ok) => {
+              const q = indexedDB.open("hunchess-town", 1);
+              q.onupgradeneeded = () => q.result.createObjectStore("pictures");
+              q.onsuccess = () => {
+                const g = q.result.transaction("pictures").objectStore("pictures").get("town");
+                g.onsuccess = () => (q.result.close(), ok({ pictures: g.result !== undefined, tops: localStorage.getItem("brc.townTops") !== null }));
+              };
+            }),
+        );
+      if (kind === "player") {
+        await page.goto("/version.json");
+        await page.evaluate(
+          () =>
+            new Promise<void>((ok) => {
+              localStorage.setItem("brc.townTops", JSON.stringify({ key: "old", tops: [1] }));
+              const q = indexedDB.open("hunchess-town", 1);
+              q.onupgradeneeded = () => q.result.createObjectStore("pictures");
+              q.onsuccess = () => {
+                const tx = q.result.transaction("pictures", "readwrite");
+                tx.objectStore("pictures").put({ manifest: { key: "old" }, blobs: [] }, "town");
+                tx.oncomplete = () => (q.result.close(), ok());
+              };
+            }),
+        );
+        expect(await saved()).toEqual({ pictures: true, tops: true });
+      }
+      // (Why the baked town wasn't used: said once a page, in the request an error goes in. S3.)
+      const reported: string[] = [];
+      page.on("request", (r) => {
+        if (!r.url().endsWith("/api/problems")) return;
+        for (const e of (JSON.parse(r.postData() ?? "{}") as { errors?: { kind: string; message: string }[] }).errors ?? []) if (e.kind === TOWN_BAKED_FALLBACK.kind) reported.push(e.message);
+      });
       const pngs: string[] = [];
       let drop = "";
       await page.route("**/town-pictures/*.png", (route) => {
@@ -620,6 +675,7 @@ test.describe(() => {
       expect(pngs.filter((n) => n.startsWith("sidekick-")), "the sidekicks' sheets (not read from here yet)").toEqual([]);
       expect(baked.sum.n, "pictures the loading screen put in place").toBeGreaterThan(2000);
       expect(baked.paint.atlas.unkept, "pictures the atlas couldn't keep").toBe(0);
+      if (kind === "player") await expect.poll(saved, { message: "the town this device saved before, let go" }).toEqual({ pictures: false, tops: false });
       // One file missing: none of the baked town is used. The device paints every picture, as before.
       drop = pngs[3]!;
       const painted = await visit();
@@ -627,6 +683,7 @@ test.describe(() => {
       expect(painted.paint.pictures.byWorkers, "pictures its paint workers made").toBeGreaterThan(1000);
       expect(painted.paint.pictures.saved, "and keeps none of them (the next visit loads the files)").toBeNull();
       expect(painted.sum, "the painted town, by the town's own picture hash and the GPU's").toEqual(baked.sum);
+      await expect.poll(() => reported, { message: "the fallback and its reason, reported once", timeout: 15_000 }).toEqual(["file"]);
       // (The one request that failed, by design.)
       expect(errors.filter((e) => !e.includes(drop))).toEqual([]);
     });
