@@ -1,5 +1,5 @@
 Town phase 1a done (claude/town-phase1a, from origin/main a615f7bf with origin/claude/town-phase0 merged in). PR title and body:
-.pr-body.md. No PR opened; CI has not run (it runs on a PR). About 2.5 hours; nothing split off.
+.pr-body.md. No PR opened; CI has not run (it runs on a PR). About 2 hours; nothing split off.
 
 - The list: packages/app/src/town/pictures.ts (makeTownArt, townWants, townSheets). render.ts `plan` runs a job a want from it; its
   constructor takes its boxes and frame caches' characters from it. No pixel changes: against main's own build the device's
@@ -26,8 +26,8 @@ For phase 1b to know:
 
 Noticed, not changed (not in the brief):
 - An admin's town never draws Rivet (Timber's kid). render.ts looks his sheet up by its id ("sidekick-beaver" -> "beaver"), but the file
-  is timber.png, so the page asks for /undefined (seen in an admin's town's requests on main's code path too). One line to fix, with a
-  still, in its own PR.
+  is timber.png, so the page asks for /undefined (seen among an admin's town's requests on this branch; that code is main's, untouched
+  here). One line to fix, with a still, in its own PR.
 - The @perf "Chess Town on a slow phone" budgets fail on this machine on main as well (its reference job varies 0.9 to 1.5 s between
   runs); the load itself is unchanged (pr body). CI leaves @perf out.
 - After it's live: nothing for Eric to see yet; the /town?report ask belongs to phase 1b.
