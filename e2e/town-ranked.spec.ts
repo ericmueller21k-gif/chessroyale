@@ -122,6 +122,9 @@ test("two players found from two tables sit at the first's for a third visitor, 
     await gus.goto(`/town?sky=day&debug&townroom=${room}&pool=${pool}&townguest=off`);
     await expect(canvas(gus)).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
     await gus.waitForFunction(() => typeof (window as unknown as { __townHere?: unknown }).__townHere === "function");
+    // (His town's bots held too, as `into` holds the others': free, one stood over Ann at table 3 and his tap on her never found her
+    // clear for 60 s; #1038's run, phone.)
+    await gus.evaluate(() => (window as unknown as { __townStill: () => void }).__townStill());
     await walkUpTo(gus, 3);
   }
   // Ann searches first, from table 3; Bo from table 4: they meet.
