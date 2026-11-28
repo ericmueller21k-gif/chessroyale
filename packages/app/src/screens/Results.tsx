@@ -1,4 +1,5 @@
 import { applyMove } from "@chessroyale/chess";
+import { UnlockNotice } from "../components/UnlockNotice.tsx";
 import { WelcomeNotice } from "../components/WelcomeNotice.tsx";
 import { MiniBoard } from "../components/MiniBoard.tsx";
 import { elimination, lossRows, myTeam, scoreDp, type GameView } from "../game.ts";
@@ -326,6 +327,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
       {match.settings.raid && <TokenBox match={match} />}
       {/* (A finished game may have earned the Welcome Crate, Nov 6: its one-time notice, asked for again as the result is saved.) */}
       <WelcomeNotice refresh />
+      {/* (A tower floor's win that unlocked a boss, the Stranger: his one-time notice; TowerResult's useTowerEnd says when.) */}
+      {tower && <UnlockNotice />}
     </div>
   );
 }

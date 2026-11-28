@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { FLOOR_DOOR, FLOOR_IN, FLOOR_TABLE, FLOOR_YOU, MATE_MARKS, TOWER_FLOOR_FEEL, arrowBlink, bossAt, bossMarks, floorArrow, floorTimes, mateAt, piecesAt, upWords, type BossNow } from "../src/town/shops/tower-floor.ts";
+import { FLOOR_DOOR, FLOOR_IN, FLOOR_TABLE, FLOOR_YOU, MATE_MARKS, STRANGER_ENTRANCE, TOWER_FLOOR_FEEL, arrowBlink, bossAt, bossMarks, floorArrow, floorTimes, mateAt, ownEntrance, piecesAt, upWords, type BossNow } from "../src/town/shops/tower-floor.ts";
+import { STRANGER } from "../src/characters/stranger.ts";
+import { STRANGER_FLOOR_LINES, STRANGER_LINES } from "../src/characters/stranger-lines.ts";
 import { SHOP_TOWER_FLOOR_LAYOUT, SHOP_TOWER_FLOOR_N, SHOP_TOWER_FLOOR_TABLE_SQUARES, towerFloorPieces } from "../src/town/shops/tower-floor-art.ts";
 import { SHOP_TOWER_KEEPER, SHOP_TOWER_LAYOUT, SHOP_TOWER_N } from "../src/town/shops/tower-art.ts";
 import { SHOPS } from "../src/town/shops/shops.ts";
@@ -86,6 +88,35 @@ describe("the tower's floor room", () => {
     }
     // (Solo: none.)
     expect(solo.mateGo).toEqual([]);
+  });
+
+  it("the Stranger's own entrance on a floor of his alone (Eric, Nov 27): about 10 s, out of the elevator, his two lines one after the other, then his blades as the pieces come up", () => {
+    expect(ownEntrance(["stranger"])).toBe("stranger");
+    expect(ownEntrance(["stranger", "clown"])).toBeNull();
+    expect(ownEntrance(["clown"])).toBeNull();
+    const usual = floorTimes(1, 1, false);
+    expect(usual.entrance).toBeUndefined();
+    const t = floorTimes(1, 1, false, TOWER_FLOOR_FEEL, 0, "stranger");
+    const [first, second] = t.entrance!.say;
+    // (He walks out slower than a floor's bosses do; his lines only once everyone's on their marks.)
+    expect(t.bossOn[0]! - t.bossGo[0]!).toBeGreaterThan(usual.bossOn[0]! - usual.bossGo[0]!);
+    expect(t.doorsShut).toBeGreaterThan(t.bossGo[0]! + STRANGER_ENTRANCE.stepMs);
+    expect(first![0]).toBeGreaterThan(Math.max(t.youOn, t.bossOn[0]!));
+    expect(first![1] - first![0]).toBe(STRANGER_ENTRANCE.readMs);
+    expect(second![0]).toBeGreaterThan(first![1]);
+    expect(t.entrance!.draw).toBeGreaterThan(second![1]);
+    // (The pieces come up as his blades do; the match once they're out and held.)
+    expect(t.board).toBe(t.entrance!.draw);
+    expect(t.go).toBeGreaterThanOrEqual(t.entrance!.draw + STRANGER_ENTRANCE.drawMs + STRANGER_ENTRANCE.readyMs);
+    expect(t.go).toBeGreaterThan(9000);
+    expect(t.go).toBeLessThan(11_000);
+    // (His draw's length is his own animation's.)
+    expect(STRANGER.anims.draw!.frames.reduce((ms, f) => ms + f.ms, 0)).toBe(STRANGER_ENTRANCE.drawMs);
+    // (His floor lines: his alone, short enough for two rows.)
+    for (const l of STRANGER_FLOOR_LINES) {
+      expect(l.length).toBeLessThan(48);
+      expect(Object.values(STRANGER_LINES).flat()).not.toContain(l);
+    }
   });
 
   it("with reduced motion, nobody walks: everyone on their marks from the start, the pieces come up, then the match", () => {

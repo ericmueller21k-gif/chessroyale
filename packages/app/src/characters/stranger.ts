@@ -1272,7 +1272,9 @@ const stormPlantFrames = (): Frame[] => {
   const slam = 90;
   return [
     ...drawn,
-    F("raiseDown", 0, { ms: Math.max(100, STORM_SCENE.fireAt - start - drawMs), cue: "shout", aura: 2 }),
+    // (Both swords raised, then a last lift before the plunge: two frames, never one held still.)
+    F("raiseDown", 0, { ms: Math.max(100, STORM_SCENE.fireAt - start - drawMs - 150), cue: "shout", aura: 2 }),
+    F({ ...POSES.raiseDown, armF: [[40, 50], [32, 33]], armI: [[88, 50], [96, 33]], swordF: held([32, 33], 160), swordI: held([96, 33], 200) }, 1, { ms: 150, aura: 2 }),
     F("plantF", 1, { ms: slam, cue: "slam", aura: 2, shake: [0, 2] }),
     ...hold("plantF", STORM_SCENE.iceAt - STORM_SCENE.fireAt - slam),
     F("plantBoth", 2, { ms: slam, cue: "slam", aura: 2, shake: [0, 2] }),

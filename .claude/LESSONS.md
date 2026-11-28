@@ -60,6 +60,16 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     drawing coming late. Try a moment's path with the page's CPU slowed 4x (CDP `Emulation.setCPUThrottlingRate`), not only at full speed.
   - A test of a short-lived state (under about 300 ms) records it as the app sets it (a MutationObserver), never with a once-a-frame sampler.
 
+- **A storm that showed before its scene, and sheets let go every turn** (Nov 27, [story](../docs/history/lessons.md#a-storm-that-showed-before-its-scene-and-sheets-let-go-every-turn-nov-27-2026)):
+  - A layer drawn from the rules' state (a power's turn has begun) waits for its moment too: the state is set as the boss's move shows,
+    before its scene plays. A test records it from the battle's first frame: nothing before, every frame after.
+  - A banner covers what plays under it: a scene's beats begin as its banner leaves.
+  - A component's cleanup isn't "the battle is over": the match's screens are drawn again every phase. What must outlive a redraw (a
+    decoded sheet, a layer over the page) is let go a moment after, called off by the next drawing (`keepStranger`).
+  - A figure a moment takes over starts and ends in the box of the figure it replaces, measured, to a pixel.
+  - A hole in a headless recording isn't a freeze: check a trace's draws before blaming the game, and record true screenshots
+    (`scripts/frames-stranger-storm.mjs`); a still taken mid-recording holes it too.
+
 ## Measure what's on screen; don't trust a screenshot
 
 - **Lines on the star's seat** (Nov 17, [story](../docs/history/lessons.md#lines-on-the-stars-seat-nov-17-2026)): never draw a

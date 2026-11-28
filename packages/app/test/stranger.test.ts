@@ -5,9 +5,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ART_KITS, BOSS_KITS, STRANGER_FLOURISH_EVERY, STRANGER_SLASHES, strangerAnim } from "../src/characters/kits.ts";
-import { FINISHERS, FINISHER_BLOCK_MS } from "@chessroyale/chess";
+import { FINISHERS, FINISHER_BLOCK_MS, STORM_SCENE } from "@chessroyale/chess";
 import { animLength } from "../src/characters/power-art.ts";
-import { FINISHER_MARGIN_MS, UP, arc, cornerOf, finishTimeline, finisherStand, hopHeight } from "../src/components/Stranger.tsx";
+import { FINISHER_MARGIN_MS, RING_BUILD, STORM_ART, THROW, UP, arc, buildStep, cornerOf, finishTimeline, finisherStand, fly, hopHeight, nudged, ringArrivals, sceneOf, stormLevel, thrownAt } from "../src/components/Stranger.tsx";
 import { fireBurnItems } from "../src/components/Grex.tsx";
 import { EFFECTS } from "../src/characters/power-art.ts";
 import { POSES, STRANGER, STRANGER_FOOT, STRANGER_HOP, STRANGER_PORTRAIT, STRANGER_SOUNDS, TIPS_AT } from "../src/characters/stranger.ts";
@@ -213,5 +213,107 @@ describe("his swords (Eric, Nov 27: his slashes, his block, his flourish, his fi
     for (const burnt of [[{ square: "e4", piece: "n" }], [{ square: "e4" }], [{ square: "e4", fizzled: true }]]) expect(fireBurnItems(burnt, 0, true).every((i) => i.quiet), JSON.stringify(burnt)).toBe(true);
     // (Grex's own keeps his poof.)
     expect(fireBurnItems([{ square: "e4", piece: "n" }], 0).some((i) => !i.quiet)).toBe(true);
+  });
+});
+
+describe("his storm's polish (Eric, Nov 27 and 28; docs/decisions/2026-11-27-stranger-polish.md)", () => {
+  const S = STORM_SCENE;
+
+  it("nothing of the storm before its scene: a storm moment still to come says so, one playing gives its clock, none (the storm's turns) neither", () => {
+    const m = { kind: "storm" as const, at: 10_000, ms: S.ms, lead: 2249 };
+    expect(sceneOf([m], 7000)).toEqual({ at: null, ahead: true });
+    expect(sceneOf([m], 7751)).toEqual({ at: 10_000, ahead: false });
+    expect(sceneOf([m], 10_000 + S.ms - 1)).toEqual({ at: 10_000, ahead: false });
+    expect(sceneOf([m], 10_000 + S.ms)).toEqual({ at: null, ahead: false });
+    expect(sceneOf([], 7000)).toEqual({ at: null, ahead: false });
+  });
+
+  it("the ring gathers from nothing: each element from its own sword's slam, whole by his grip, never falling; steady through the turns", () => {
+    expect(stormLevel(0, S.fireAt - 1)).toMatchObject({ fire: 0, ice: 0 });
+    expect(stormLevel(0, S.fireAt + 1).fire).toBeLessThan(0.01);
+    expect(stormLevel(0, S.iceAt).ice).toBe(0);
+    expect(stormLevel(0, S.gripAt)).toMatchObject({ fire: 1, ice: 1 });
+    let last = 0;
+    for (let t = S.fireAt; t <= S.gripAt; t += 50) {
+      const now = stormLevel(0, t).fire;
+      expect(now).toBeGreaterThanOrEqual(last);
+      last = now;
+    }
+    expect(stormLevel(null, 123)).toEqual({ fire: 1, ice: 1, chaos: 0 });
+    expect(buildStep(0)).toBe(0);
+    expect(buildStep(1)).toBe(STORM_ART.steps);
+  });
+
+  it("the ring's build: every pixel joins by the end, the board's edge near each element's start first, the far corner and the outer rim last", () => {
+    const { at, ice } = ringArrivals();
+    const n = STORM_ART.px;
+    expect(at.length).toBe(n * n);
+    expect(Math.max(...at)).toBeLessThan(255);
+    expect(RING_BUILD.along + RING_BUILD.off + RING_BUILD.rough).toBeCloseTo(1);
+    const lo = Math.round((n * STORM_ART.margin) / (1 + 2 * STORM_ART.margin));
+    const px = (x: number, y: number) => y * n + x;
+    // (The fire: up the left side from the bottom-left corner. The ice: down the right side from the top-right.)
+    expect(ice[px(lo, n - lo - 20)]).toBe(0);
+    expect(ice[px(n - lo, lo + 20)]).toBe(1);
+    expect(at[px(lo, n - lo - 20)]!).toBeLessThan(at[px(lo, lo + 20)]!);
+    expect(at[px(lo, lo + 20)]!).toBeLessThan(at[px(n - lo - 20, lo)]!);
+    expect(at[px(n - lo, lo + 20)]!).toBeLessThan(at[px(n - lo, n - lo - 20)]!);
+    // (On the edge line before the rim far outside it, at the same place along.)
+    expect(at[px(lo, 125)]!).toBeLessThan(at[px(1, 125)]! + 40);
+  });
+
+  it("his hop's size: from one box to the other, eased, the two ends exact (Eric: 'it almost looked like his size shrunk a bit')", () => {
+    const home = { x: 14, y: -4, w: 28 };
+    const stand = { x: 50, y: 56, w: 38 };
+    expect(fly(home, stand, 14, 0)).toEqual(home);
+    expect(fly(home, stand, 14, 1)).toEqual(stand);
+    let w = home.w;
+    for (let u = 0; u <= 1; u += 0.05) {
+      const at = fly(home, stand, 14, u);
+      expect(at.w).toBeGreaterThanOrEqual(w - 1e-9);
+      w = at.w;
+    }
+  });
+
+  it("the pieces his swords throw (Eric, Nov 28): the middle's, knocked back a little on the first stab, at the board's edge after the second, home as he leaps away; always on the board", () => {
+    const fen = "r1bqkb1r/pp3ppp/2n2n2/2ppp3/2BPP3/2N2N2/PPP2PPP/R1BQK2R w KQkq - 0 6";
+    for (const o of ["white", "black"] as const) {
+      const all = nudged(fen, o);
+      const names = all.map((n) => n.square);
+      // (The middle's pieces, not the back ranks' corners.)
+      for (const sq of ["d4", "e4", "d5", "e5", "c4", "c5", "c3", "f3", "c6", "f6"]) expect(names, `${sq} (${o})`).toContain(sq);
+      for (const sq of ["a1", "h1", "a8", "h8", "a2", "h7"]) expect(names).not.toContain(sq);
+      for (const n of all) {
+        expect(Math.hypot(n.ux, n.uy)).toBeCloseTo(1);
+        expect(thrownAt(n, S.nudgeAt - 1)).toMatchObject({ out: 0, turn: 0 });
+        const knocked = thrownAt(n, S.iceAt - 1).out;
+        const edge = thrownAt(n, S.iceAt + THROW.blastMs + 1).out;
+        expect(knocked - n.shove, `${n.square} knocked`).toBeGreaterThan(THROW.knock * 0.45);
+        expect(knocked - n.shove).toBeLessThan(THROW.knock * 1.05);
+        expect(edge, `${n.square} blasted further than knocked`).toBeGreaterThanOrEqual(knocked - 0.01);
+        expect(thrownAt(n, S.healAt - 1).out).toBeCloseTo(n.far);
+        expect(thrownAt(n, S.healAt + S.healMs)).toMatchObject({ out: 0, turn: 0, moving: false });
+        // (Its square's middle plus its way out: inside the board at every beat, a bounce and a hop aside.)
+        const file = n.square.charCodeAt(0) - 97;
+        const rank = Number(n.square[1]);
+        const cx = ((o === "white" ? file : 7 - file) + 0.5) * 12.5;
+        const cy = ((o === "white" ? 8 - rank : rank - 1) + 0.5) * 12.5;
+        for (let t = 0; t <= S.ms; t += 40) {
+          const at = thrownAt(n, t);
+          const x = cx + n.ux * at.out;
+          const y = cy + n.uy * at.out;
+          expect(x, `${n.square} at ${t}`).toBeGreaterThan(2);
+          expect(x).toBeLessThan(98);
+          expect(y).toBeGreaterThan(2);
+          expect(y).toBeLessThan(98);
+        }
+      }
+      // (Thrown along one line, they land one behind another, never on one spot.)
+      const ends = all.map((n) => `${Math.round(n.ux * 30)},${Math.round(n.uy * 30)},${Math.round(n.far)}`);
+      expect(new Set(ends).size).toBe(all.length);
+    }
+    // (He leaps away, they fly home: from his leap, done before the scene ends.)
+    expect(S.healAt).toBeGreaterThanOrEqual(S.leapAt);
+    expect(S.healAt + S.healMs).toBeLessThanOrEqual(S.homeAt + 400);
   });
 });

@@ -1043,15 +1043,20 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   `FINISHER_MARGIN_MS` before the hold ends). His block plays in his thinking, at least `FINISHER_BLOCK_MS` (`strangerTurnMs`). On a phone
   his hop never rises above his corner (`hopHeight`). His Frostfire burn is Grex's art, quiet (`FireBurn`'s `quiet`). Your pawn: one of three slashes; his piece lost:
   his block; every third quiet move: his flourish (`kits.ts` `strangerAnim`, the kit's `animOf`). Shout: `gkHyuah`. Test link `&power=finisher[-kind]`.
-  His storm (Nov 27, docs/decisions/2026-11-27-stranger-storm.md): its opening scene (`storm`, STORM_SCENE's beats, 11 s from his leap) is
+  His storm (Nov 27, docs/decisions/2026-11-27-stranger-storm.md; polished: 2026-11-27-stranger-polish.md): its opening scene (`storm`,
+  STORM_SCENE's beats, 10 s from his leap, its whole banner before it: POWER_BANNERS) is
   `components/Stranger.tsx` `stormMoment`: his leap to the board's middle (the nudged pieces drawn by it, off the board's own drawing:
-  `strangerBoard`), `stormPlant`/`stormCharge`/`stormPull`, one SVG of the swords' ripples. Its art is drawn offline and only played back
+  `strangerBoard`; Nov 28: every piece within `THROW.reach` of his swords knocked back on the first stab, blasted to the board's edge on the second,
+  home from his leap away, `nudged`/`thrownAt`, two big ripples a stab), `stormPlant`/`stormCharge`/`stormPull`, one SVG of the swords' ripples. Every hop of his starts and ends at his own
+  figure's box, measured (`homeOf`), scaled about his feet as he flies (`fly`). Nothing of the storm shows before its scene (`sceneOf`'s
+  `ahead`); the ring gathers from nothing by a mask (`ringArrivals`, `stormLevel`); the page's shade is one element on the page, the board's
+  row raised over it (`keepShade`, `.sg-shade`, `.sg-shading`; STORM_ART.dim); his sheets go only once his battle has closed (`keepStranger`). Its art is drawn offline and only played back
   (Nov 27, docs/decisions/2026-11-27-stranger-storm-art.md; GBA style: `scripts/storm-art/` `render.py`, `rift.py`, `pack.py` write
   `characters/stranger-storm.webp` and `stranger-rift.webp`, loaded as his battle shows): the ring (`StormRing`, `STORM_ART`) is one 250 px
-  canvas, a few image draws a frame from the clock alone, the turn's element leading, 88% see-through, a soft dim round the board
-  (`.sg-dim`); the rift (`StormRift`, `RIFT_ART`, a boss under-layer) tears open with the swords, stays under the pieces and heals a stage
+  canvas, a few image draws a frame from the clock alone, the turn's element leading, 88% see-through; the rift (`StormRift`, `RIFT_ART`, a boss under-layer, half see-through) tears open with the swords, stays under the pieces and heals a stage
   each turn. Ice reuses Ginger's ice (the rules' `iced`), Fire Grex's tile and burn. Dock line through each turn: `refused.ts` `stormLine`.
-  Frames: `node scripts/frames-stranger-storm.mjs <dir> phone` (stills, a real-speed GIF, the opening's GIF; `PERF=1`: frame times).
+  Frames: `node scripts/frames-stranger-storm.mjs <dir> phone` (stills, a real-speed GIF from true screenshots, the opening's GIF; `PERF=1`:
+  frame times; `NOSTILLS=1 RAW=1`: every frame, for contact sheets; `CROWD=4 MP4=1`: a crowded middle, an MP4). Unlocked by a win, he's said once: `unlocks.ts` `wonUnlockFloor`, `UnlockNotice.tsx`.
 
 - **Chandy** (Nov 16; art docs/decisions/2026-11-16-chandy-art.md, rules 2026-11-16-chandy-rules.md): rules `bosses/chandy.ts`
   (and `chandyBattle`: the meter, the queen lock's shot, Dodge's rounds), server `server/src/bosses/chandy.ts` (Dodge's timer and

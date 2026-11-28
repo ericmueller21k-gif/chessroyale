@@ -1260,3 +1260,22 @@ showed the last town's renderer and its pictures (about 230 MB) alive through th
 (`__shopElves`), and, once that was fixed, by module-level vnodes (TowerHearts' pixels) and Preact's first vnode, whose handlers keep
 the screen's refs. Back from the floor, a second whole street loaded beside it just to show the tower. A heap snapshot's retaining
 path (CDP `HeapProfiler`) found each holder in minutes; guessing had found none. docs/decisions/2026-11-27-town-return.md.
+
+## A storm that showed before its scene, and sheets let go every turn (Nov 27, 2026)
+
+Eric, playing the Stranger on a phone: "right when he triggered his ult, it showed the tornado before he even initiated anything ...
+for a split second around the board", and the whole scene "looks clunky, like a second thought". A frame-by-frame record (every frame's
+ring strength, dim and figure box, read in the page) showed why. The storm's turn begins in the rules as his move shows, about 450 ms
+before the scene's banner, and the board's layer drew the ring, the rift and the dim from that state alone. The banner then covered the
+middle of the board for 1.5 s of the scene: his landing and his swords coming out were never seen. His figure passed from his bar's own
+(101 px) to the scene's (137 px, 36 px off) in one frame, and back. And at every phase of the storm's turns the ring, the rift and the
+dim were gone for a frame: his figure's component let the storm's sheets go in its cleanup, and the match's screens are drawn again every
+phase, so both sheets were fetched and decoded again each turn. The tests had checked that each thing showed, never that nothing showed
+before, nor every frame between.
+
+One false trail: the recording had a quarter-second hole at his leap. A trace showed the page drew every frame; headless Chrome's
+screencast delivers none while a text box's line ends.
+
+**The fix:** the layers wait for their scene (`sceneOf`'s `ahead`); the banner whole before his leap; his hop from his own figure's
+measured box; the sheets kept through a redraw (`keepStranger`); the shade one element on the page; the spec records every frame from the
+battle's first. docs/decisions/2026-11-27-stranger-polish.md.

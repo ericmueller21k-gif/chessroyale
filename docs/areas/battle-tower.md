@@ -161,7 +161,8 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 
 - **No tower screen** (PR 10's `/tower` page out of the flow, its code kept unused at Eric's word): the clerk's card (`town/TowerDesk.tsx`: Start, or Continue: floor N with a small
   Start over that asks) → you walk into the elevator → the floor room (`shops/tower-floor*.ts`: N on its walls, you to your mark, its bosses out
-  of the elevator one by one, the pieces up, the zoom) → `enterTowerFloor()` → Boss alone's battle (no Last Stand; `TowerBar.tsx`) → the
+  of the elevator one by one, the pieces up, the zoom; a floor that is the Stranger's alone plays his own entrance, about 10 s: out of the
+  elevator slower, his two lines in the town's bubble, his blades drawn as the pieces come up: `tower-floor.ts` `STRANGER_ENTRANCE`, `ownEntrance`, the scene's `entrance`, `bubble.ts`; Nov 27) → `enterTowerFloor()` → Boss alone's battle (no Last Stand; `TowerBar.tsx`) → the
   end screen ([2026-11-20-end-screen.md](../decisions/2026-11-20-end-screen.md): `useTowerEnd` in `TowerResult.tsx` puts "Floor 3 cleared!" / "Floor 4 lost · 1 life left" in the headline, the floor's bosses 1-2-1, the next floor's line and one button, Back to the Battle Tower (Eric, Nov 22), live once the server has the result) → the floor room on your mark, straight in (Nov 27: the street not loaded again; town-square.md, "Straight into a building"): won (or a life spent), the elevator open
   (Up to floor N+1), a blinking arrow on the floor before it; out, shut, the arrow before the way down. The room's table is solid: held keys
   walk you round it (Nov 21: [2026-11-21-tower-room-arrow.md](../decisions/2026-11-21-tower-room-arrow.md); town-square.md, "Floor room"). Bests on the lobby's board. Between floors leave by the way down or Back. A match's address is `/tower`: a reload rejoins it
