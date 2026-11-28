@@ -8,7 +8,7 @@
  * corner, each a pixel over its shared edges so no seam opens), for when its perspective needs them. A box's pieces are packed into a
  * sheet or two (so WebGL's atlas holds a few big pictures, not hundreds of small ones).
  *
- * Painting a box is a few milliseconds: render.ts does it ahead, a little a frame, nearest first (`TOWN_FEEL.boxBakeMs`).
+ * Painting a box is a few milliseconds: the build does it (scripts/bake-town.ts), never the device.
  */
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import { faceStep, geomOf, worldNormal, type FaceGeom, type RoofBox, type RoofInst } from "./box-geom.ts";

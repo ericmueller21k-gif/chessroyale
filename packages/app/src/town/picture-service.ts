@@ -11,9 +11,10 @@
  *   the only way one reaches the GPU: the painter uploads nothing as it draws (paint-gl.ts), so a picture that never came through this
  *   door is simply not drawn, and a new feature can't bring an upload back into a frame by accident.
  * - **Ready** once the GPU holds it. A picture asked again with a new `stamp` (the device's pixel ratio changed, its font came) is made
- *   again while the old one goes on being drawn, and swapped when the new one is ready.
- * - **Let go** by whoever asked (`drop`: a rider gone, a look changed), or, for pictures that can be made again whenever they're
- *   wanted (a tag, a bubble), when their group's pages are full: the one least lately asked for makes room. One with nothing to make
+ *   again while the old one goes on being drawn, and swapped when the new one is ready. Pictures made elsewhere, off the frame (a
+ *   ride's frames, an outfit), are asked for the same way: their `make` only hands them over.
+ * - **Let go** by whoever asked (`drop`), or, for all but those asked for with `hold`, when their group's pages are full: the one
+ *   least lately asked for (never one asked for in this frame or the last) makes room, and is made again if it's asked for again. One with nothing to make
  *   room waits, and is tried again as room comes. No atlas page is ever started again.
  *
  * Groups (`PIC_GROUP`) are the painter's: each has atlas pages of its own, so the text never competes with the outfits for room.
@@ -31,7 +32,7 @@ export type Art = { readonly cv: CanvasImageSource } | { readonly cvs: readonly 
 const srcsOf = (a: Art): readonly CanvasImageSource[] => ("cvs" in a ? a.cvs : [a.cv]);
 
 interface Making {
-  stamp: string;
+  stamp: number;
   /** Makes it: the picture, or null after one step of several (called again in the next slice). */
   make: () => Art | null;
   /** Made, handed to the painter, waiting for the GPU. */
@@ -43,7 +44,7 @@ interface Slot {
   group: number;
   /** What's drawn now (null: nothing yet) and the stamp it was made with. */
   art: Art | null;
-  stamp: string;
+  stamp: number;
   /** The one on its way: it takes `art`'s place once the GPU holds it. */
   next: Making | null;
   /** The tick it was last asked for. */
@@ -52,7 +53,6 @@ interface Slot {
   hold: boolean;
   /** Its pictures found no room and nothing could make any: tried again at `retryAt` (a tick), or sooner when one of its group goes. */
   retryAt: number;
-  then: (() => void)[];
 }
 
 /** How many ticks a picture that found no room waits before it's tried again (a second or so of frames). */
@@ -74,7 +74,7 @@ export class PictureService {
   evicted = 0;
 
   constructor(
-    private readonly painter: Pick<Painter, "keep" | "kept" | "holds" | "free">,
+    private readonly painter: Pick<Painter, "keep" | "kept" | "holds" | "free"> & { readonly lost?: boolean },
     private readonly now: () => number = () => performance.now(),
   ) {}
 
@@ -83,36 +83,19 @@ export class PictureService {
    * it out). The first asking queues `make` to run between frames; a new `stamp` queues it again, the old picture drawn meanwhile.
    * `hold`: never let go to make room. `make` may return null after one step of a long job: it's called again.
    */
-  ask<T extends Art>(group: number, key: string, stamp: string, make: () => T | null, hold = false): T | null {
+  ask<T extends Art>(group: number, key: string, stamp: number, make: () => T | null, hold = false): T | null {
     let s = this.slots.get(key);
     if (!s) {
-      s = { key, group, art: null, stamp: "", next: null, used: this.tickNo, hold, retryAt: 0, then: [] };
+      s = { key, group, art: null, stamp: NaN, next: null, used: this.tickNo, hold, retryAt: 0 };
       this.slots.set(key, s);
     }
     s.used = this.tickNo;
-    if (s.art ? s.stamp !== stamp && s.next?.stamp !== stamp : s.next?.stamp !== stamp) this.queue(s, stamp, make);
+    // (Nothing of this stamp here or on its way: made. One on its way is what counts: it takes the other's place.)
+    if ((s.next ? s.next.stamp : s.stamp) !== stamp) this.queue(s, stamp, make);
     return s.art as T | null;
   }
 
-  /**
-   * Pictures already made off the frame (a ride's frames, a dressed pawn's), handed over: uploaded between frames, then `then` is
-   * called (drawn from then on, not before). Held until `drop(key)`. Handed over again under the same key: the new ones replace the
-   * old once they're ready.
-   */
-  take(group: number, key: string, cvs: readonly CanvasImageSource[], then?: () => void): void {
-    let s = this.slots.get(key);
-    if (!s) {
-      s = { key, group, art: null, stamp: "", next: null, used: this.tickNo, hold: true, retryAt: 0, then: [] };
-      this.slots.set(key, s);
-    }
-    s.used = this.tickNo;
-    const art: Art = { cvs };
-    this.queue(s, `take ${++this.takes}`, () => art);
-    if (then) s.then.push(then);
-  }
-  private takes = 0;
-
-  private queue(s: Slot, stamp: string, make: () => Art | null): void {
+  private queue(s: Slot, stamp: number, make: () => Art | null): void {
     // (One on its way with another stamp: this one in its place. What it had handed over is let go.)
     if (s.next?.art) this.letGo(s.next.art);
     for (const l of [this.sent, this.stuck]) {
@@ -206,6 +189,9 @@ export class PictureService {
     }
     if (n && REC) REC.made(n, this.now() - t0);
     if (!upload) return this.toMake.length > 0;
+    // (The context lost: nothing can go up, and nothing is held. Once it's back the town puts everything on the GPU again under its
+    // loading card, and `settle` follows.)
+    if (this.painter.lost) return this.busy;
     if (this.sent.length) {
       const done = this.painter.kept?.(Math.max(0, budgetMs - (this.now() - t0))) ?? 1;
       this.settle(done >= 1);
@@ -236,12 +222,13 @@ export class PictureService {
   }
 
   /**
-   * What the GPU holds of the pictures handed over is ready: it takes its key's place (the one it replaces let go) and its `then`s
-   * run. `all`: the painter has been through everything it was handed, so one not held found no room: the least lately asked for of
+   * What the GPU holds of the pictures handed over is ready: it takes its key's place (the one it replaces let go). `all`: the painter has been through everything it was handed, so one not held found no room: the least lately asked for of
    * its group that may go make room (not one asked for in this frame or the last) and it's handed over again; with none to go, it
    * waits (`RETRY_TICKS`, or until one of its group is dropped).
    */
   settle(all: boolean): void {
+    /** Those handed over again, room made: uploaded by the next slice, settled after it. */
+    const again: Slot[] = [];
     for (let i = 0; i < this.sent.length; i++) {
       const s = this.sent[i]!;
       const m = s.next!;
@@ -256,19 +243,19 @@ export class PictureService {
         s.stamp = m.stamp;
         s.next = null;
         if (old) this.letGo(old);
-        for (const f of s.then.splice(0)) f();
         continue;
       }
       // No room: what it did get is given back, room is made if any can be, and it's handed over again.
       this.letGo(m.art!);
       let room = 0;
       while (room < EVICT_MAX && this.evict(s)) room++;
-      if (room) this.send(s);
+      if (room) again.push(s);
       else {
         s.retryAt = this.tickNo + RETRY_TICKS;
         this.stuck.push(s);
       }
     }
+    for (const s of again) this.send(s);
   }
 
   /** Lets go the least lately asked for picture of `for_`'s group that may go (not held, ready, not asked for in this frame or the last). */

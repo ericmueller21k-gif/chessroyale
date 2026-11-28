@@ -217,6 +217,8 @@ interface Entry {
   sy: number;
   sh: number;
   reused: boolean;
+  /** Handed to `keep` (once). */
+  asked: boolean;
   /** Let go (`free`) while it waited for `kept`: not uploaded. */
   gone: boolean;
   /** A kept page's picture (`adopt`): its canvas empty until `fill` puts its pixels on it, before it's ever uploaded alone. */
@@ -680,8 +682,10 @@ class GLPainter implements Painter {
   keep(src: CanvasImageSource, group = 0): void {
     // (With the context lost too, since Nov 28: it waits for `kept` once the context is back, `init`. Until then a picture handed over
     // during a loss, the labels made in that moment of the loading screen, was dropped, and uploaded in a frame as it first showed.)
-    if (this.layers.has(src) || this.reg.has(src)) return;
+    if (this.layers.has(src)) return;
     const e = this.entryOf(src);
+    if (e.asked) return;
+    e.asked = true;
     e.group = group;
     this.keepQ.push(e);
   }
@@ -862,7 +866,7 @@ class GLPainter implements Painter {
   private entryOf(src: CanvasImageSource): Entry {
     let e = this.reg.get(src);
     if (!e) {
-      e = { src, tex: null, page: null, x: 0, y: 0, w: 0, h: 0, gen: 0, group: 0, sy: 0, sh: 0, reused: false, gone: false, stand: false };
+      e = { src, tex: null, page: null, x: 0, y: 0, w: 0, h: 0, gen: 0, group: 0, sy: 0, sh: 0, reused: false, asked: false, gone: false, stand: false };
       this.reg.set(src, e);
       this.live.add(e);
     }

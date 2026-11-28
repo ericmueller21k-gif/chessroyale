@@ -6,8 +6,9 @@
  * fade, haze and blur (a shrink and a stretch back, which needs no ctx.filter); sprites are drawn only once their square
  * is inside the rim, always whole, fading in; the haze strip is drawn behind them.
  *
- * Everything that can be made ahead is cached (square colors, fonts, the clouds, each boss's and home's frames, drawn
- * once with renderFrame the first time they show, the pawns), so a frame allocates nothing on its hot path.
+ * Nothing is made in a frame (Nov 28, the town's structure, phase 2): the pictures of the world are the build's baked ones, in place
+ * before the first frame, and whatever the device makes itself (the tags, the names, the bubble, the pawns and their outfits and rides,
+ * the sky) is asked of the picture service (picture-service.ts), made and uploaded between frames, and left out until it's ready.
  */
 import { frameKeys, renderFrame, type Character } from "../characters/sprite.ts";
 import { mirrorFor } from "../characters/sprite-kit.ts";
@@ -30,29 +31,30 @@ import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
 import { look, mixLights, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
 import { SkyPainter } from "./sky-draw.ts";
 import type { Ctx, PaintLayer, Painter } from "./paint.ts";
-import { ATLAS, art2d } from "./paint.ts";
-import type { LightPool, LightSpot } from "./houses/kit.ts";
-import { PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
+import { art2d } from "./paint.ts";
+import type { LightSpot } from "./houses/kit.ts";
+import { PARK_LAMP, PARK_LAMP_HEAD, PARK_TABLE, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
 import type { SidekickSheet } from "./sidekick-sheets.ts";
 import type { Rider, RiderTrail } from "./rides.ts";
 import { building } from "./buildings.ts";
 import type { TownBox } from "./town-kit.ts";
 import { HEDGE } from "./dressing.ts";
-import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY } from "./street.ts";
+import { ROW_GROUND, STREET_GROUND, STREET_GROUND_KEY } from "./street.ts";
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
-import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, setSolidTop, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
+import { affine, boxPoint, geomOf, newPlan, planBox, setSolidTop, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, upName, type PartId } from "./frame-report.ts";
-import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
+import type { Piece, RoofArt } from "./box-draw.ts";
 import type { Baked } from "./baked.ts";
 import { Pictures } from "./keep-pictures.ts";
-import { framePixels, glowPixels } from "./paint-jobs.ts";
+import { framePixels } from "./paint-jobs.ts";
 import { BOSS_ART, SHEET_ANIMS, figureArt, roofKey, makeTownArt, sheetName, sidekickFrame, townWants, type ArtCache, type TownArt, type Want } from "./pictures.ts";
 import { stepChar } from "./kit/bake.ts";
-import { ALL_HOMES, ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
-import { drawZzz } from "./zzz.ts";
-import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
+import { ALL_HOMES, ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, bossNextLine, figureName, groundAt, hasTownBoss, isSprite, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
+import { drawZzz, zzzGlyph } from "./zzz.ts";
+import { PIC_GROUP, PictureService } from "./picture-service.ts";
+import { TAG_STYLE, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export { BOSS_ART };
@@ -163,8 +165,10 @@ function farFirst(pcs: readonly TablePiece[]): readonly TablePiece[] {
 /** Fonts by whole pixel size (tags, signs). */
 const TAG_FONT = Array.from({ length: 16 }, (_, s) => `600 ${s}px ${FONT}`);
 /**
- * A name tag drawn once (`Renderer.tagArtOf`): its canvas (four rows, each `rh` device pixels high, TAG_PAD device pixels
- * round the pill for its shadow's blur, 4), the pill's size, its size and kind (yours, a pawn's or a sidekick's: its colors), the frame it was last drawn.
+ * A name tag's picture (`Renderer.paintTag`, made by the picture service): its canvas (four rows, each `rh` device pixels high, TAG_PAD
+ * device pixels round the pill for its shadow's blur, 4), the pill's size (CSS pixels) at the font size `s` it was made at, its kind
+ * (yours, a pawn's or a sidekick's: its colors) and the device's pixel ratio it was made for. One a name and kind (Nov 28, phase 2:
+ * until then one for each of the five sizes a tag shows at); the GPU scales it to the size drawn.
  */
 interface TagArt {
   cv: HTMLCanvasElement;
@@ -173,27 +177,38 @@ interface TagArt {
   rh: number;
   s: number;
   kind: TagKind;
-  used: number;
-  /** `fontsLoaded` when it was drawn: a tag drawn before its font came is drawn again (-2: its font was in; -1: not drawn yet). */
-  fonts: number;
+  dpr: number;
 }
-/** A home's name drawn once a size (`Renderer.nameArtOf`): its outline's row and its white's, `rh` device pixels each; where x, y fall. */
+/** A home's name's picture (`Renderer.paintName`): its outline's row and its white's, `rh` device pixels each; where x, y fall; the font size and pixel ratio it was made at. One a name (until Nov 28 one for each of nine sizes). */
 interface NameArt {
   cv: HTMLCanvasElement;
   ox: number;
   oy: number;
   rh: number;
-  /** As TagArt's. */
-  fonts: number;
+  s: number;
+  dpr: number;
 }
 /** The homes' names' outline (CSS pixels). */
 const NAME_LINE = 3.5;
-/** The sizes a home's name shows at (drawNames' clamp) and a tag (`tag`'s): the loading screen makes each (`makeLabels`). */
+/**
+ * The sizes a home's name shows at (drawNames' clamp) and a tag (`tag`'s). Each is one picture, made at `TOWN_FEEL.namePicSizes` /
+ * `tagPicSizes` (the biggest it shows at: never stretched) and scaled by the GPU (`picSize`).
+ */
 const NAME_SIZES = [12, 20] as const;
 const TAG_SIZES = [8, 12] as const;
-/** Device pixels round the speech bubble's pictures for their shadow; how many lines' bubbles are kept. */
+/** The size a label's picture is made at to be drawn at `want`: the smallest of `sizes` (rising) that's at least as big, else the biggest. */
+const picSize = (sizes: readonly number[], want: number): number => sizes.find((s) => s >= want) ?? sizes[sizes.length - 1]!;
+/** Device pixels round the speech bubble's pictures for their shadow. */
 const BUBBLE_PAD = 17;
-const BUBBLE_MAX = 8;
+/** A line's bubble's picture (`Renderer.paintBubble`): its canvas, its body's size (CSS pixels), the pixel ratio it was made for. */
+interface BubbleArt {
+  cv: HTMLCanvasElement;
+  w: number;
+  h: number;
+  dpr: number;
+}
+/** The kinds of tag, in the order their pictures' keys are kept (`Renderer.tagPic`). */
+const TAG_KINDS: readonly TagKind[] = ["you", "bot", "sidekick"];
 /** The speech bubble's shadow (in the canvas's pixels, whatever the transform, as on the town's canvas). */
 function bubbleShadow(g: CanvasRenderingContext2D): void {
   g.shadowColor = "rgba(0,0,0,.25)";
@@ -201,6 +216,8 @@ function bubbleShadow(g: CanvasRenderingContext2D): void {
   g.shadowOffsetY = 2;
   g.fillStyle = "#fff";
 }
+/** The table pieces' pictures' keys (the picture service's), by kind, light and dark. */
+const PIECE_KEYS = { l: Object.fromEntries(Object.keys(TABLE_PIECES).map((k) => [k, `piece|${k}|l`])), d: Object.fromEntries(Object.keys(TABLE_PIECES).map((k) => [k, `piece|${k}|d`])) } as { l: Record<string, string>; d: Record<string, string> };
 /** The tables' clock's characters (TABLE_DIGITS), and the digits by value. */
 const CLOCK_CHARS = "0123456789:";
 const DIGIT = "0123456789".split("");
@@ -215,6 +232,18 @@ function fontReady(font: string): boolean {
 const TAG_PAD = 8;
 /** Counts the web fonts' loads finished (a tag's font, Archivo, may come after the town opens). */
 let fontsLoaded = 0;
+/** The fonts known to be in (`fontIn`), and the count of loads each other one was last checked at. */
+const fontsIn = new Set<string>();
+const fontChecked = new Map<string, number>();
+/** Whether `font` is in, asked every frame for every label drawn: the browser is asked only when a font has loaded since the last asking. */
+function fontIn(font: string): boolean {
+  if (fontsIn.has(font)) return true;
+  if (fontChecked.get(font) === fontsLoaded) return false;
+  fontChecked.set(font, fontsLoaded);
+  if (!fontReady(font)) return false;
+  fontsIn.add(font);
+  return true;
+}
 if (typeof document !== "undefined" && document.fonts) {
   const loaded = () => void fontsLoaded++;
   document.fonts.addEventListener?.("loadingdone", loaded);
@@ -222,7 +251,6 @@ if (typeof document !== "undefined" && document.fonts) {
 }
 /** How far off its canvas a tag's pill is drawn to throw its shadow alone onto it (CSS pixels). */
 const TAG_THROW = 1000;
-const TAG_ART_MAX = 64;
 /** The homes' floating names (the game's display font), by whole pixel size. */
 const NAME_FONT = Array.from({ length: 41 }, (_, s) => `400 ${s}px ${FONT_BLACK}`);
 const BUBBLE_FONT = `500 12px ${FONT}`;
@@ -298,10 +326,14 @@ function darkFrame(img: HTMLCanvasElement): HTMLCanvasElement {
   return f ? f.fc.dark(f.i) : img;
 }
 
+/** An empty picture: what stands in for one that isn't there (the painter draws nothing for it). */
+let blank: HTMLCanvasElement | null = null;
+const BLANK = (): HTMLCanvasElement => (blank ??= Object.assign(document.createElement("canvas"), { width: 1, height: 1 }));
+
 /** An art's frames' times (ms a frame) by its id, where they're known without its animation (the build's manifest, baked.ts). */
 type FrameTimes = (id: string) => readonly number[] | undefined;
 /**
- * A character's frames as canvases, drawn the first time each shows (a frame at a time, never all at once). How many frames it has and
+ * A character's frames as canvases: the build's baked pictures, put in place by the loading screen. How many frames it has and
  * when each ends are laid out the first time they're asked for (Nov 28, phase 1b): from `times` if it knows this art (the baked town's
  * manifest: then the character's animation is never built just to count its frames, 0.8 s of a slowed phone's load), else from its
  * animation, as before.
@@ -351,20 +383,26 @@ class FrameCache {
     while (i < ends.length - 1 && t >= ends[i]!) i++;
     return this.get(i);
   }
-  /** Frame `i`: the build's baked picture (`kept`, the town's own list), else painted the first time it's asked for (a picture not on the list). */
+  /**
+   * Frame `i`: the build's baked picture, put here by the loading screen (`kept`). Nothing is painted here (Nov 28, phase 2: until then
+   * a frame not on the town's list was painted, and uploaded, the first time it was drawn): one that isn't here is a blank the painter
+   * leaves out.
+   */
   get(i: number): HTMLCanvasElement {
+    return (this.laid ?? this.lay()).frames[i] ?? BLANK();
+  }
+  /** Frame `i` painted here, for a 2D context to read (the Colosseum's chip icon, which the town itself never draws): made once. */
+  painted(i: number): HTMLCanvasElement {
     const frames = (this.laid ?? this.lay()).frames;
     let c = frames[i];
     if (c) return c;
-    const t0 = REC ? performance.now() : 0;
     const { w, h, data } = framePixels(this.ch, i);
-    c = upName(document.createElement("canvas"), `frame ${this.ch.id}`);
+    c = document.createElement("canvas");
     c.width = w;
     c.height = h;
     art2d(c).putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
     frames[i] = c;
     frameOf.set(c, { fc: this, i });
-    if (REC) REC.paint(performance.now() - t0);
     return c;
   }
   /** Frame `i` one ramp step darker. */
@@ -607,20 +645,6 @@ function keptGlow(cv: HTMLCanvasElement | null, row: readonly number[], ch: Char
   for (let k = 0; cv && k < row.length; k += 7) pieces.push({ cv, sx: row[k]!, sy: row[k + 1]!, w: row[k + 2]!, h: row[k + 3]!, x: row[k + 4]!, y: row[k + 5]!, flicker: row[k + 6] === 1 });
   return { pieces, lit: null, ch, spots };
 }
-/**
- * A picture's lights baked (paint-jobs.ts `glowPixels`), its sheet on a canvas: one picture a glow (Nov 26:
- * a canvas a piece was 2,551 canvases).
- */
-function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly LightPool[]): Glow {
-  const { sheet, pieces: at } = glowPixels(ch, spots, pools);
-  if (!sheet) return { pieces: [], lit: null, ch, spots };
-  const cv = upName(document.createElement("canvas"), "glow");
-  cv.width = sheet.w;
-  cv.height = sheet.h;
-  art2d(cv).putImageData(new ImageData(new Uint8ClampedArray(sheet.data.buffer as ArrayBuffer, sheet.data.byteOffset, sheet.data.length), sheet.w, sheet.h), 0, 0);
-  return keptGlow(cv, at, ch, spots);
-}
-
 /** A piece on a table's board: its square (f: rank from white's side, g: file), where it slid from, when, and when it's gone. */
 interface TablePiece {
   f: number;
@@ -645,6 +669,9 @@ function setUp(): TablePiece[] {
 /** The street town's chase camera (round 4): its phone and computer sets in place of the town's. */
 /** The street town's camera this frame: its zoom steps' numbers blended at the step it's at (feel.ts streetZoomSteps). */
 const STREET_CAMS = { tall: { ...TOWN_FEEL.camStreetTall }, wide: { ...TOWN_FEEL.camStreetWide } };
+
+/** (The picture service's) The "zzz"'s glyph. */
+const zzzPic = () => ({ cv: zzzGlyph() });
 
 /** The most "zzz"s drawn in a frame. */
 const ZZZ_MAX = 64;
@@ -708,7 +735,7 @@ export class Renderer {
   private readonly statueImg: (HTMLCanvasElement | null)[] = STATUES.map(() => null);
   /** Which of each world's-scale statue's pixels are drawn (taps read this, never the canvas: a read-back stalls). */
   private readonly statueMask: (Uint8Array | null)[] = STATUES.map(() => null);
-  /** Statue i at the world's scale and its mask, made the first time it's drawn (Nov 10, phone load 3: not all as the town opens). */
+  /** Statue i at the world's scale: the build's baked picture, put here by the loading screen (`made`), its mask read from its pixels then. */
   private statueAt(i: number, made?: () => HTMLCanvasElement): HTMLCanvasElement {
     let c = this.statueImg[i];
     if (!c && made) {
@@ -718,19 +745,18 @@ export class Renderer {
       const m = (this.statueMask[i] = new Uint8Array(c.width * c.height));
       for (let j = 0; j < m.length; j++) m[j] = a[j * 4 + 3]! > 0 ? 1 : 0;
     }
-    if (!c) {
-      const m: Uint8Array[] = [];
-      c = this.statueImg[i] = canvasOf(statueArt(STATUES[i]!.id, 1), m);
-      this.statueMask[i] = m[0]!;
-    }
-    return c;
+    return c ?? BLANK();
   }
-  private readonly closeImg: (HTMLCanvasElement | null)[] = STATUES.map(() => null);
+  /**
+   * The statues' close-up drawings: each asked of the picture service a little after the town shows (`closeBuildAfterMs`; at once, and
+   * first, for one the camera is coming in on) and made there between frames, a step a call (`closeStep`); when each was first drawn.
+   */
   private readonly closeReady: number[] = STATUES.map(() => NaN);
-  private closeJob: { i: number; steps: ReturnType<typeof statueSteps>; layers: { part: import("../characters/sprite.ts").Part; at: readonly [number, number] }[] | null; next: number; cv: HTMLCanvasElement | null } | null = null;
+  private readonly closeJobs: ({ steps: ReturnType<typeof statueSteps>; layers: { part: import("../characters/sprite.ts").Part; at: readonly [number, number] }[] | null; next: number; cv: HTMLCanvasElement | null } | null)[] = STATUES.map(() => null);
+  private readonly closeKeys = STATUES.map((_, i) => `close|${i}`);
   private buildFrom = NaN;
-  /** The quotes' lettering, by statue and size (device pixels a font pixel): one canvas, its lines' pitch and height. */
-  private readonly quoteArt = new Map<string, QuoteArt>();
+  /** The quotes' lettering laid out, by statue, size (device pixels a font pixel) and leading: its lines and its picture's size and key. */
+  private readonly quoteLay = new Map<string, { key: string; lines: string[]; w: number; h: number; e: number } | null>();
   /** How deep (squares ahead of the camera) the statue in close-up stands: the people nearer than it fade. */
   private statueDz = Infinity;
   /** This sprite's fade (the people in front of a statue in close-up), multiplied into its alpha. */
@@ -797,21 +823,22 @@ export class Renderer {
   readonly youRide = { anim: "" as "" | "idle" | "move", frame: -1, facing: 1, view: 0 };
   /** Each sidekick's frames, by its sheet: put in place by the loading screen (`plan`), never made per frame. */
   private readonly spriteArt = new Map<SidekickSheet, SpriteFrames>();
-  /** Tag widths by name and size; sign and bubble layouts by text. */
   /**
-   * The name tags, each drawn once (its pill, its shadow and its name) at the device's pixels and stamped every frame
-   * (Oct 28: a tag's shadow blur and its text, redrawn each frame, were the costliest part of a figure): by name, one
-   * per size and color; about TAG_ART_MAX in all, the least lately used making way (its canvas reused).
+   * The picture service (picture-service.ts): every picture the device makes is asked of it and drawn once it's ready (the name
+   * tags, the homes' names, the bubble, the signs, the pawns and their outfits and rides, the sky, the statues' close-ups).
    */
-  private readonly tagArt = new TagCache<TagArt>(TAG_ART_MAX);
-  private tagDpr = 0;
+  readonly svc: PictureService;
+  /** The keys of the labels' pictures, built once each (a frame builds no string): a tag's by its name, a bubble's by its line. */
+  private readonly tagKeys = new Map<string, string[]>();
+  private readonly bubbleKeys = new Map<string, string>();
+  private readonly lookKeys = new WeakMap<object, string>();
+  private nLooks = 0;
   private readonly nameW = new Map<string, number[]>();
-  /** Each home's sign lettering: laid out once, drawn once per size (in device pixels a font pixel). */
-  private readonly signs: { lines: string[]; w: number; h: number; art: HTMLCanvasElement | null }[];
+  /** Each home's sign lettering: laid out once, its picture made once (the picture service's, by `key`). */
+  private readonly signs: { lines: string[]; w: number; h: number; key: string }[];
   /** Where each place's name floats this frame (drawn over everything, after the homes): x, the building's top, its fade. */
   private readonly names: { x: number; y: number; a: number; k: number; eave: number; dz: number }[];
   private readonly tops: number[] = [];
-  private readonly bubbles = new Map<string, { cv: HTMLCanvasElement; w: number; h: number }>();
   private readonly drawSquare: (c: number, r: number, cu: number, ru: number, q: Quad) => void;
   /** This frame's squares: corners, faces' corners, colors; and a counting sort of them by color. */
   private readonly sqQuad = new Float64Array(SQ_MAX * 8);
@@ -928,12 +955,14 @@ export class Renderer {
     private readonly homes: readonly Home[],
   ) {
     this.ctx = paint.ctx;
+    this.svc = new PictureService(paint);
+    this.sky.ask = (key, stamp, make) => this.svc.ask(PIC_GROUP.looks, key, stamp, make, true);
     this.places = [...homes, COLISEUM_PLACE];
     this.houseItems = this.places.map((_, i) => newItem("house", i));
     this.names = this.places.map(() => ({ x: 0, y: 0, a: 0, k: 0, eave: NaN, dz: 0 }));
-    this.signs = this.places.map((h) => {
+    this.signs = this.places.map((h, i) => {
       const face = artOf(h).sign;
-      return { ...layout(h.name, face.w, face.h), art: null };
+      return { ...layout(h.name, face.w, face.h), key: `sign|${i}` };
     });
     this.bossItems = town.bosses.map((_, i) => newItem("boss", i));
     this.propItems = PROPS.map((_, i) => newItem("prop", i));
@@ -944,7 +973,6 @@ export class Renderer {
     const art = (this.art = makeTownArt(homes, town.bosses.map((bs) => bs.home.id)));
     this.boxes = art.boxes;
     this.plans = this.boxes.map((b) => newPlan(b.box));
-    this.warmAt = [new Int32Array(this.boxes.length), new Int32Array(this.boxes.length)];
     // (Each box's footprint's squares: it shows when the rows let you see any of them, seen.ts.)
     const pt = { x: 0, y: 0 };
     this.boxSq = this.boxes.map((b) => {
@@ -1017,12 +1045,8 @@ export class Renderer {
     this.H = H;
     this.DPR = DPR;
     this.sky.resize(W, H, DPR);
-    // (The labels' pictures are drawn at the device's pixel ratio: a new one, they're drawn again as they show.)
-    if (this.labelDpr !== DPR) {
-      this.labelDpr = DPR;
-      this.nameArt.length = 0;
-      this.bubbles.clear();
-    }
+    // (The labels' pictures are made at the device's pixel ratio, part of each one's stamp: at a new ratio each is asked for again as
+    // it's drawn, the one it had drawn meanwhile.)
   }
 
   /** The sky's look changed (the clock, or `?sky=`): the sky, the horizon's colors and the world's tint follow. */
@@ -1045,6 +1069,7 @@ export class Renderer {
     const { ctx, W, H, DPR } = this;
     this.paint.frame();
     this.frameNo++;
+    this.svc.tick();
     this.nSoft = 0;
     this.camX = camX;
     this.camY = camY;
@@ -1087,7 +1112,7 @@ export class Renderer {
       this.sightN = seenWorked();
       REC!.sight(performance.now() - sightT);
     }
-    this.buildCloseUps(now);
+    this.askCloseUps(now);
     REC?.mark(P.camera);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
@@ -1118,7 +1143,10 @@ export class Renderer {
       const t = this.tags[i]!;
       this.drawTag(t.text, t.x, t.y, t.kind, t.size, t.alpha);
     }
-    for (let i = 0; i < this.nZzz; i++) drawZzz(ctx, this.zX[i]!, this.zY[i]!, this.zS[i]!, now, this.zA[i]!);
+    if (this.nZzz) {
+      const z = this.svc.ask(PIC_GROUP.text, "zzz", 0, zzzPic, true);
+      if (z) for (let i = 0; i < this.nZzz; i++) drawZzz(ctx, this.zX[i]!, this.zY[i]!, this.zS[i]!, now, this.zA[i]!, z.cv);
+    }
     ctx.globalAlpha = 1;
     if (TOWN_FEEL.floatingNames) this.drawNames(now);
     if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
@@ -1186,42 +1214,41 @@ export class Renderer {
   }
 
   /**
-   * Makes the statues' close-up drawings ahead, a slice a frame (`closeBuildBudgetMs` of painting, or one layer drawn):
-   * starting a little after the page opens, or at once for one the camera is coming in on.
+   * Asks for the statues' close-up drawings ahead: a little after the page opens, or at once (and before whatever else waits) for one
+   * the camera is coming in on. Nothing is made here: the picture service makes each between frames (`closeStep`).
    */
-  private buildCloseUps(now: number): void {
-    if (!this.closeImg.includes(null)) return;
-    const f = TOWN_FEEL;
-    if (Number.isNaN(this.buildFrom)) this.buildFrom = now + f.closeBuildAfterMs;
-    const want = this.close.i >= 0 && !this.closeImg[this.close.i] ? this.close.i : -1;
+  private askCloseUps(now: number): void {
+    if (Number.isNaN(this.buildFrom)) this.buildFrom = now + TOWN_FEEL.closeBuildAfterMs;
+    const want = this.close.i;
     if (now < this.buildFrom && want < 0) return;
-    const t0 = performance.now();
-    do {
-      let job = this.closeJob;
-      if (!job) {
-        const i = want >= 0 ? want : this.closeImg.indexOf(null);
-        job = this.closeJob = { i, steps: statueSteps(STATUES[i]!.id, CLOSE), layers: null, next: 0, cv: null };
-      }
-      if (!job.layers) {
-        const r = job.steps.next();
-        if (r.done) job.layers = r.value;
-        continue;
-      }
-      // One layer drawn (outlined and colored) at most a frame.
-      const id = STATUES[job.i]!.id;
-      if (!job.cv) {
-        job.cv = upName(document.createElement("canvas"), "statue");
-        job.cv.width = STATUE_W * CLOSE;
-        job.cv.height = statueH(id) * CLOSE;
-      }
-      job.cv.getContext("2d")!.drawImage(canvasOf(statueFrame(id, CLOSE, [job.layers[job.next]!])), 0, 0);
-      if (++job.next === job.layers.length) {
-        this.closeImg[job.i] = job.cv;
-        this.closeReady[job.i] = now;
-        this.closeJob = null;
-      }
-      return;
-    } while (performance.now() - t0 < f.closeBuildBudgetMs);
+    for (let i = 0; i < STATUES.length; i++) if (want === i || now >= this.buildFrom) this.closePic(i);
+    if (want >= 0) this.svc.hurry(this.closeKeys[want]!);
+  }
+  /** Statue `i`'s close-up drawing, once the picture service has made it (null until then: the world's figure is drawn). */
+  private closePic(i: number): { cv: HTMLCanvasElement } | null {
+    return this.svc.ask(PIC_GROUP.looks, this.closeKeys[i]!, 0, () => this.closeStep(i), true);
+  }
+  /**
+   * (The picture service's, between frames) One step of statue `i`'s close-up drawing: a step of its sculpting, or one layer drawn
+   * (outlined and colored) on its canvas. Its picture once the last layer is on; null until then (called again).
+   */
+  private closeStep(i: number): { cv: HTMLCanvasElement } | null {
+    const id = STATUES[i]!.id;
+    const job = (this.closeJobs[i] ??= { steps: statueSteps(id, CLOSE), layers: null, next: 0, cv: null });
+    if (!job.layers) {
+      const r = job.steps.next();
+      if (r.done) job.layers = r.value;
+      return null;
+    }
+    if (!job.cv) {
+      job.cv = upName(document.createElement("canvas"), "statue");
+      job.cv.width = STATUE_W * CLOSE;
+      job.cv.height = statueH(id) * CLOSE;
+    }
+    art2d(job.cv).drawImage(canvasOf(statueFrame(id, CLOSE, [job.layers[job.next]!])), 0, 0);
+    if (++job.next < job.layers.length) return null;
+    this.closeJobs[i] = null;
+    return { cv: job.cv };
   }
 
   /**
@@ -1251,7 +1278,8 @@ export class Renderer {
       b.y0 = sy;
       b.x1 = sx + sw;
       b.y1 = sy + sh;
-      const close = this.closeImg[i];
+      const close = c.i === i ? (this.closePic(i)?.cv ?? null) : null;
+      if (close && Number.isNaN(this.closeReady[i]!)) this.closeReady[i] = now;
       let swap = 0;
       if (c.i === i && close) {
         const [a0, a1] = f.closeSwap;
@@ -1320,22 +1348,26 @@ export class Renderer {
 
   /**
    * The quote's lettering for a panel fw x fh device pixels: the biggest whole size whose wrapped lines fit (with the
-   * signs' leading, or a pixel less where that lets it be bigger); cached.
+   * signs' leading, or a pixel less where that lets it be bigger), laid out once a size; its picture is the picture service's (asked
+   * for as the camera arrives, as its first line starts to fade in: null until it's made).
    */
   private quoteFor(i: number, fw: number, fh: number): QuoteArt | null {
     const st = STATUES[i]!;
     for (let s = Math.floor(fh / CAP); s >= 1; s--) {
       const e = Math.max(1, Math.round(s / 3)); // the lettering's lit (or shadowed) edge, down and right
       for (const lead of [LEADING, LEADING - 1]) {
-        const key = `${i}:${s}:${lead}`;
-        let art = this.quoteArt.get(key) ?? null;
-        if (!art) {
+        const key = `quote|${i}|${s}|${lead}`;
+        let lay = this.quoteLay.get(key);
+        if (lay === undefined) {
           const lines = wrapQuote(st.quote, (fw - e) / s);
-          if (!lines) continue;
-          if ((lines.length * CAP + (lines.length - 1) * lead) * s + e > fh) continue;
-          this.quoteArt.set(key, (art = quoteArt(st.id, lines, s, e, lead)));
+          const h = lines ? (lines.length * CAP + (lines.length - 1) * lead) * s + e : 0;
+          // (Lines that don't fit this panel: asked again for the next, as before: only a layout that fit is kept.)
+          if (!lines || h > fh) continue;
+          this.quoteLay.set(key, (lay = { key, lines, w: Math.max(...lines.map(lineWidth)) * s + e, h, e }));
         }
-        if (art.cv.width <= fw && art.cv.height <= fh) return art;
+        if (!lay || lay.w > fw || lay.h > fh) continue;
+        const { lines } = lay;
+        return this.svc.ask(PIC_GROUP.text, key, 0, () => quoteArt(st.id, lines, s, lay!.e, lead));
       }
     }
     return null;
@@ -1390,9 +1422,10 @@ export class Renderer {
     const out = [];
     for (let i = 0; i < this.nTags; i++) {
       const t = this.tags[i]!;
-      const a = this.tagArt.find(t.text, Math.round(t.size), t.kind);
-      const w = a?.w ?? 0;
-      const h = a?.h ?? 0;
+      const s = Math.round(t.size);
+      const a = this.tagPic(t.text, t.kind, s);
+      const w = a ? (a.w * s) / a.s : 0;
+      const h = a ? (a.h * s) / a.s : 0;
       out.push({ text: t.text, kind: t.kind, alpha: t.alpha, ...TAG_STYLE[t.kind], x: t.x - w / 2, y: t.y - h, w, h, who: t.who });
     }
     return out;
@@ -1665,6 +1698,12 @@ export class Renderer {
         if (this.fade > 0.004) this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, flip, 1.6);
         b.onScreen = !it.faded && it.fx > -40 && it.fx < this.W + 40 && it.fy > 0 && it.hy < this.H && bandOf(v, it.dx, it.dz) < 0.6; // (a boss deep in the haze doesn't talk)
         this.fade = 1;
+        // (Its next line's bubble asked for now, ahead of the line (Nov 28, phase 2): a boss on screen talks only once it's made,
+        // world.ts `updateSpeech`. Until then a line's bubble was made and uploaded in the frame it first showed.)
+        if (b.onScreen) {
+          const next = bossNextLine(town, b);
+          b.lineReady = !next || !!this.bubblePic(next);
+        }
         if (town.speech.boss === b) {
           this.bubble.on = true;
           this.bubble.text = town.speech.line;
@@ -1687,14 +1726,18 @@ export class Renderer {
         this.personAlpha[it.i] = this.fade;
         if (person.you) {
           // Your shadows are a bot's: sized from the pawn, not from the margin your look's items are drawn in.
-          const art = this.youArt;
+          // (Dressed once its pictures are on the GPU: plain until then, `lookReady`.)
+          const art = this.youArt && this.lookReady(this.youArt) ? this.youArt : null;
           const k = 1 + 2 * (art?.pad ?? 0);
           const pad = art?.pad ?? 0;
           this.youRide.anim = "";
-          if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, wview, f.youSquares, now, this.youRide);
+          const rider = !table && this.youRider && this.lookReady(this.youRider) ? this.youRider : null;
+          if (rider) this.drawRider(it, rider, pose, facing, wview, f.youSquares, now, this.youRide);
           else {
-            this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares, (this.youDrawn = loopAt(art?.loop, now)), art?.loop);
-            this.soonBox(it, this.soonOf(person), wview, f.youSquares);
+            const img = art?.img ?? (isSprite(person.look) ? this.pawnPic("light", null) : this.pawnPic(person.look.side, person.look.tint));
+            if (img) this.drawSprite(it, img, f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares, (this.youDrawn = loopAt(art?.loop, now)), art?.loop);
+            else it.on = false; // (its picture not on the GPU yet: not drawn, not tapped)
+            this.soonBox(it, this.soonOf(person) ?? (this.youRider && !table ? this.youRider : null), wview, f.youSquares);
           }
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, TAG_SIZES[0], TAG_SIZES[1]), this.fade, it.i);
           if (person.zzz) this.zzz(it.i, it.fx, it.hy, clamp((11 * this.p.k) / v.kf, TAG_SIZES[0], TAG_SIZES[1]), this.fade);
@@ -1712,14 +1755,18 @@ export class Renderer {
             } else it.on = false; // (its frames not in place yet: not drawn, not tapped)
           } else {
             // A bot's dressed pawn (its one or two crate items, made once), drawn as yours is; on its ride if it has one.
-            const art = this.botArt.get(person.id);
+            const worn = this.botArt.get(person.id);
+            const art = worn && this.lookReady(worn) ? worn : null;
             const k = 1 + 2 * (art?.pad ?? 0);
             const pad = art?.pad ?? 0;
-            const rider = this.riders.get(person.id);
-            if (rider && !table) this.drawRider(it, rider, pose, facing, wview, f.botSquares, now + it.i * 577);
+            const on = table ? undefined : this.riders.get(person.id);
+            const rider = on && this.lookReady(on) ? on : null;
+            if (rider) this.drawRider(it, rider, pose, facing, wview, f.botSquares, now + it.i * 577);
             else {
-              this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares, loopAt(art?.loop, now), art?.loop);
-              this.soonBox(it, this.soonOf(person), wview, f.botSquares);
+              const img = art?.img ?? this.pawnPic(lk.side, lk.tint);
+              if (img) this.drawSprite(it, img, f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares, loopAt(art?.loop, now), art?.loop);
+              else it.on = false; // (its picture not on the GPU yet: not drawn, not tapped)
+              this.soonBox(it, this.soonOf(person) ?? on ?? null, wview, f.botSquares);
             }
           }
           // Name tags on the near ones only: not far toward the rim (as before), and (Oct 28, Eric) not far from you either, by default: within
@@ -1752,20 +1799,17 @@ export class Renderer {
   // ---- The street town's boxes (Nov 5, round 3): planned each frame (boxes.ts planBox), drawn here (the art's order: each part by its
   // own depth among everything else; a roof's faces far to near; a shed and a hedge whole, with their fronts).
 
-  /** Plans every box near enough to show, and gets the roofs near the camera painted ahead (a little a frame, nearest first). */
+  /**
+   * Plans every box near enough to show. (Until Nov 28, phase 2, it also painted the roofs and walls near the camera ahead, a little a
+   * frame: every one is the build's baked picture now, in place before the first frame.)
+   */
   private planBoxes(): void {
     const v = this.view;
     const cut = -TOWN_FEEL.streetNearCut;
-    const ahead = this.ahead;
-    let na = 0;
     for (const b of this.boxes) {
       const p = this.plans[b.i]!;
       rel(v, this.camX, this.camY, b.fx, b.fy, this.rq);
       const R = radial(v, this.rq.dx, this.rq.dz);
-      if (R < v.rim + 6 && na < ahead.length) {
-        ahead[na] = b.i;
-        this.aheadD[na++] = R;
-      }
       // (What the rows hide is left out; a skyline tower no ray reaches shows over them out to `streetTowerReach`, past it in the haze.)
       // (The Colosseum's ring and portal, the north edge round: never left out by the rows; its walls rise over their roofs.)
       const big = b.kind === "ring" || b.kind === "portal";
@@ -1779,70 +1823,29 @@ export class Renderer {
       // camera and you; left out, a drag round beside it would look into its bowl.)
       planBox(p, b, b.box, v, this.camX, this.camY, b.kind === "hedge" || big ? -Infinity : cut);
     }
-    // Paint ahead (Nov 11, Eric: "turning is dropping it to like 40 frames"): the pictures of the boxes within reach, nearest first,
-    // until the frame's budget is spent, in the order they're needed. Always: the roofs for the quarter the camera faces, then the sides'
-    // and backs' pictures and their shaded steps (a side shows at the screen's edge as you walk). Mid-turn, the next quarter's roofs.
-    // Standing still (when you look round), the rest a look round shows: the fronts' frames and their shaded steps (a front at a slant),
-    // and the other quarters' roofs, with a bigger budget while the view is at rest (`boxBakeStillMs`). Before, only the faced quarter's
-    // roofs (and the next, mid-turn) were painted ahead, so a first look round painted hundreds of pictures as they showed, up to 20 ms
-    // a frame (the frame report, `?report`); painting all of them while walking too cost the walk frames (pictures a walk never shows).
-    // (One being drawn this frame and not yet painted is still painted then, whatever the budget.)
-    const t0 = performance.now();
-    const hq = ((this.heading % 360) + 360) % 360;
-    const q0 = Math.floor(hq / 90) % 4;
-    const still = !this.town.you.walker.moving();
-    const turning = hq - q0 * 90 >= 0.5;
-    // (Standing still with the view at rest, a frame has room: a bigger budget.)
-    const budget = still && !turning ? TOWN_FEEL.boxBakeStillMs : TOWN_FEEL.boxBakeMs;
-    const qs = this.warmQ;
-    qs[0] = q0;
-    qs[1] = (q0 + 1) % 4;
-    qs[2] = (q0 + 3) % 4;
-    qs[3] = (q0 + 2) % 4;
-    // (Tiers: 0, the faced quarter's roofs; 1, the sides' pictures; 2, the next quarter's roofs; 3, the fronts' pictures; 4 and 5, the
-    // other quarters' roofs.)
-    for (let tier = 0; tier < 6; tier++) {
-      if (tier >= 2 && !still && !(tier === 2 && turning)) break;
-      const list = tier === 1 ? 0 : tier === 3 ? 1 : -1;
-      const q = qs[tier === 0 ? 0 : tier === 2 ? 1 : tier - 2]!;
-      const at = list < 0 ? null : this.warmAt[list as 0 | 1];
-      for (;;) {
-        let best = -1;
-        for (let j = 0; j < na; j++) {
-          const b = this.boxes[ahead[j]!]!;
-          if (at ? at[b.i]! < 0 : this.instArt[q]![b.i]) continue;
-          if (best < 0 || this.aheadD[j]! < this.aheadD[best]!) best = j;
-        }
-        if (best < 0 || performance.now() - t0 > budget) break;
-        const b = this.boxes[ahead[best]!]!;
-        if (list >= 0) this.warmNext(b, list);
-        else this.roofArt(b, q);
-      }
-      if (performance.now() - t0 > budget) break;
-    }
   }
   /**
    * The town's loading screen (Nov 11, Eric: "I have no issue with doing a loading screen for the town… loads it all in at once and
    * then it stays there"): every picture the street town can show put in its place, a slice at a time: each box's sides, back and front
    * frames (and each a step darker), its roof for each of the four quarters, every home's, boss's, prop's and statue's frames, the
-   * hedges' tops, the lights' glows, the sidekicks' frames; then the labels made (handed to `keep`, the painter's: uploaded now and kept
-   * for good). The pictures are the build's baked ones (`takeBaked` first; Nov 28, phase 1c: none is painted on the device), uploaded
-   * with their files (`Painter.adopt`). Spends up to `budgetMs` and says how much is done (0 to 1). A job that throws stops the load
-   * (the town never shows with a picture short).
+   * hedges' tops, the lights' glows, the sidekicks' frames; then the pictures the device makes itself asked of the picture service
+   * (`askAhead`) and made there. The pictures are the build's baked ones (`takeBaked` first; Nov 28, phase 1c: none is painted on the
+   * device), uploaded with their files (`Painter.adopt`). Spends up to `budgetMs` and says how much is done (0 to 1). A job that
+   * throws stops the load (the town never shows with a picture short).
    */
-  warm(budgetMs: number, keep: (src: CanvasImageSource) => void): number {
+  warm(budgetMs: number): number {
     if (!this.baked) throw new Error("town warm: no baked town");
-    this.pics ??= new Pictures(keep, this.baked);
+    this.pics ??= new Pictures(this.baked);
     const jobs = this.plan();
     const t0 = performance.now();
     while (this.warmAt0 < jobs.length) {
-      // (A job in steps, the labels: its next step now, or in the next slice.)
-      if (jobs[this.warmAt0]!() !== "more") this.warmAt0++;
+      // (A job in steps, the device's pictures: its next slice now, or in the next.)
+      if (jobs[this.warmAt0]!(Math.max(1, budgetMs - (performance.now() - t0))) !== "more") this.warmAt0++;
       if (performance.now() - t0 > budgetMs) break;
     }
     return jobs.length ? this.warmAt0 / jobs.length : 1;
   }
-  private warmJobs: (() => "more" | void)[] | null = null;
+  private warmJobs: ((budgetMs: number) => "more" | void)[] | null = null;
   private warmAt0 = 0;
   /** The loading screen's pictures: the build's baked ones, each listed once in the order the jobs come to them (keep-pictures.ts; set by the first `warm`). */
   pics: Pictures | null = null;
@@ -1850,9 +1853,9 @@ export class Renderer {
    * The loading screen's jobs (`warm`): one picture (or one roof) each, in the picture list's order (pictures.ts `townWants`: the list
    * the build bakes from). Each is the baked picture of its name (`pics.baked`), listed by `pics.add`.
    */
-  private plan(): (() => "more" | void)[] {
+  private plan(): ((budgetMs: number) => "more" | void)[] {
     if (this.warmJobs) return this.warmJobs;
-    const jobs: (() => "more" | void)[] = [];
+    const jobs: ((budgetMs: number) => "more" | void)[] = [];
     const P = () => this.pics!;
     for (const w of this.wants ?? townWants(this.art, this.frameCount)) {
       const { name } = w;
@@ -1902,54 +1905,16 @@ export class Renderer {
     for (const fc of new Set(this.propFrames)) jobs.push(() => void this.propMask(fc));
     for (const fc of this.bossFrames) jobs.push(() => void art2d(fc.get(0)));
     for (const sp of this.spriteArt.values()) jobs.push(() => void (sp.frames.idle[0] && art2d(sp.frames.idle[0])));
-    // (The labels, Nov 25: made fresh each visit, as they're quick. Their fonts are in by now: Town.tsx waits for `labelFonts`.)
-    jobs.push(() => this.makeLabels((c) => P().keep(c)));
-    // (Painted ahead by planBoxes from here on: nothing left to paint. Marked done so it doesn't walk them again.)
+    // (Every box's roof for every quarter found now, by name: `roofArt` only looks one up from here on. One not baked stops the load:
+    // nothing is painted as it's first drawn.)
     jobs.push(() => {
-      for (const at of this.warmAt) at.fill(-1);
+      for (const b of this.boxes) for (let q = 0; q < 4; q++) this.roofArt(b, q);
     });
+    // (What the device makes itself, Nov 25; since Nov 28, phase 2, asked of the picture service and made there, a slice a call: the
+    // labels, the pawns, the sky. Their fonts are in by now: Town.tsx waits for `labelFonts`.)
+    jobs.push(() => this.askAhead());
+    jobs.push((budgetMs) => (this.svc.pump(budgetMs, false) ? "more" : undefined));
     return (this.warmJobs = jobs);
-  }
-  /** The quarters in the order they're painted ahead (planBoxes). */
-  private readonly warmQ = new Int32Array(4);
-  /** Each box's next picture to paint ahead in each of its two lists (warmList); -1: all painted. */
-  private warmAt!: [Int32Array, Int32Array];
-  private readonly warmLists: ({ fc: FrameCache; k: number; dark: boolean }[] | undefined)[][] = [[], []];
-  /**
-   * Box `b`'s pictures to paint ahead (made once a box): list 0, its sides' and back's (as drawWall shows them, and a step darker,
-   * turned from the light); list 1, its front's frames and each a step darker (a front at a slant: drawBoxFront's drawWall).
-   */
-  private warmList(b: BoxInst, list: number): { fc: FrameCache; k: number; dark: boolean }[] {
-    let l = this.warmLists[list]![b.i];
-    if (l) return l;
-    l = [];
-    if (list === 0) {
-      const B = b.box;
-      for (const side of [b.hideL ? null : B.left, b.hideR ? null : B.right, B.back ?? B.rear]) {
-        if (!side) continue;
-        const fc = this.wallFc(side.ch);
-        l.push({ fc, k: 0, dark: false }, { fc, k: 0, dark: true });
-      }
-    } else {
-      const hi = b.home ? this.places.findIndex((h) => h.id === b.home) : -1;
-      const pi = hi < 0 ? this.propBox.indexOf(b) : -1;
-      const fc = hi >= 0 ? this.houseFrames[hi] : pi >= 0 ? this.propFrames[pi] : undefined;
-      if (fc) for (let k = 0; k < fc.frames.length; k++) l.push({ fc, k, dark: false }, { fc, k, dark: true });
-    }
-    this.warmLists[list]![b.i] = l;
-    return l;
-  }
-  /** Paints the next picture of box `b`'s list ahead (one a call: a frame's budget is checked between them). */
-  private warmNext(b: BoxInst, list: number): void {
-    const l = this.warmList(b, list);
-    const at = this.warmAt[list]!;
-    const k = at[b.i]!;
-    const w = l[k];
-    if (w) {
-      if (w.dark) w.fc.dark(w.k);
-      else w.fc.get(w.k);
-    }
-    at[b.i] = k + 1 >= l.length ? -1 : k + 1;
   }
   /** Whether any square of box `i`'s footprint is seen this frame. */
   private boxSeen(i: number): boolean {
@@ -1957,9 +1922,11 @@ export class Renderer {
     for (let j = 0; j < ks.length; j++) if (this.seen[ks[j]!]) return true;
     return false;
   }
-  private readonly ahead = new Int32Array(512);
-  private readonly aheadD = new Float64Array(512);
-  /** A box's roof painted for the camera facing north or east (box-draw.ts), made the first time it's asked for (shared by every box of that art facing that way). */
+  /**
+   * A box's roof as the build painted it for the camera facing quarter `q` (box-draw.ts; shared by every box of that art facing that
+   * way): `make`, the loading screen's, puts the baked one in place. Without it the roof is only looked up (Nov 28, phase 2: until
+   * then one not there was painted, and uploaded, as it was first drawn): one that was never baked is an error, at the loading screen.
+   */
   private roofArt(b: BoxInst, q: number, make?: (flat: boolean, q: number) => RoofArt): RoofArt {
     const box = b.box;
     const had = this.instArt[q]![b.i];
@@ -1969,10 +1936,8 @@ export class Renderer {
     const key = roofKey(b, q);
     let a = m.get(key);
     if (!a) {
-      const t0 = REC ? performance.now() : 0;
-      const flat = key === "flat";
-      m.set(key, (a = make ? make(flat, q) : bakeRoof(b, box, flat ? 0 : q)));
-      if (REC) REC.paint(performance.now() - t0);
+      if (!make) throw new Error(`town: the roof "${box.id}" (${key}) isn't baked`);
+      m.set(key, (a = make(key === "flat", q)));
     }
     this.instArt[q]![b.i] = a;
     return a;
@@ -2122,9 +2087,8 @@ export class Renderer {
   }
   /** A side's windows lit at dusk and night (the art's: its own lights, baked as a front's are), once a picture. */
   private wallGlowOf(ch: Character, lights: readonly LightSpot[]): Glow | null {
-    let g = this.wallGlow.get(ch);
-    if (g === undefined) this.wallGlow.set(ch, (g = lights.length ? bakeGlow(ch, lights, []) : null));
-    return g;
+    // (As the build baked it, put here by the loading screen: none is made here.)
+    return lights.length ? (this.wallGlow.get(ch) ?? null) : null;
   }
 
   /** Where on screen a wall's picture column `s` of the way along stands (perspective-correct between its ends): into wq. */
@@ -2367,6 +2331,7 @@ export class Renderer {
     const s = Math.floor(fit * DPR + 0.25);
     if (s < 1 || (s / DPR) * CAP < TOWN_FEEL.signMinCap) return;
     const art = this.signArt(sg);
+    if (!art) return;
     // (In the picture's pixels: the lettering's CSS size over the front's scale.)
     const w = (sg.w * s) / DPR / px;
     const h = (sg.h * s) / DPR / px;
@@ -2482,7 +2447,7 @@ export class Renderer {
     ctx.globalAlpha = 1;
     this.cover(img, x0, y0, w, h, alpha);
     // A lamp, lit at dusk and night (fading and hazing in the far band as its picture does).
-    if (this.lightK > 0.01 && PROPS[it.i]!.kind === "lamp") this.lightUp((this.lampGlow ??= bakeGlow(PARK_LAMP, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS)), x0, y0, px, alpha * (1 - 0.88 * s), now, it.i * 389);
+    if (this.lightK > 0.01 && PROPS[it.i]!.kind === "lamp") this.lightUp(this.lampGlow, x0, y0, px, alpha * (1 - 0.88 * s), now, it.i * 389);
     // A building's front, its windows lit at dusk and night (the street town's: each picture's lights baked once).
     if (this.lightK > 0.01 && prop.kind === "front") this.lightUp(this.frontGlowOf(fc, prop.lot!), x0, y0, px, alpha * (1 - 0.88 * s), now, it.i * 389);
     this.propTop[it.i] = p.y - (PROPS[it.i]!.kind === "table" ? TABLE_TOP * px : ch.foot[1] * px);
@@ -2539,13 +2504,8 @@ export class Renderer {
   private readonly hC = newPt();
   /** A front's lights (its building's), baked once a picture; null: none. */
   private frontGlowOf(fc: FrameCache, lot: number): Glow | null {
-    let g = this.frontGlow.get(fc);
-    if (g === undefined) {
-      const box = lotArt(STREET_BUILDINGS[lot]!);
-      g = box.lights.length ? bakeGlow(box.front, box.lights, []) : null;
-      this.frontGlow.set(fc, g);
-    }
-    return g;
+    // (As the build baked it, put here by the loading screen: none is made here.)
+    return this.frontGlow.get(fc) ?? null;
   }
 
   // ---- The chess tables' boards (Oct 27; Eric: "even tiny little pieces that look like pieces … facing the right way …
@@ -2556,7 +2516,6 @@ export class Renderer {
   private tables: TableState[] = [];
   private tablesAt = -1;
   private games: ({ pcs: TablePiece[]; moves: number; next: number; since: number } | null)[] = [];
-  private pieceImgs = new Map<string, HTMLCanvasElement>();
   private bp = newPt();
   private bq = newPt();
   private grid = Array.from({ length: 81 }, () => newPt());
@@ -2606,16 +2565,18 @@ export class Renderer {
     return game;
   }
 
-  /** A piece in pixels (TABLE_PIECES: its fill shaded on the right, an outline round it), made once. */
-  private pieceImg(kind: string, light: boolean): HTMLCanvasElement {
-    const key = kind + (light ? "l" : "d");
-    let c = this.pieceImgs.get(key);
-    if (c) return c;
+  /** A piece's picture (`paintPiece`), the picture service's: asked for on the loading screen, each kind and side (null until made). */
+  private pieceImg(kind: string, light: boolean): HTMLCanvasElement | null {
+    const key = (light ? PIECE_KEYS.l : PIECE_KEYS.d)[kind]!;
+    return this.svc.ask(PIC_GROUP.text, key, 0, () => ({ cv: this.paintPiece(kind, light) }), true)?.cv ?? null;
+  }
+  /** A piece in pixels (TABLE_PIECES: its fill shaded on the right, an outline round it). */
+  private paintPiece(kind: string, light: boolean): HTMLCanvasElement {
     let rows = TABLE_PIECES[kind]!;
     if (!light && kind === "N") rows = rows.map((r) => [...r].reverse().join("")); // black's knight faces white
     const w = rows[0]!.length + 2;
     const h = rows.length + 2;
-    c = upName(document.createElement("canvas"), "table piece");
+    const c = upName(document.createElement("canvas"), "table piece");
     c.width = w;
     c.height = h;
     const g = art2d(c);
@@ -2632,7 +2593,6 @@ export class Renderer {
           g.fillRect(x, y, 1, 1);
         }
       }
-    this.pieceImgs.set(key, c);
     return c;
   }
 
@@ -2640,8 +2600,10 @@ export class Renderer {
    * The clock's digits and colon (TABLE_DIGITS: black, their top edge lighter, a grey side under) side by side in one picture, made
    * once (Nov 25: before, each second's face was a picture of its own, made and uploaded as it ticked).
    */
-  private clockStrip(): HTMLCanvasElement {
-    if (this.clockArt) return this.clockArt;
+  private clockStrip(): HTMLCanvasElement | null {
+    return this.svc.ask(PIC_GROUP.text, "clock", 0, () => ({ cv: this.paintClock() }), true)?.cv ?? null;
+  }
+  private paintClock(): HTMLCanvasElement {
     const ink = TABLE_CLOCK_INK;
     const c = upName(document.createElement("canvas"), "clock");
     let x = 0;
@@ -2665,15 +2627,15 @@ export class Renderer {
           }
         });
       }
-    return (this.clockArt = c);
+    return c;
   }
-  private clockArt: HTMLCanvasElement | null = null;
   private readonly clockAt: Record<string, number> = {};
   private readonly clockText: string[] = [];
 
   /** A game's clock, "m:ss" for `secs`, centered on x with its foot on y, `ps` pixels a font pixel: each character from `clockStrip`. */
   private drawClock(secs: number, x: number, y: number, ps: number): void {
     const strip = this.clockStrip();
+    if (!strip) return;
     const t = this.clockText;
     t.length = 0;
     for (let mins = Math.floor(secs / 60); ; mins = Math.floor(mins / 10)) {
@@ -2728,12 +2690,11 @@ export class Renderer {
   /**
    * Table `ti`'s top: the slab (its front face, its stone top), the board's 8 x 8 squares lying flat (two fills over one
    * 9 x 9 grid of points), its pieces standing up (far ones first), and over a game its clock. `s`: how far into the far
-   * band it stands (its pieces and clock are left out far off). While nothing on it moves and the camera holds still, the
-   * slab, board and pieces are one picture, made on the second frame alike and reused (`boardCache`): one draw a frame. (Canvas 2D
-   * only: WebGL draws it as it is, Nov 25.)
+   * band it stands (its pieces and clock are left out far off). Drawn as it is every frame (until Nov 28, phase 2, Canvas 2D kept a
+   * still board as one picture: the street town has drawn with WebGL alone since Nov 6, which never did).
    */
   private drawBoard(it: Item, ti: number, state: TableState, now: number, alpha: number, s: number): void {
-    const { ctx, view: v, DPR } = this;
+    const { ctx, view: v } = this;
     const B = TABLE_BOARD;
     const a = this.bp;
     const b = this.bq;
@@ -2764,32 +2725,13 @@ export class Renderer {
     const near = s <= TOWN_FEEL.tableFarCut;
     const game = near ? this.gameFor(ti, state.kind === "playing", now) : null;
     const pcs = near ? (game?.pcs ?? (this.stillSet ??= setUp())) : [];
-    const f = TOWN_FEEL;
-    const moving = !!game && pcs.some((q) => now - q.t0 < f.tableSlideMs || (q.gone > 0 && now < q.gone));
-    const paint = (g: Ctx) => {
-      if (m === 1) return this.paintBoard(g, it.dx, dz, top, thick, shift, pcs, game ? now : -1);
-      g.save();
-      g.transform(m, 0, 0, m, tx, ty);
-      this.paintBoard(g, it.dx, dz, top, thick, shift, pcs, game ? now : -1);
-      g.restore();
-    };
-    // The same picture as the last frame (camera, alpha and pieces alike): once seen twice, it's kept and reused. (Not with WebGL,
-    // Nov 25: a picture made on the CPU is uploaded, a hitch each time the camera comes to rest; drawn as it is while you walk instead.)
-    const c0 = this.grid[0]!;
-    const c8 = this.grid[80]!;
-    const gl = this.paint.kind === "webgl";
-    // (No key with WebGL, Nov 27: it draws the board as it is every frame; the string was built for nothing, ten tables a frame.)
-    const key = gl ? "" : `${Math.round((c0.x * m + tx) * 8)},${Math.round((c0.y * m + ty) * 8)},${Math.round((c8.x * m + tx) * 8)},${Math.round((c8.y * m + ty) * 8)},${Math.round(shift * m * 8)},${pcs.length},${game?.moves ?? -1},${game ? game.since : 0},${DPR}`;
-    const cache = (this.boardCache[ti] ??= { key: "", seen: "", cv: null, x: 0, y: 0, w: 0, h: 0 });
     ctx.globalAlpha = alpha;
-    if (moving || key !== cache.seen || gl) {
-      cache.seen = moving ? "" : key;
-      cache.key = "";
-      paint(ctx);
-    } else {
-      if (cache.key !== key) this.cacheBoard(cache, key, it.dx, dz, top, thick, shift, b.k * B.piecePx * m, m, tx, ty, paint);
-      if (cache.cv) ctx.drawImage(cache.cv, cache.x, cache.y, cache.w, cache.h);
-      else paint(ctx);
+    if (m === 1) this.paintBoard(ctx, it.dx, dz, top, thick, shift, pcs, game ? now : -1);
+    else {
+      ctx.save();
+      ctx.transform(m, 0, 0, m, tx, ty);
+      this.paintBoard(ctx, it.dx, dz, top, thick, shift, pcs, game ? now : -1);
+      ctx.restore();
     }
     // The game's clock, floating over the middle of the board, straight above the leg.
     if (game && proj(v, it.dx, dz, top + B.clockLift, a)) {
@@ -2804,45 +2746,6 @@ export class Renderer {
   /** (WebGL) A board's 64 squares' corners this frame, light squares first (BOARD_ORDER), for `quads`. */
   private readonly boardPts = new Float64Array(64 * 8);
   private stillSet: TablePiece[] | null = null;
-  private boardCache: { key: string; seen: string; cv: HTMLCanvasElement | null; x: number; y: number; w: number; h: number }[] = [];
-
-  /**
-   * Paints table's slab, board and pieces into `cache` (its box: the slab's corners and the tallest piece over them),
-   * worked out at (dx, dz) and drawn at x * m + tx, y * m + ty (drawBoard).
-   */
-  private cacheBoard(cache: (typeof this.boardCache)[number], key: string, dx: number, dz: number, top: number, thick: number, shift: number, ps: number, m: number, tx: number, ty: number, paint: (g: Ctx) => void): void {
-    const { view: v, DPR } = this;
-    const a = this.bp;
-    const h = TABLE_BOARD.half;
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const [x, z, l] of [[-h, -h, top], [h, -h, top], [h, h, top], [-h, h, top], [-h, -h, top - thick], [h, -h, top - thick]] as const) {
-      if (!proj(v, dx + x, dz + z, l, a)) return void (cache.cv = null);
-      x0 = Math.min(x0, (a.x - shift) * m + tx);
-      x1 = Math.max(x1, (a.x - shift) * m + tx);
-      y0 = Math.min(y0, a.y * m + ty);
-      y1 = Math.max(y1, a.y * m + ty);
-    }
-    // (The tallest piece, the king, stands 13 of its pixels over its square.)
-    const king = 13 * ps + 2;
-    x0 = Math.floor((x0 - 2) * DPR) / DPR;
-    y0 = Math.floor((y0 - king) * DPR) / DPR;
-    const w = Math.ceil((x1 + 2 - x0) * DPR);
-    const hh = Math.ceil((y1 + 2 - y0) * DPR);
-    if (w <= 0 || hh <= 0 || w * hh > 4_000_000) return void (cache.cv = null);
-    const cv = cache.cv ?? upName(document.createElement("canvas"), "board");
-    if (cv.width !== w || cv.height !== hh) {
-      cv.width = w;
-      cv.height = hh;
-    }
-    const g = art2d(cv);
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.clearRect(0, 0, w, hh);
-    g.setTransform(DPR, 0, 0, DPR, -x0 * DPR, -y0 * DPR);
-    paint(g);
-    this.paint.changed(cv);
-    Object.assign(cache, { key, cv, x: x0, y: y0, w: w / DPR, h: hh / DPR });
-  }
-
   /** The slab, the board and `pcs` on it, into `g` in the screen's coordinates (`now` < 0: the pieces at rest). */
   private paintBoard(g: Ctx, dx: number, dz: number, top: number, thick: number, shift: number, pcs: readonly TablePiece[], now: number): void {
     const { view: v } = this;
@@ -2926,6 +2829,7 @@ export class Renderer {
       const lift = t < 1 ? f.tableHop * Math.sin(Math.PI * t) : 0;
       if (!proj(v, dx - hb + (pf + 0.5) * sq, dz - hb + (pg + 0.5) * sq, top + lift, b)) continue;
       const img = this.pieceImg(q.kind, q.light);
+      if (!img) continue;
       const ps = b.k * B.piecePx;
       g.globalAlpha = base * (q.gone && now >= 0 ? clamp((q.gone - now) / f.tableTakeMs, 0, 1) : 1);
       g.drawImage(img, b.x - shift - (img.width * ps) / 2, b.y - (img.height - 1) * ps, img.width * ps, img.height * ps);
@@ -2994,13 +2898,8 @@ export class Renderer {
 
   /** A picture's lights (a place's: its index; made the first time it's drawn lit), or null when it has none. */
   private glowOf(i: number): Glow | null {
-    let g = this.placeGlow[i];
-    if (g === null) {
-      const art = artOf(this.places[i]!);
-      if (!art.lights.length && !art.pools.length) return null;
-      g = this.placeGlow[i] = bakeGlow(art.ch, art.lights, art.pools);
-    }
-    return g ?? null;
+    // (As the build baked it, put here by the loading screen: none is made here.)
+    return this.placeGlow[i] ?? null;
   }
 
   /** The flicker of a candle's or a torch's light at `now` (1 at its brightest): two slow sways out of step, never a blink. */
@@ -3189,29 +3088,43 @@ export class Renderer {
   }
 
   /**
-   * Home `i`'s name at `size` (centered on x, its foot on y), from its picture (`nameArtOf`): its outline, then its white over it, at the
-   * alpha set, as strokeText and fillText drew them (Nov 25: before, each size a string came to was drawn and uploaded as it showed).
+   * Home `i`'s name at `size` (centered on x, its foot on y), from its picture (`namePic`): its outline, then its white over it, at the
+   * alpha set, as strokeText and fillText drew them. The picture is made at one size and scaled here by the GPU (Nov 28, phase 2; at
+   * its own size it lands pixel for pixel, as before). Not made yet: left out.
    */
   private drawName(i: number, size: number, x: number, y: number): void {
     const { ctx, DPR } = this;
-    const a = this.nameArtOf(i, size);
+    const a = this.namePic(i, size);
+    if (!a) return;
+    const k = size / a.s / a.dpr;
     const cw = a.cv.width;
-    // (On the device's pixel grid, so the picture lands pixel for pixel.)
-    const X = (Math.round(x * DPR) - a.ox) / DPR;
-    const Y = (Math.round(y * DPR) - a.oy) / DPR;
-    ctx.drawImage(a.cv, 0, 0, cw, a.rh, X, Y, cw / DPR, a.rh / DPR);
-    ctx.drawImage(a.cv, 0, a.rh, cw, a.rh, X, Y, cw / DPR, a.rh / DPR);
+    // (On the device's pixel grid, so at its own size the picture lands pixel for pixel.)
+    const X = Math.round(x * DPR) / DPR - a.ox * k;
+    const Y = Math.round(y * DPR) / DPR - a.oy * k;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(a.cv, 0, 0, cw, a.rh, X, Y, cw * k, a.rh * k);
+    ctx.drawImage(a.cv, 0, a.rh, cw, a.rh, X, Y, cw * k, a.rh * k);
   }
 
-  /** Home `i`'s name's picture at `size` (NAME_FONT): two rows, `rh` device pixels each, its outline and its white; made once. */
-  private nameArtOf(i: number, size: number): NameArt {
-    const row = (this.nameArt[i] ??= []);
-    const had = row[size];
-    if (had && (had.fonts === -2 || had.fonts === fontsLoaded)) return had;
+  /** A label's stamp (the picture service's): the device's pixel ratio it's made for, and whether its font was in (0) or which load it waits on. */
+  private labelStamp(font: string): number {
+    return this.DPR * 4096 + (fontIn(font) ? 0 : 1 + (fontsLoaded % 4095));
+  }
+
+  /** Home `i`'s name's picture for drawing at `size`: the picture service's, made at `picSize` (null: not made yet). Never let go. */
+  private namePic(i: number, size: number): NameArt | null {
+    const S = picSize(TOWN_FEEL.namePicSizes, size);
+    const keys = (this.nameKeys[i] ??= []);
+    return this.svc.ask(PIC_GROUP.text, (keys[S] ??= `name|${i}|${S}`), this.labelStamp(NAME_FONT[S]!), () => this.paintName(i, S), true);
+  }
+  private readonly nameKeys: string[][] = [];
+
+  /** Home `i`'s name's picture at font size `S` (NAME_FONT): two rows, `rh` device pixels each, its outline and its white. */
+  private paintName(i: number, S: number): NameArt {
     const { DPR } = this;
     const text = this.places[i]!.name;
-    const font = NAME_FONT[size]!;
-    const cv = had?.cv ?? upName(document.createElement("canvas"), "home name");
+    const font = NAME_FONT[S]!;
+    const cv = upName(document.createElement("canvas"), "home name");
     const g = art2d(cv);
     g.font = font;
     g.textAlign = "center";
@@ -3234,59 +3147,67 @@ export class Renderer {
     g.setTransform(DPR, 0, 0, DPR, ox, rh + oy);
     g.fillStyle = "#ffffff";
     g.fillText(text, 0, 0);
-    const a: NameArt = { cv, ox, oy, rh, fonts: fontReady(font) ? -2 : fontsLoaded };
-    row[size] = a;
-    if (had) this.paint.changed(cv);
-    return a;
+    return { cv, ox, oy, rh, s: S, dpr: DPR };
   }
-  private readonly nameArt: (NameArt | undefined)[][] = [];
-  private labelDpr = 0;
 
-  /** A home's sign's lettering at its font's own pixels (sign-font.ts), made once: drawn `s` times over (writeSign, writeSignT). */
-  private signArt(sg: (typeof this.signs)[number]): HTMLCanvasElement {
-    return (sg.art ??= renderLines(sg.lines, sg.w, sg.h, 1, SIGN_INK));
+  /** A home's sign's lettering at its font's own pixels (sign-font.ts): the picture service's, made once (null until then); drawn `s` times over (writeSign, writeSignT). */
+  private signArt(sg: (typeof this.signs)[number]): HTMLCanvasElement | null {
+    return this.svc.ask(PIC_GROUP.text, sg.key, 0, () => ({ cv: renderLines(sg.lines, sg.w, sg.h, 1, SIGN_INK) }), true)?.cv ?? null;
   }
 
   /**
-   * (The loading screen, Nov 25: Eric's laptop, "1063 uploads" in 15 s of walking.) The labels, made here and kept (`keep`), so walking
-   * and zooming make and upload none: every home's sign and its name at every size it can show (NAME_SIZES), the tags of everyone in
-   * the town now at every size (TAG_SIZES, as `tag` sizes them), the sky's clouds and sun, the tables' clock digits, the bubble's tail.
-   * Someone arriving later has theirs made as they show (a few small pictures, once), and a line said its bubble (one).
+   * (The loading screen; Nov 25: Eric's laptop, "1063 uploads" in 15 s of walking.) Everything the device makes that the town can
+   * show from its first frame, asked of the picture service here, so the loading screen makes and uploads it under its card
+   * (`warm`'s next job, then Town.tsx's): every home's sign and its name, the tags of everyone in the town now, each one's pawn,
+   * the sky's clouds and sun for every hour, the tables' pieces and clock digits, the "zzz", the bubble's tail, and the bubble of a
+   * line being said as the town opens (a boss's goodbye). Whoever comes later has theirs asked for as they come (`askTags`), and a
+   * line its bubble while its boss is on screen, before it's said.
    */
-  private makeLabels(keep: (c: HTMLCanvasElement) => void): "more" | void {
-    // (A step a call, Nov 28: the signs, each home's names, each person's tags, the sky's: all at once they were one 250 ms task on a
-    // slowed phone's loading screen, its bar stopped. The people are read as the first step comes, as before.)
-    if (!this.labelSteps) {
-      const steps: (() => void)[] = (this.labelSteps = []);
-      steps.push(() => {
-        for (const sg of this.signs) keep(this.signArt(sg));
-      });
-      for (let i = 0; i < this.places.length; i++)
-        steps.push(() => {
-          for (let s = NAME_SIZES[0]; s <= NAME_SIZES[1]; s++) keep(this.nameArtOf(i, s).cv);
-        });
-      const people = this.town.people;
-      // (Room for them all, and as many again: the tags are let go only past it.)
-      this.tagArt.max = Math.max(TAG_ART_MAX, 2 * people.length * (TAG_SIZES[1] - TAG_SIZES[0] + 1));
-      for (const p of people) {
-        if (p.remote && !p.name) continue;
-        const kind: TagKind = p.you ? "you" : isSprite(p.look) ? "sidekick" : "bot";
-        const name = p.name;
-        steps.push(() => {
-          for (let s = TAG_SIZES[0]; s <= TAG_SIZES[1]; s++) keep(this.tagReady(name, s, kind).cv);
-        });
-      }
-      steps.push(() => this.sky.warm(keep));
-      steps.push(() => {
-        keep(this.clockStrip());
-        keep(this.tailArt());
-      });
-    }
-    this.labelSteps.shift()?.();
-    return this.labelSteps.length ? "more" : undefined;
+  private askAhead(): void {
+    for (const sg of this.signs) this.signArt(sg);
+    for (let i = 0; i < this.places.length; i++) for (const S of TOWN_FEEL.namePicSizes) this.namePic(i, S);
+    this.askTags(this.town.people);
+    for (const p of this.town.people) if (!isSprite(p.look)) this.pawnPic(p.look.side, p.look.tint);
+    this.pawnPic("light", null);
+    this.pawnPic("dark", null);
+    this.sky.warm();
+    for (const kind of Object.keys(TABLE_PIECES)) for (const light of [true, false]) this.pieceImg(kind, light);
+    this.clockStrip();
+    this.tailArt();
+    this.svc.ask(PIC_GROUP.text, "zzz", 0, zzzPic, true);
+    if (this.town.speech.boss) this.bubblePic(this.town.speech.line);
+    this.askLooks();
   }
-  /** (`makeLabels`) The labels' steps still to run (null: not started). */
-  private labelSteps: (() => void)[] | null = null;
+
+  /**
+   * The outfits and rides of everyone in the town now, asked of the picture service (the loading screen, once they're made: Town.tsx;
+   * and `askAhead`): the frame asks for each as it draws it (`lookReady`), and this asks ahead, so a look made off the frame is on
+   * the GPU before its first frame.
+   */
+  askLooks(): void {
+    for (const a of [this.youArt, this.youRider, ...this.botArt.values(), ...this.riders.values()]) if (a) this.lookReady(a);
+  }
+
+  /**
+   * Whether a look's pictures (a dressed pawn's still and its item's loop frames; a ride's frames and trail marks: made off the frame,
+   * you-look.ts, rides.ts) are on the GPU: asked of the picture service the first time, uploaded there between frames; drawn only
+   * from then on (plain, or on foot, until then). One not drawn for a while may make room for another, and is asked for again when
+   * it's next drawn.
+   */
+  private lookReady(look: YouArt | Rider): boolean {
+    // (A ride whose frames aren't composed yet has nothing to hand over.)
+    if (!("img" in look) && !look.ready) return false;
+    let key = this.lookKeys.get(look);
+    if (!key) this.lookKeys.set(look, (key = `look|${++this.nLooks}`));
+    return !!this.svc.ask(PIC_GROUP.looks, key, 0, () => ({ cvs: "img" in look ? [upName(look.img, "dressed pawn"), ...(look.loop?.frames ?? []).map((c) => upName(c, "dressed pawn frame"))] : look.pictures() }));
+  }
+
+  /** A pawn's picture (`pawnImage`) once it's on the GPU: the picture service's, asked for as its person comes (null until then: not drawn). */
+  private pawnPic(side: "light" | "dark", tint: string | null): HTMLCanvasElement | null {
+    const key = tint ? (this.pawnKeys.get(tint) ?? this.pawnKeys.set(tint, [`pawn|light|${tint}`, `pawn|dark|${tint}`]).get(tint)!)[side === "light" ? 0 : 1]! : side === "light" ? "pawn|light" : "pawn|dark";
+    return this.svc.ask(PIC_GROUP.looks, key, 0, () => ({ cv: pawnImage(side, tint) }), true)?.cv ?? null;
+  }
+  private readonly pawnKeys = new Map<string, [string, string]>();
 
   /**
    * (The loading screen) The labels' fonts, asked for now: a promise a font, settled once it's in or has failed (Town.tsx waits for
@@ -3576,6 +3497,7 @@ export class Renderer {
     const s = Math.floor(fit * DPR + 0.25); // device pixels a font pixel, whole, so the letters stay crisp
     if (s < 1 || (s / DPR) * CAP < TOWN_FEEL.signMinCap) return;
     const art = this.signArt(sg);
+    if (!art) return;
     const w = (sg.w * s) / DPR;
     const h = (sg.h * s) / DPR;
     ctx.globalAlpha = alpha;
@@ -3584,118 +3506,77 @@ export class Renderer {
   }
 
   /**
-   * (Nov 27) Newcomers' name tags (another player arriving: here-net.ts's answer, Town.tsx `others`) painted ahead, every size, a slice
-   * at a time between frames (an idle callback), not in the frame they first show: 55 arriving at once cost the
-   * busy town's frames 3 ms of painting and 2 of uploads each (the busy town's perf check), and a crowd of more tags than the cache held
-   * painted them again and again. The cache is sized to everyone's tags at every size, twice over.
+   * (Nov 27; Nov 28, phase 2) Newcomers' name tags (another player arriving: here-net.ts's answer, Town.tsx `others`; everyone, on the
+   * loading screen) asked of the picture service ahead, so each is made and uploaded between frames, not in the frame it first shows:
+   * 55 arriving at once cost the busy town's frames 3 ms of painting and 2 of uploads each (the busy town's perf check). One a name
+   * and kind since phase 2 (five before, one a size), on the text's own atlas pages: 55 players' fit with room to spare, and no page
+   * is ever started again.
    */
-  queueTags(people: readonly Person[]): void {
+  askTags(people: readonly Person[]): void {
     for (const p of people) {
       if (!p.name || p.home) continue;
-      this.tagQ.push({ name: p.name, kind: p.you ? "you" : isSprite(p.look) ? "sidekick" : "bot" });
+      const kind: TagKind = p.you ? "you" : isSprite(p.look) ? "sidekick" : "bot";
+      for (const S of TOWN_FEEL.tagPicSizes) this.tagPic(p.name, kind, S);
     }
-    this.tagArt.max = Math.max(this.tagArt.max, 2 * this.town.people.length * (TAG_SIZES[1] - TAG_SIZES[0] + 1));
-    if (this.tagQ.length && !this.tagSlicing) this.nextTagSlice();
-  }
-  /** (Tests) Newcomers' tags still to make between frames. */
-  get tagsQueued(): number {
-    return this.tagQ.length;
-  }
-  private readonly tagQ: { name: string; kind: TagKind }[] = [];
-  /** The frame a new tag was last painted in (drawTag: one a frame). */
-  private newTagAt = -1;
-  private tagSlicing = false;
-  private nextTagSlice(): void {
-    this.tagSlicing = true;
-    const ric = (globalThis as { requestIdleCallback?: (f: (d: { timeRemaining(): number; didTimeout: boolean }) => void, o?: { timeout: number }) => number }).requestIdleCallback;
-    // (No idle time for half a second, a busy device: a 4 ms slice anyway.)
-    if (ric) ric((d) => this.tagSlice(d.didTimeout ? 4 : Math.min(4, d.timeRemaining())), { timeout: 500 });
-    else setTimeout(() => this.tagSlice(3), 16);
-  }
-  private tagSlice(budgetMs: number): void {
-    const t0 = performance.now();
-    do {
-      const q = this.tagQ.shift();
-      if (!q) break;
-      // (Painted only: each size goes on the GPU as it's first drawn. Every size of 55 newcomers' tags uploaded at once overfilled the
-      // atlas's spare pages, which started again, and everything on them was uploaded again.)
-      for (let s = TAG_SIZES[0]; s <= TAG_SIZES[1]; s++) this.tagReady(q.name, s, q.kind);
-    } while (performance.now() - t0 < budgetMs);
-    if (this.tagQ.length) this.nextTagSlice();
-    else this.tagSlicing = false;
   }
 
-  /** A name tag over a figure: white for the pawns, gold for you, blue for a boss's sidekick; it shrinks with distance. Stamped from its drawing (`tagArtOf`). */
+  /** A name tag over a figure: white for the pawns, gold for you, blue for a boss's sidekick; it shrinks with distance. Stamped from its picture (`tagPic`), scaled by the GPU to its size. */
   private drawTag(text: string, ax: number, ay: number, kind: TagKind, size: number, alpha: number): void {
     const { ctx, DPR } = this;
     const s = Math.round(size);
-    // (Nov 27) A tag not made yet (someone just come, or a size not drawn yet): at most one painted a frame; the rest are made between
-    // frames (queueTags) and show from the frame after. 55 players arriving at once painted 275 tags in the frames they first showed.
-    const had = this.tagDpr === DPR ? this.tagArt.find(text, s, kind) : undefined;
-    if (!had || (had.fonts !== -2 && had.fonts !== fontsLoaded)) {
-      if (this.newTagAt === this.frameNo) {
-        if (!this.tagQ.some((q) => q.name === text && q.kind === kind)) this.tagQ.push({ name: text, kind });
-        if (!this.tagSlicing) this.nextTagSlice();
-        return;
-      }
-      this.newTagAt = this.frameNo;
-    }
-    const a = this.tagReady(text, s, kind);
-    a.used = this.frameNo;
-    this.keepFree(ax - a.w / 2, ay - a.h, a.w, a.h);
-    // (On the device's pixel grid, so the drawing lands pixel for pixel.)
+    // (Not made yet, someone just come: left out; the picture service makes it between frames and it shows from the frame after.)
+    const a = this.tagPic(text, kind, s);
+    if (!a) return;
+    // (Its picture's pixels a CSS pixel as drawn: its own size on the device's grid at the size it was made at.)
+    const k = s / a.s / a.dpr;
+    const w = (a.w * s) / a.s;
+    const h = (a.h * s) / a.s;
+    this.keepFree(ax - w / 2, ay - h, w, h);
+    // (On the device's pixel grid, so at its own size the drawing lands pixel for pixel.)
     const cw = a.cv.width;
-    const x = (Math.round((ax - a.w / 2) * DPR) - TAG_PAD) / DPR;
-    const y = (Math.round((ay - a.h) * DPR) - TAG_PAD) / DPR;
+    const x = Math.round((ax - w / 2) * DPR) / DPR - TAG_PAD * k;
+    const y = Math.round((ay - h) * DPR) / DPR - TAG_PAD * k;
     ctx.globalAlpha = alpha;
-    if (alpha >= 1) ctx.drawImage(a.cv, 0, 0, cw, a.rh, x, y, cw / DPR, a.rh / DPR);
+    ctx.imageSmoothingEnabled = true;
+    if (alpha >= 1) ctx.drawImage(a.cv, 0, 0, cw, a.rh, x, y, cw * k, a.rh * k);
     // Fading: its shadow, its pill and its name each at that alpha, one over the other, as they were drawn before (the
     // whole tag at that alpha would show less of the pill through the name).
-    else for (let r = 1; r < 4; r++) ctx.drawImage(a.cv, 0, r * a.rh, cw, a.rh, x, y, cw / DPR, a.rh / DPR);
+    else for (let r = 1; r < 4; r++) ctx.drawImage(a.cv, 0, r * a.rh, cw, a.rh, x, y, cw * k, a.rh * k);
   }
 
   /**
-   * A name tag's drawing at size `s` of a kind (drawn by paintTag, as drawTag drew it each frame before): its pill (white, gold for
-   * you, blue for a sidekick: `TAG_STYLE`) with its soft shadow and its name; in four rows of its canvas, each `rh` device pixels high:
-   * the whole tag, then its shadow alone, its pill alone and its name alone (for a fading tag). One per name, size and kind.
+   * A name tag's picture for drawing at size `s`: the picture service's, one a name and kind, made at `picSize` (the biggest a tag
+   * shows at) and scaled by the GPU; null until it's made. Asked for every frame it's drawn, so the tags in use stay and the one
+   * least lately drawn makes room when the text's pages fill. Made again when the device's pixel ratio changes or its font comes.
    */
-  private tagArtOf(text: string, s: number, kind: TagKind): TagArt {
-    const { DPR } = this;
-    if (this.tagDpr !== DPR) {
-      this.tagArt.clear();
-      this.tagDpr = DPR;
+  private tagPic(text: string, kind: TagKind, s: number): TagArt | null {
+    const S = picSize(TOWN_FEEL.tagPicSizes, s);
+    let keys = this.tagKeys.get(text);
+    if (!keys) {
+      // (The keys of names long gone: let go together, rarely.)
+      if (this.tagKeys.size > 4096) this.tagKeys.clear();
+      this.tagKeys.set(text, (keys = []));
     }
-    const had = this.tagArt.find(text, s, kind);
-    if (had) return had;
-    // A new one: a canvas of its own, or the least lately used one's (never one drawn this frame or the last, which
-    // this frame may still draw: a crowd of more names than TAG_ART_MAX on screen keeps them all).
-    const old = this.tagArt.evict(this.frameNo);
-    const a: TagArt = { cv: old?.cv ?? upName(document.createElement("canvas"), "tag"), w: 0, h: 0, rh: 0, s, kind, used: this.frameNo, fonts: -1 };
-    this.tagArt.add(text, a);
-    return a;
+    const k = TAG_KINDS.indexOf(kind) * 16 + S;
+    return this.svc.ask(PIC_GROUP.text, (keys[k] ??= `tag|${kind}|${S}|${text}`), this.labelStamp(TAG_FONT[S]!), () => this.paintTag(text, S, kind));
   }
 
-  /** A tag's drawing (`tagArtOf`), painted if it's new or was painted before its font came. */
-  private tagReady(text: string, s: number, kind: TagKind): TagArt {
-    const a = this.tagArtOf(text, s, kind);
-    if (a.fonts !== -2 && a.fonts !== fontsLoaded) this.paintTag(a, text);
-    return a;
-  }
-
-  /** Draws a tag's four rows (`tagArtOf`) into its canvas, sized to its name in its font. */
-  private paintTag(a: TagArt, text: string): void {
+  /**
+   * A name tag's picture at font size `s` of a kind (as drawTag drew it each frame before Oct 28): its pill (white, gold for you, blue
+   * for a sidekick: `TAG_STYLE`) with its soft shadow and its name; in four rows of its canvas, each `rh` device pixels high: the whole
+   * tag, then its shadow alone, its pill alone and its name alone (for a fading tag).
+   */
+  private paintTag(text: string, s: number, kind: TagKind): TagArt {
     const { DPR } = this;
-    const { cv, s } = a;
-    // (Its font in: never painted again. Not yet: painted again when a font comes.)
-    a.fonts = fontReady(TAG_FONT[s]!) ? -2 : fontsLoaded;
+    const cv = upName(document.createElement("canvas"), "tag");
     const g = art2d(cv);
     g.font = TAG_FONT[s]!;
-    const w = (a.w = g.measureText(text).width + s * 1.25);
-    const h = (a.h = s + (8 * s) / 11);
-    const rh = (a.rh = Math.ceil(h * DPR) + 2 * TAG_PAD);
+    const w = g.measureText(text).width + s * 1.25;
+    const h = s + (8 * s) / 11;
+    const rh = Math.ceil(h * DPR) + 2 * TAG_PAD;
     cv.width = Math.ceil(w * DPR) + 2 * TAG_PAD;
     cv.height = 4 * rh;
-    const { pill, ink } = TAG_STYLE[a.kind];
+    const { pill, ink } = TAG_STYLE[kind];
     g.font = TAG_FONT[s]!;
     g.textAlign = "center";
     g.textBaseline = "middle";
@@ -3721,41 +3602,44 @@ export class Renderer {
         g.fillText(text, w / 2, h / 2);
       }
     }
-    this.paint.changed(cv);
+    return { cv, w, h, rh, s, kind, dpr: DPR };
   }
 
   /**
    * The speech bubble: white, rounded, its tail pointing down at the speaker's head. Its body and words are one picture a line
-   * (`bubbleArt`), its tail one picture (`tailArt`, made on the loading screen), each laid on whole device pixels (Nov 25: drawn as
+   * (`bubblePic`), its tail one picture (`tailArt`, made on the loading screen), each laid on whole device pixels (Nov 25: drawn as
    * shapes, the shadowed body and tail were drawn again into new pictures, and uploaded, every frame the speaker glided a fraction
-   * of a pixel).
+   * of a pixel). Its picture is made ahead of its line (Nov 28, phase 2: asked for while its boss is on screen, `drawThings`; a boss
+   * talks only once it's made), so it's here when the line starts; one that isn't is left out.
    */
   private drawBubble(text: string, ax: number, ay: number): void {
     const { ctx, W, DPR } = this;
-    const b = this.bubbleArt(text);
+    const b = this.bubblePic(text);
+    const tail = this.tailArt();
+    if (!b || !tail) return;
     const bx = Math.round(clamp(ax - b.w / 2, 6, W - b.w - 6) * DPR);
     const by = Math.round(Math.max(6, ay - b.h - 9) * DPR);
     this.keepFree(bx / DPR, by / DPR, b.w, b.h + 7);
     ctx.globalAlpha = 1;
-    ctx.drawImage(b.cv, (bx - BUBBLE_PAD) / DPR, (by - BUBBLE_PAD) / DPR, b.cv.width / DPR, b.cv.height / DPR);
-    const tail = this.tailArt();
+    ctx.imageSmoothingEnabled = true;
+    // (Made for the device's pixel ratio: one made for another, drawn while its own is on its way, at its own size all the same.)
+    ctx.drawImage(b.cv, (bx - BUBBLE_PAD * (DPR / b.dpr)) / DPR, (by - BUBBLE_PAD * (DPR / b.dpr)) / DPR, b.cv.width / b.dpr, b.cv.height / b.dpr);
     const tx = Math.round((clamp(ax, bx / DPR + 14, bx / DPR + b.w - 14) - 6) * DPR);
     const ty = Math.round(by + (b.h - 1) * DPR);
-    ctx.drawImage(tail, (tx - BUBBLE_PAD) / DPR, (ty - BUBBLE_PAD) / DPR, tail.width / DPR, tail.height / DPR);
+    ctx.drawImage(tail.cv, (tx - BUBBLE_PAD * (DPR / tail.dpr)) / DPR, (ty - BUBBLE_PAD * (DPR / tail.dpr)) / DPR, tail.cv.width / tail.dpr, tail.cv.height / tail.dpr);
   }
 
-  /** A line's bubble (`drawBubble`): its body, shadow and words, BUBBLE_PAD device pixels round it; the last BUBBLE_MAX lines kept. */
-  private bubbleArt(text: string): { cv: HTMLCanvasElement; w: number; h: number } {
-    const had = this.bubbles.get(text);
-    if (had) return had;
+  /** A line's bubble (`paintBubble`): the picture service's, asked for ahead of its line; the least lately said make room when the text's pages fill. */
+  private bubblePic(text: string): BubbleArt | null {
+    let key = this.bubbleKeys.get(text);
+    if (!key) this.bubbleKeys.set(text, (key = `bubble|${text}`));
+    return this.svc.ask(PIC_GROUP.text, key, this.labelStamp(BUBBLE_FONT), () => this.paintBubble(text));
+  }
+
+  /** A line's bubble's picture: its body, shadow and words, BUBBLE_PAD device pixels round it. */
+  private paintBubble(text: string): BubbleArt {
     const { DPR } = this;
-    let cv: HTMLCanvasElement | undefined;
-    if (this.bubbles.size >= BUBBLE_MAX) {
-      const [oldest, old] = this.bubbles.entries().next().value!;
-      this.bubbles.delete(oldest);
-      cv = old.cv;
-    }
-    cv ??= upName(document.createElement("canvas"), "bubble");
+    const cv = upName(document.createElement("canvas"), "bubble");
     const g = art2d(cv);
     g.font = BUBBLE_FONT;
     const words = text.split(" ");
@@ -3787,18 +3671,16 @@ export class Renderer {
     g.textBaseline = "middle";
     // (Each line's middle on a whole device pixel, as the town's text is laid.)
     for (let i = 0; i < lines.length; i++) g.fillText(lines[i]!, Math.round((w / 2) * DPR) / DPR, Math.round((5 + lh / 2 + i * lh) * DPR) / DPR);
-    const b = { cv, w, h };
-    this.bubbles.set(text, b);
-    this.paint.changed(cv);
-    return b;
+    return { cv, w, h, dpr: DPR };
   }
 
-  /** The bubble's tail (a 12 x 8 triangle, its top left at BUBBLE_PAD device pixels in) with its shadow, made once a pixel ratio. */
-  private tailArt(): HTMLCanvasElement {
+  /** The bubble's tail (a 12 x 8 triangle, its top left at BUBBLE_PAD device pixels in) with its shadow: the picture service's, made once a pixel ratio. */
+  private tailArt(): { cv: HTMLCanvasElement; dpr: number } | null {
+    return this.svc.ask(PIC_GROUP.text, "tail", this.DPR, () => this.paintTail(), true);
+  }
+  private paintTail(): { cv: HTMLCanvasElement; dpr: number } {
     const { DPR } = this;
-    if (this.tail && this.tailDpr === DPR) return this.tail;
-    const cv = (this.tail ??= upName(document.createElement("canvas"), "bubble tail"));
-    this.tailDpr = DPR;
+    const cv = upName(document.createElement("canvas"), "bubble tail");
     cv.width = Math.ceil(12 * DPR) + 2 * BUBBLE_PAD;
     cv.height = Math.ceil(8 * DPR) + 2 * BUBBLE_PAD;
     const g = art2d(cv);
@@ -3810,11 +3692,8 @@ export class Renderer {
     g.lineTo(6, 8);
     g.closePath();
     g.fill();
-    this.paint.changed(cv);
-    return cv;
+    return { cv, dpr: DPR };
   }
-  private tail: HTMLCanvasElement | null = null;
-  private tailDpr = 0;
 
   // ---- Taps: the pressed square; what a finger landed on; where a card stands.
 
@@ -4465,7 +4344,7 @@ export class Renderer {
 
   /** What a place's chip shows: its boss's first idle frame and the box round the boss's head, or the Colosseum's crown. */
   chipFace(place: Place): { img: HTMLCanvasElement; box: readonly [x: number, y: number, size: number] } {
-    if (place.id === "coliseum") return { img: this.chipIcon.get(0), box: CHIP_ICON_BOX };
+    if (place.id === "coliseum") return { img: this.chipIcon.painted(0), box: CHIP_ICON_BOX };
     const b = this.town.bosses.findIndex((x) => x.home.id === place.id);
     // (A stand-in's home, Rolling Dough's: its own picture's door, not him.)
     return { img: b < 0 || !hasTownBoss(this.town.bosses[b]!.home) ? this.houseFrames[this.places.indexOf(place)]!.get(0) : this.bossFrames[b]!.get(0), box: BOSS_FACE[place.id] };

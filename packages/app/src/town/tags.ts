@@ -9,7 +9,7 @@
  */
 import { TOWN_FEEL } from "./feel.ts";
 
-/** The kinds of tag: yours, a pawn's (a bot) and a boss's sidekick's. The tag drawings are cached by it (render.ts, `tagArtOf`). */
+/** The kinds of tag: yours, a pawn's (a bot) and a boss's sidekick's. A tag's picture is one a name and kind (render.ts, `tagPic`). */
 export type TagKind = "you" | "bot" | "sidekick";
 
 /**
@@ -22,57 +22,6 @@ export const TAG_STYLE: Readonly<Record<TagKind, { pill: string; ink: string }>>
   bot: { pill: "rgba(255,255,255,.92)", ink: "#1f2530" },
   sidekick: { pill: "rgba(29,78,216,.96)", ink: "#ffffff" },
 };
-
-/**
- * The tag drawings' cache (render.ts, `tagArtOf`): each tag drawn once and stamped every frame, one per name, size and **kind** (yours,
- * a pawn's or a sidekick's: they differ in color, so the kind is part of the key, not a gold-or-not flag), at most `max` in all, the
- * least lately used making way. Generic over what it holds (the renderer keeps canvases; a test keeps plain records). Pure.
- */
-export class TagCache<A extends { s: number; kind: TagKind; used: number }> {
-  private readonly byName = new Map<string, A[]>();
-  /** How many drawings are held. */
-  n = 0;
-  constructor(public max: number) {}
-
-  /** The drawing of this name at this size and kind, or undefined. */
-  find(text: string, s: number, kind: TagKind): A | undefined {
-    const list = this.byName.get(text);
-    if (list) for (const a of list) if (a.s === s && a.kind === kind) return a;
-    return undefined;
-  }
-
-  /** Holds a new drawing (the caller has made room with `evict`). */
-  add(text: string, a: A): void {
-    let list = this.byName.get(text);
-    if (!list) this.byName.set(text, (list = []));
-    list.push(a);
-    this.n++;
-  }
-
-  /**
-   * When it's full, lets go of the least lately used drawing and hands it back (the renderer reuses its canvas), but never one drawn in
-   * this frame or the last (`frameNo`: this frame may still draw it): a crowd of more names than `max` on screen keeps them all and
-   * the cache grows past `max` until they thin. Null: nothing let go.
-   */
-  evict(frameNo: number): A | null {
-    if (this.n < this.max) return null;
-    let old: A | null = null;
-    let oldText = "";
-    for (const [k, l] of this.byName) for (const a of l) if (!old || a.used < old.used) ((old = a), (oldText = k));
-    if (!old || old.used >= frameNo - 1) return null;
-    const l = this.byName.get(oldText)!;
-    l.splice(l.indexOf(old), 1);
-    if (!l.length) this.byName.delete(oldText);
-    this.n--;
-    return old;
-  }
-
-  /** Forgets everything (the device's pixel ratio changed: every drawing is the wrong size). */
-  clear(): void {
-    this.byName.clear();
-    this.n = 0;
-  }
-}
 
 /**
  * How strongly a tag shows from how far its figure is from you: `dist` squares, the larger of the two directions (|dc| and |dr|, so
