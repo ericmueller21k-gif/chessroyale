@@ -77,3 +77,10 @@ it at `pad`, 30 s and just before `pad + loopSeconds`). Keyed `stranger` (the ro
 hybrid v3, you can change it to the stranger, because that's what the boss is". Its opening (17 s of one voice over a low tone, no beat)
 is part of the loop, so every pass replays it. The first theme with sampled sound: its voice, strings, flute, oboe, violin and bell are
 played through the FluidR3_GM sound bank (Frank Wen, MIT license), credited in the FAQ and `/licenses/third-party.txt`.
+
+## Nov 28: the Stranger's theme, the choir version
+
+`stranger-loop` replaced in place (same name, same 160 s loop, same entry; `lufs` -16.4 → -16.6): from `boss-music-stereo-192/` on
+`stills/trailer-v2` (commit `efeade008`). Wherever the one sampled voice sang, the same bank's choir's women now sing the same notes at
+the same level; nothing else changed. Eric, Nov 28, to the music helper: "this should be the new one ... replace the old one" (the full
+song, both voices equal). Re-encoded to 128 kbps as above and lined up with the handoff. The Nov 27 version stays at `61f81d07a`.
