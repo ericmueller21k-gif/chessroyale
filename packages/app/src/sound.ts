@@ -1321,10 +1321,11 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   bannerStart: (t) => sample("bannerStart", t, 0.9),
   // A woman's short gasp, quieter than a move. Unused for now (Eric, Oct 11: the queen banners are silent; it sounded wrong).
   queenGasp: (t) => sample("queenGasp", t, 0.9),
-  menuOpen: (t) => sample("menuOpen", t, 0.7),
-  menuClose: (t) => sample("menuClose", t, 0.7),
-  // (30% quieter, Eric Nov 27: "the sharp noise made when you click on an item... hard on the ears": was 0.8.)
-  menuSelect: (t) => sample("menuSelect", t, 0.56),
+  // (Half as loud, Eric Nov 28: tapping an item and its magnifier, "so ear piercing… half as loud as it is now": were 0.7.)
+  menuOpen: (t) => sample("menuOpen", t, 0.35),
+  menuClose: (t) => sample("menuClose", t, 0.35),
+  // (30% quieter, Eric Nov 27: "the sharp noise made when you click on an item... hard on the ears": was 0.8; half again Nov 28: was 0.56.)
+  menuSelect: (t) => sample("menuSelect", t, 0.28),
   // The Colosseum's crowd cheering a queen taken (sounds/colosseum/CREDITS.md): fetched when the Colosseum opens, not
   // with the samples every screen loads.
   colosseumCheer: (t) => fileSample(COLOSSEUM_CHEER, t, 0.9),
