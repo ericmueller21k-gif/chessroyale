@@ -762,10 +762,10 @@ class GLPainter implements Painter {
    * 25). Each is uploaded whole by `kept`, onto a layer of the atlas beside and under the others (`placePages`; one big picture's, into
    * its own texture), and each picture on it kept where its page put it, as `keep` would keep it. Until Nov 25, 7.0 s to a slowed
    * phone's first frame, 3.3 s of it cutting 1,912 pictures out of these pages and 0.55 s uploading each.
-   * (Called once, before `kept` starts. Pages that wouldn't all fit, or one not of the atlas's layout, leave every picture to `keep`,
-   * filled as it's uploaded.)
+   * (Called once, before `kept` starts. Pages that wouldn't all fit, or one not of the atlas's layout: false, and every picture is left
+   * to `keep`, filled as it's uploaded.)
    */
-  adopt(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): void {
+  adopt(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): boolean {
     this.fill = fill;
     const own = (pg: AtlasPage) => pg.pics.length >= 1 && (pg.width > BIG || pg.height > BIG) && pg.pics.every((p) => p.x === 0 && p.y === 0 && p.src.width === pg.width && p.src.height === pg.height);
     const shared = pages.filter((pg) => !own(pg));
@@ -801,6 +801,7 @@ class GLPainter implements Painter {
         page?.entries.push(e);
       }
     }
+    return whole;
   }
 
   /** (`kept`) A kept page uploaded whole: onto its place on its layer of the atlas, or into a texture of its own. */

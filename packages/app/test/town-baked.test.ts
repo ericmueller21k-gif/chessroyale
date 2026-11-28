@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadBaked, type BakedNet } from "../src/town/baked.ts";
+import { adoptOrKeep, loadBaked, type Baked, type BakedNet, type NetAsk } from "../src/town/baked.ts";
 import { Pictures, type Page, type PageIO } from "../src/town/keep-pictures.ts";
 import { BAKED_NAME, filesOf, manifestFrom, type TownManifest } from "../src/town/manifest.ts";
 import { countPages, placePages } from "../src/town/paint-gl.ts";
-import { ATLAS } from "../src/town/paint.ts";
+import { ATLAS, type AtlasPage } from "../src/town/paint.ts";
 
 /**
  * The town loads the build's baked pictures (Nov 28, the town's structure, phase 1b: town/baked.ts, town/manifest.ts,
@@ -100,7 +100,7 @@ describe("loading the baked town (town/baked.ts)", () => {
     const m = manifest();
     const n = net(m);
     const shares: number[] = [];
-    const b = (await loadBaked("player", n, io(m), (s) => shares.push(s)))!;
+    const b = (await loadBaked("player", n, io(m), { onShare: (s) => shares.push(s) })) as Baked;
     expect(n.asked.sort()).toEqual([m.files[0]!.name, m.files[1]!.name]);
     // (Its bytes in so far, of this town's 4,000: one file, then both.)
     expect(shares.length).toBe(2);
@@ -130,29 +130,113 @@ describe("loading the baked town (town/baked.ts)", () => {
   it("an admin's town fetches its own files", async () => {
     const m = manifest();
     const n = net(m);
-    const b = (await loadBaked("admin", n, io(m)))!;
+    const b = (await loadBaked("admin", n, io(m))) as Baked;
     expect(n.asked.sort()).toEqual([m.files[0]!.name, m.files[2]!.name].sort());
     expect([b.has("b#0"), b.has("x#0")]).toEqual([true, false]);
   });
-  it("all or nothing: no manifest, a file missing, one that doesn't decode or isn't its size, or a browser that can't decode gives none of it, the decoded files let go", async () => {
+  it("all or nothing, and it says why (the review of phase 1b, S3): no manifest, a file missing, one that doesn't decode or isn't its size, or a browser that can't decode gives none of it, the decoded files let go", async () => {
     const m = manifest();
-    expect(await loadBaked("player", net(null), io(m))).toBeNull();
-    expect(await loadBaked("player", { manifest: () => Promise.reject(new Error("offline")), file: async () => new Blob([]) }, io(m))).toBeNull();
-    expect(await loadBaked("player", net(m), null)).toBeNull();
-    for (const make of [() => loadBaked("player", net(m, { missing: m.files[1]!.name }), io(m)), () => loadBaked("player", net(m), io(m, { fail: m.files[1]!.name })), () => loadBaked("player", net(m), io(m, { width: 199 }))]) {
+    expect(await loadBaked("player", net(null), io(m))).toBe("manifest");
+    expect(await loadBaked("player", { manifest: () => Promise.reject(new Error("offline")), file: async () => new Blob([]) }, io(m))).toBe("manifest");
+    expect(await loadBaked("player", net(m), null)).toBe("decode");
+    const cases: [string, () => ReturnType<typeof loadBaked>][] = [
+      ["file", () => loadBaked("player", net(m, { missing: m.files[1]!.name }), io(m))],
+      ["decode", () => loadBaked("player", net(m), io(m, { fail: m.files[1]!.name }))],
+      ["size", () => loadBaked("player", net(m), io(m, { width: 199 }))],
+    ];
+    for (const [why, make] of cases) {
       closed.length = 0;
-      expect(await make()).toBeNull();
+      expect(await make()).toBe(why);
       await new Promise((go) => setTimeout(go));
       // (What did decode is closed: no page left in memory.)
       expect(closed).toContain(m.files[0]!.name);
     }
+  });
+  /** A network whose second file (the row) hangs until `land` is called; `asks`: what each fetch was handed. */
+  const hung = (m: TownManifest) => {
+    const asks: NetAsk[] = [];
+    const o = {
+      asks,
+      land: (_b: Blob) => {},
+      net: {
+        manifest: async () => m,
+        file: (name: string, ask: NetAsk) => (asks.push(ask), name === m.files[1]!.name ? new Promise<Blob>((ok) => (o.land = ok)) : Promise.resolve(new Blob([name]))),
+      } satisfies BakedNet,
+    };
+    return o;
+  };
+  it("nothing arriving for the stall limit (a connection that hangs, S2): it stops waiting and says so, every fetch stopped and what had decoded let go; a slow connection still coming in is never cut off, nor does time with the page hidden count", async () => {
+    vi.useFakeTimers();
+    try {
+      const m = manifest();
+      const h = hung(m);
+      closed.length = 0;
+      let done: unknown = "waiting";
+      const p = loadBaked("player", h.net, io(m), { stallMs: 3000 });
+      void p.then((v) => (done = v));
+      // (Slow, but moving: a few bytes every 2 s for 10 s.)
+      for (let k = 0; k < 5; k++) {
+        await vi.advanceTimersByTimeAsync(2000);
+        h.asks[1]!.moved();
+      }
+      // (The page hidden, a phone's other app: its requests are held, and the wait doesn't count.)
+      vi.stubGlobal("document", { visibilityState: "hidden" });
+      await vi.advanceTimersByTimeAsync(20_000);
+      vi.stubGlobal("document", { visibilityState: "visible" });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(done).toBe("waiting");
+      expect(h.asks[1]!.signal.aborted).toBe(false);
+      // (Nothing for 3 s, the page showing.)
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(done).toBe("stall");
+      expect(h.asks.every((a) => a.signal.aborted), "every fetch stopped").toBe(true);
+      expect(closed).toEqual([m.files[0]!.name]);
+      // (The file landing after all isn't decoded.)
+      h.land(new Blob([m.files[1]!.name]));
+      await vi.advanceTimersByTimeAsync(10);
+      expect(closed).toEqual([m.files[0]!.name]);
+      expect(vi.getTimerCount(), "its watch stopped").toBe(0);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+  it("the town closing mid-load (S1): the fetches are stopped, a file landing after isn't decoded, what had decoded is let go, and it's no fallback (null); closed before it starts, nothing is asked", async () => {
+    const m = manifest();
+    const h = hung(m);
+    const shut = new AbortController();
+    closed.length = 0;
+    const p = loadBaked("player", h.net, io(m), { closed: shut.signal });
+    await new Promise((go) => setTimeout(go));
+    expect(h.asks.length).toBe(2);
+    shut.abort();
+    expect(await p).toBeNull();
+    expect(h.asks.every((a) => a.signal.aborted)).toBe(true);
+    h.land(new Blob([m.files[1]!.name]));
+    await new Promise((go) => setTimeout(go));
+    expect(closed).toEqual([m.files[0]!.name]);
+    const n = net(m);
+    expect(await loadBaked("player", n, io(m), { closed: shut.signal })).toBeNull();
+    expect(n.asked).toEqual([]);
+  });
+  it("pages the painter can't take whole (no room on the atlas): each picture is handed to its keep, so none is left to upload on its first draw", () => {
+    const pages = [
+      { img: {}, width: 10, height: 10, pics: [{ src: "a", x: 0, y: 0 }, { src: "b", x: 5, y: 0 }] },
+      { img: {}, width: 10, height: 10, pics: [{ src: "c", x: 0, y: 0 }] },
+    ] as unknown as AtlasPage[];
+    const kept: unknown[] = [];
+    const keep = (c: unknown) => void kept.push(c);
+    expect(adoptOrKeep({ adopt: () => true, keep }, pages, () => {})).toBe(true);
+    expect(kept).toEqual([]);
+    expect(adoptOrKeep({ adopt: () => false, keep }, pages, () => {})).toBe(false);
+    expect(kept).toEqual(["a", "b", "c"]);
   });
 });
 
 describe("the baked pictures in the loading screen's list (keep-pictures.ts Pictures)", () => {
   it("a baked picture is listed, never handed to the painter's keep (its file is adopted whole); a roof's pieces come from the manifest, each sheet one canvas a roof", async () => {
     const m = manifest();
-    const b = (await loadBaked("player", net(m), io(m)))!;
+    const b = (await loadBaked("player", net(m), io(m))) as Baked;
     const kept: unknown[] = [];
     const P = new Pictures((c) => kept.push(c), null, b);
     const a0 = b.pic("a#0");
@@ -216,21 +300,34 @@ describe("whole pages on the atlas's layers (paint-gl.ts placePages, countPages)
 describe("fetching the baked files (town/baked-files.ts)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.doUnmock("@chessroyale/core");
+    vi.doUnmock("../src/install.ts");
     vi.resetModules();
   });
   const NAME = `manifest.${H}.json`;
-  /** The module as a build with a baked town has it, over a pretend network. */
-  const load = async (answer: (path: string) => Response | Promise<Response>) => {
-    const asked: { path: string; low: boolean }[] = [];
+  const wait = (ms: number) => new Promise((go) => setTimeout(go, ms));
+  /** Each town's pages' names, as the build hands them to the app (`__TOWN_PAGES__`: vite.config.ts, from the manifest's `filesOf`). */
+  const pagesOf = (m: TownManifest) => Object.fromEntries((["player", "admin"] as const).map((t) => [t, filesOf(m, t).map((i) => m.files[i]!.name)]));
+  /** The module as a build with a baked town has it, over a pretend network. `o.afterMs`: home's wait (4 s on home). */
+  const load = async (answer: (path: string, signal?: AbortSignal) => Response | Promise<Response>, o: { afterMs?: number } = {}) => {
+    const asked: { path: string; low: boolean; signal?: AbortSignal }[] = [];
     vi.stubGlobal("__TOWN_PICTURES__", NAME);
-    vi.stubGlobal("fetch", async (path: string, init?: { priority?: string }) => {
-      asked.push({ path, low: init?.priority === "low" });
-      return answer(path);
+    vi.stubGlobal("__TOWN_PAGES__", pagesOf(manifest()));
+    vi.stubGlobal("fetch", async (path: string, init?: { priority?: string; signal?: AbortSignal }) => {
+      asked.push({ path, low: init?.priority === "low", ...(init?.signal ? { signal: init.signal } : {}) });
+      return answer(path, init?.signal);
     });
-    return { asked, mod: await import("../src/town/baked-files.ts") };
+    if (o.afterMs !== undefined)
+      vi.doMock("@chessroyale/core", async (orig) => {
+        const core = await orig<typeof import("@chessroyale/core")>();
+        return { ...core, TOWN_PICTURES: { ...core.TOWN_PICTURES, homeFetchAfterMs: o.afterMs } };
+      });
+    return { asked, paths: () => asked.map((a) => a.path.replace("/town-pictures/", "")), mod: await import("../src/town/baked-files.ts") };
   };
   const json = (x: unknown) => new Response(JSON.stringify(x), { headers: { "content-type": "application/json" } });
   const png = (name: string) => new Response(name, { headers: { "content-type": "image/png" } });
+  /** An answer that never comes, until its request is stopped. */
+  const never = (signal?: AbortSignal) => new Promise<Response>((_, no) => signal?.addEventListener("abort", () => no(new DOMException("stopped", "AbortError"))));
 
   it("reads this build's manifest once a page, by the name the build gave it", async () => {
     const m = manifest();
@@ -251,7 +348,7 @@ describe("fetching the baked files (town/baked-files.ts)", () => {
     expect(await (await mod.bakedFile(m.files[0]!.name)).text()).toBe(`/town-pictures/${m.files[0]!.name}`);
     expect(asked.filter((a) => a.path.endsWith(".json")).length).toBe(2);
   });
-  it("the dev server's build is handed order.json: the manifest is the one it names, asked fresh; a name that isn't a baked file's is no manifest; home fetches nothing ahead", async () => {
+  it("the dev server's build is handed order.json: the manifest is the one it names, read fresh each time the town loads (an art edit bakes a new one); a name that isn't a baked file's is no manifest; home fetches nothing ahead", async () => {
     const m = manifest();
     let named: unknown = NAME;
     const asked: string[] = [];
@@ -261,6 +358,11 @@ describe("fetching the baked files (town/baked-files.ts)", () => {
     const mod = await import("../src/town/baked-files.ts");
     expect(await mod.bakedManifest()).toEqual(m);
     expect(asked).toEqual(["/town-pictures/order.json", `/town-pictures/${NAME}`]);
+    // (The town opened again after an art edit: the new bake's manifest, by the name order.json gives now.)
+    const NEXT = `manifest.${H.split("").reverse().join("")}.json`;
+    named = NEXT;
+    expect(await mod.bakedManifest()).toEqual(m);
+    expect(asked.slice(2)).toEqual(["/town-pictures/order.json", `/town-pictures/${NEXT}`]);
     vi.resetModules();
     named = "../../api/me.json";
     asked.length = 0;
@@ -272,58 +374,120 @@ describe("fetching the baked files (town/baked-files.ts)", () => {
       const core = await orig<typeof import("@chessroyale/core")>();
       return { ...core, TOWN_PICTURES: { ...core.TOWN_PICTURES, homeFetchAfterMs: 10 } };
     });
-    try {
-      vi.resetModules();
-      asked.length = 0;
-      (await import("../src/town/baked-files.ts")).fetchTownAhead("player");
-      await new Promise((go) => setTimeout(go, 80));
-      expect(asked).toEqual([]);
-    } finally {
-      vi.doUnmock("@chessroyale/core");
-    }
+    vi.resetModules();
+    asked.length = 0;
+    (await import("../src/town/baked-files.ts")).fetchTownAhead("player");
+    await wait(80);
+    expect(asked).toEqual([]);
   });
-  it("an error's answer is no file; a file being fetched is never fetched twice at once", async () => {
-    let go: (r: Response) => void = () => {};
-    const { asked, mod } = await load((path) => (path.includes("gone") ? new Response("", { status: 404, headers: { "content-type": "image/png" } }) : new Promise<Response>((ok) => (go = ok))));
+  it("an error's answer is no file; a file's bytes are told as they arrive (the loading screen's stall watch); the town's request is its own, never joined to one home started at low priority", async () => {
+    const { asked, mod } = await load((path, signal) => (path.includes("gone") ? new Response("", { status: 404, headers: { "content-type": "image/png" } }) : path.includes("slow") ? never(signal) : png("a")));
     await expect(mod.bakedFile(`gone.${H}.png`)).rejects.toThrow(/404/);
-    const one = mod.bakedFile(`a.${H}.png`, true);
-    const two = mod.bakedFile(`a.${H}.png`);
-    await Promise.resolve();
-    go(png("a"));
-    expect(await (await one).text()).toBe("a");
-    expect(await (await two).text()).toBe("a");
-    expect(asked.filter((a) => a.path.includes("/a.")).length).toBe(1);
-    expect(asked.find((a) => a.path.includes("/a."))!.low, "home's fetch is at low priority").toBe(true);
+    let moves = 0;
+    const b = await mod.bakedFile(`a.${H}.png`, { moved: () => void moves++ });
+    expect([await b.text(), b.type, moves > 0]).toEqual(["a", "image/png", true]);
+    // (Home's, on its way at low priority; the town asks for the same file: a request of its own at the usual priority. Home's stopped:
+    // its own request ends, the town's is untouched.)
+    const homes = new AbortController();
+    const one = mod.bakedFile(`slow.${H}.png`, { low: true, signal: homes.signal });
+    const towns = new AbortController();
+    const two = mod.bakedFile(`slow.${H}.png`, { signal: towns.signal });
+    const slow = asked.filter((a) => a.path.includes("/slow."));
+    expect(slow.map((a) => a.low)).toEqual([true, false]);
+    homes.abort();
+    await expect(one).rejects.toThrow(/stopped/);
+    expect(towns.signal.aborted).toBe(false);
+    towns.abort();
+    await expect(two).rejects.toThrow(/stopped/);
   });
-  it("home's fetch ahead: after its wait, this town's files one at a time at low priority; stopped, none; a connection that asks to save data, none", async () => {
+  it("home's fetch ahead: after its wait, the manifest and this town's pages by the names the build handed it, one at a time, all at low priority (the manifest never read on home); stopped before its wait, none", async () => {
     const m = manifest();
-    const wait = (ms: number) => new Promise((go) => setTimeout(go, ms));
-    // (Its wait, 4 s on home, 60 ms here.)
-    vi.doMock("@chessroyale/core", async (orig) => {
-      const core = await orig<typeof import("@chessroyale/core")>();
-      return { ...core, TOWN_PICTURES: { ...core.TOWN_PICTURES, homeFetchAfterMs: 60 } };
-    });
-    try {
-      vi.stubGlobal("navigator", {});
-      const { asked, mod } = await load((path) => (path.endsWith(".json") ? json(m) : png(path)));
-      const stop = mod.fetchTownAhead("admin");
-      await wait(20);
-      expect(asked).toEqual([]);
-      await wait(150);
-      expect(asked.map((a) => a.path)).toEqual([`/town-pictures/${NAME}`, `/town-pictures/${m.files[0]!.name}`, `/town-pictures/${m.files[2]!.name}`]);
-      expect(asked.slice(1).every((a) => a.low)).toBe(true);
-      stop();
-      // (Stopped before its wait is over: nothing.)
-      asked.length = 0;
-      mod.fetchTownAhead("player")();
-      await wait(150);
-      expect(asked).toEqual([]);
-      vi.stubGlobal("navigator", { connection: { saveData: true } });
+    vi.stubGlobal("navigator", {});
+    const { asked, paths, mod } = await load((path) => (path.endsWith(".json") ? new Response("not read", { headers: { "content-type": "application/json" } }) : png(path)), { afterMs: 60 });
+    const stop = mod.fetchTownAhead("admin");
+    await wait(20);
+    expect(asked).toEqual([]);
+    await wait(150);
+    expect(paths()).toEqual([NAME, m.files[0]!.name, m.files[2]!.name]);
+    expect(asked.every((a) => a.low)).toBe(true);
+    stop();
+    asked.length = 0;
+    mod.fetchTownAhead("player")();
+    await wait(150);
+    expect(asked).toEqual([]);
+  });
+  it("home's fetch ahead never asks again for a file this page has read (after each match home shows again): only what's new to it", async () => {
+    const m = manifest();
+    vi.stubGlobal("navigator", {});
+    const { asked, paths, mod } = await load((path) => (path.endsWith(".json") ? json(m) : png(path)), { afterMs: 10 });
+    mod.fetchTownAhead("player");
+    await wait(100);
+    expect(paths()).toEqual([NAME, m.files[0]!.name, m.files[1]!.name]);
+    // (Home again: nothing. An admin's town then: only its own home's page. A file the town's load read counts too.)
+    asked.length = 0;
+    mod.fetchTownAhead("player");
+    await wait(100);
+    expect(asked).toEqual([]);
+    await mod.bakedFile(m.files[2]!.name);
+    asked.length = 0;
+    mod.fetchTownAhead("admin");
+    await wait(100);
+    expect(asked).toEqual([]);
+  });
+  it("home's fetch ahead is stopped as home closes or its queue shows (S1): the file on its way is stopped too, and nothing more is asked for", async () => {
+    const m = manifest();
+    vi.stubGlobal("navigator", {});
+    const { asked, paths, mod } = await load((path, signal) => (path.endsWith(".json") ? json(m) : never(signal)), { afterMs: 10 });
+    const stop = mod.fetchTownAhead("player");
+    await wait(100);
+    expect(paths()).toEqual([NAME, m.files[0]!.name]);
+    expect(asked[1]!.signal?.aborted).toBe(false);
+    stop();
+    expect(asked[1]!.signal?.aborted, "the file on its way").toBe(true);
+    await wait(50);
+    expect(paths()).toEqual([NAME, m.files[0]!.name]);
+  });
+  it("home fetches nothing ahead on a connection that asks to save data, nor on a slow one (2g, 3g); on 4g it does", async () => {
+    const m = manifest();
+    const { asked, mod } = await load((path) => (path.endsWith(".json") ? json(m) : png(path)), { afterMs: 10 });
+    for (const connection of [{ saveData: true, effectiveType: "4g" }, { effectiveType: "slow-2g" }, { effectiveType: "2g" }, { effectiveType: "3g" }]) {
+      vi.stubGlobal("navigator", { connection });
       mod.fetchTownAhead("player");
-      await wait(150);
-      expect(asked).toEqual([]);
-    } finally {
-      vi.doUnmock("@chessroyale/core");
+      await wait(60);
+      expect(asked, JSON.stringify(connection)).toEqual([]);
     }
+    vi.stubGlobal("navigator", { connection: { saveData: false, effectiveType: "4g" } });
+    mod.fetchTownAhead("player");
+    await wait(60);
+    expect(asked.length).toBe(3);
+  });
+  it("on a first visit home's fetch ahead waits until the service worker answers the page (S4: a file fetched before that passes it by, and isn't kept); with no worker to come, it doesn't wait", async () => {
+    const m = manifest();
+    const on = new Map<string, () => void>();
+    const sw = { controller: null as object | null, addEventListener: (t: string, f: () => void) => void on.set(t, f), removeEventListener: (t: string) => void on.delete(t) };
+    vi.stubGlobal("navigator", { serviceWorker: sw });
+    const { asked, mod } = await load((path) => (path.endsWith(".json") ? json(m) : png(path)), { afterMs: 10 });
+    mod.fetchTownAhead("player");
+    await wait(80);
+    expect(asked, "the worker still installing").toEqual([]);
+    sw.controller = {};
+    on.get("controllerchange")!();
+    await wait(60);
+    expect(asked.length).toBe(3);
+    expect(on.size, "its listener let go").toBe(0);
+    // (A page its worker answers already, any later visit: at once.)
+    vi.resetModules();
+    asked.length = 0;
+    (await import("../src/town/baked-files.ts")).fetchTownAhead("player");
+    await wait(60);
+    expect(asked.length).toBe(3);
+    // (No worker to come, install.ts `workerNever`: a browser without one, or its registration failed.)
+    vi.resetModules();
+    vi.doMock("../src/install.ts", () => ({ workerNever: Promise.resolve() }));
+    sw.controller = null;
+    asked.length = 0;
+    (await import("../src/town/baked-files.ts")).fetchTownAhead("player");
+    await wait(60);
+    expect(asked.length).toBe(3);
   });
 });

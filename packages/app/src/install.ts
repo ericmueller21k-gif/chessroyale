@@ -10,6 +10,13 @@ interface BeforeInstallPromptEvent extends Event {
 let deferred: BeforeInstallPromptEvent | null = null;
 const listeners = new Set<() => void>();
 
+let noWorker: () => void = () => {};
+/**
+ * Resolves if this page will have no service worker: the dev server's build, a browser without one, or a registration that failed.
+ * (Home's fetch ahead of the town's files waits until the worker answers the page, unless there'll be none: town/baked-files.ts.)
+ */
+export const workerNever = new Promise<void>((ok) => (noWorker = ok));
+
 /** Call before rendering: Chrome fires beforeinstallprompt early. */
 export function setUpInstall() {
   window.addEventListener("beforeinstallprompt", (e) => {
@@ -31,9 +38,10 @@ export function setUpInstall() {
         .then((reg) => reg.active?.postMessage({ type: "brc-loaded" }))
         .catch(() => {
           // Not fatal: the app works without it, just not offline.
+          noWorker();
         });
     });
-  }
+  } else noWorker();
 }
 
 /** This page's entry script (its path under /assets/: which version it runs), or null (the dev server's). */

@@ -9,7 +9,7 @@ import preact from "@preact/preset-vite";
 import { APP_CACHE } from "../core/src/settings.ts";
 import { townArt } from "./town-art.ts";
 import { TOWN_PICTURES_DIR, bakeTown, report, type BakeResult } from "../../scripts/bake-town.ts";
-import { BAKED_NAME } from "./src/town/manifest.ts";
+import { BAKED_NAME, TOWNS, TOWN_FILE_PATH, filesOf } from "./src/town/manifest.ts";
 
 const require = createRequire(import.meta.url);
 /** This config's own folder (packages/app): its files resolve from here, whichever folder Vite was started from. */
@@ -77,6 +77,19 @@ function townPictures(): Plugin {
   const dir = join(APP, "public", TOWN_PICTURES_DIR);
   let baked: Promise<BakeResult> | null = null;
   let inputs: string[] = [];
+  /** One bake at a time: the next waits for the one running (each clears the folder first, and would take the other's files). */
+  let running: Promise<unknown> = Promise.resolve();
+  const bake = (log: (text: string) => void) => {
+    const p = running
+      .then(() => bakeTown(dir))
+      .then((r) => {
+        inputs = r.inputs;
+        log(report(r));
+        return r;
+      });
+    running = p.catch(() => undefined);
+    return p;
+  };
   return {
     name: "bake-town",
     apply: "serve",
@@ -84,12 +97,8 @@ function townPictures(): Plugin {
       server.middlewares.use((req, res, next) => {
         const name = req.url?.startsWith(`/${TOWN_PICTURES_DIR}/`) ? req.url.slice(TOWN_PICTURES_DIR.length + 2).split("?")[0]! : null;
         if (name === null || !(name === "order.json" || BAKED_NAME.test(name))) return next();
-        baked ??= bakeTown(dir).then((r) => {
-          inputs = r.inputs;
-          server.config.logger.info(report(r));
-          return r;
-        });
-        baked.then(
+        const mine = (baked ??= bake((text) => server.config.logger.info(text)));
+        mine.then(
           () => {
             if (!existsSync(join(dir, name))) return next();
             res.setHeader("Content-Type", name.endsWith(".json") ? "application/json" : "image/png");
@@ -97,7 +106,7 @@ function townPictures(): Plugin {
             res.end(readFileSync(join(dir, name)));
           },
           (e) => {
-            baked = null;
+            if (baked === mine) baked = null;
             next(e);
           },
         );
@@ -178,6 +187,7 @@ function serviceWorker(): Plugin {
         .replace("__HASHES__", JSON.stringify(hashes))
         .replace("__MUSIC_HASHES__", JSON.stringify(musicHashes))
         .replace("__TOWN_FILES__", JSON.stringify(townFiles))
+        .replace("__TOWN_FILE_PATH__", String(TOWN_FILE_PATH))
         .replace("__KEEP_VERSIONS__", String(APP_CACHE.keepVersions))
         .replace("__MAIA__", `brc-maia-${maia.digest("hex").slice(0, 12)}`)
         .replace("__FILES__", JSON.stringify(files));
@@ -235,6 +245,8 @@ function maiaFileBytes(): Record<string, number> {
 // change the art keeps them: town-art.ts. The dev server keeps no pictures, so it takes none.)
 // (`__TOWN_PICTURES__`, Nov 28, phase 1b: the baked town's manifest's name, by its contents. A build bakes here, before the app is
 // built, so the app is handed the name. The dev server is handed `order.json`, which names the latest bake's: `townPictures` above.)
+// (`__TOWN_PAGES__`: each town's pages' names, as the manifest has them. Home fetches them ahead by these, without reading the manifest:
+// src/town/baked-files.ts. None in the dev server, where home fetches nothing ahead.)
 export default defineConfig(async ({ command }) => {
   const baked = command === "build" ? await bakeTown(join(APP, "public", TOWN_PICTURES_DIR)) : null;
   if (baked) console.log(report(baked));
@@ -244,6 +256,7 @@ export default defineConfig(async ({ command }) => {
       __APP_VERSION__: JSON.stringify(VERSION),
       __TOWN_ART__: JSON.stringify(command === "build" ? await townArt() : "dev"),
       __TOWN_PICTURES__: JSON.stringify(baked?.manifestName ?? "order.json"),
+      __TOWN_PAGES__: JSON.stringify(baked ? Object.fromEntries(TOWNS.map((t) => [t, filesOf(baked.manifest, t).map((i) => baked.manifest.files[i]!.name)])) : {}),
     },
     plugins: [stockfish(), maiaBox(), townPictures(), preact(), serviceWorker(), versionFile()],
     server: { host: true },

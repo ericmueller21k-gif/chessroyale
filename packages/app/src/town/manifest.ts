@@ -42,6 +42,8 @@ export interface TownManifest {
 
 /** A baked file's name: letters, digits, dots and dashes, then its contents' hash (12 hex) and its kind. Nothing that leaves the folder. */
 export const BAKED_NAME = /^[a-z0-9][a-z0-9.-]*\.[0-9a-f]{12}\.(png|json)$/;
+/** A baked file's path on the site, by the same test: the service worker's (sw-template.js TOWN_FILE, filled in from this by the build). */
+export const TOWN_FILE_PATH = new RegExp(`^/${TOWN_PICTURES_DIR}/${BAKED_NAME.source.slice(1)}`);
 
 const isInt = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 0;
 const isRec = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);

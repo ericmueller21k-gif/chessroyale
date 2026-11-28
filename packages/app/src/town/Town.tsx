@@ -73,9 +73,9 @@ import { rideMoving, rideSoundState, rideStep, warmRideSound } from "../ride-sou
 import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_ITEM_FRAMES, TOWN_PICTURES, WATCH_GUEST, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
-import { reportTownFallback } from "../problems.ts";
+import { reportBakedFallback, reportTownFallback } from "../problems.ts";
 import { ADMIN_TOWN } from "./admin-town.ts";
-import { loadBaked, type Baked } from "./baked.ts";
+import { adoptOrKeep, loadBaked, type Baked } from "./baked.ts";
 import { TOWN_MANIFEST, bakedFile, bakedManifest } from "./baked-files.ts";
 import { domPageIO, domSaveIO, idbShelf, pictureKey, restore, save, type Restored, type Shelf } from "./keep-pictures.ts";
 import { domPaintPool, workerCount, type PaintPool } from "./paint-pool.ts";
@@ -1576,6 +1576,8 @@ export const GATE_YOUNG = "Accounts are for players 13 and older.";
  */
 /** (Nov 28) The boxes' solid tops kept between visits, by the kept pictures' key (`loadTown`). */
 const TOPS_KEY = "brc.townTops";
+/** (`loadTown`) The town this device saved before the build baked its pictures has been cleared, this page. */
+let savedCleared = false;
 const LOAD_STEPS = { pictures: "Loading the town's pictures…", building: "Building the town…" } as const;
 type LoadStep = keyof typeof LOAD_STEPS;
 
@@ -2005,6 +2007,8 @@ function startTown(
   let raf = 0;
   let last = performance.now();
   let alive = true;
+  /** Aborted as the town closes: the baked files' fetching and decoding stop (`loadTown`, baked.ts). */
+  const townClosed = new AbortController();
   /** (Tests, `__townHold`) The frame loop held: the last frame stays, and nothing moves. */
   let held = false;
   /** The loading screen is up (`loadTown`): no frames yet. */
@@ -3082,13 +3086,28 @@ function startTown(
       const io = domPageIO(art2d);
       const bakedBuild = !!TOWN_MANIFEST && TOWN_PICTURES.baked;
       let made: Baked | null = null;
-      if (bakedBuild && painter.keep && painter.adopt && !TOWN_ASKED.paintAll)
-        made = await loadBaked(ADMIN_TOWN ? "admin" : "player", { manifest: bakedManifest, file: bakedFile }, io, (share) => alive && onLoading(share * f.loadFetchShare * f.loadPaintShare, "pictures"));
-      if (made && !(alive && r.takeBaked(made))) {
-        made.close();
-        made = null;
+      if (bakedBuild && painter.keep && painter.adopt && !TOWN_ASKED.paintAll) {
+        // (Stopped as the town closes, `townClosed`. Nothing arriving for `TOWN_PICTURES.stallMs`: it paints, as with a file missing.)
+        const got = await loadBaked(ADMIN_TOWN ? "admin" : "player", { manifest: bakedManifest, file: bakedFile }, io, { closed: townClosed.signal, onShare: (share) => alive && onLoading(share * f.loadFetchShare * f.loadPaintShare, "pictures") });
+        // (Not used, and why: said once a page, problems.ts. The town closing meanwhile is no fallback.)
+        if (typeof got === "string") reportBakedFallback(got);
+        else if (got && alive && r.takeBaked(got)) made = got;
+        else if (got) {
+          got.close();
+          if (alive) reportBakedFallback("list");
+        }
       }
       baked = made;
+      // (The town this device saved before the build baked it, about 5.8 MB in IndexedDB and its tops in localStorage: let go, once a page.)
+      if (made && !savedCleared) {
+        savedCleared = true;
+        void idbShelf()?.clear().catch(() => undefined);
+        try {
+          localStorage.removeItem(TOPS_KEY);
+        } catch {
+          // (No storage: nothing kept there.)
+        }
+      }
       // (`saved` null: with the baked town this visit keeps nothing of its own.)
       Object.assign(pictures, { baked: !!made, bakedMs: performance.now() - t0, files: made?.files ?? 0, bytes: made?.bytes ?? 0, ...(made ? { saved: null } : {}) });
       // (A build with no baked town, `TOWN_PICTURES.baked` off:) the pictures as the last visit painted them, if they're kept and the
@@ -3119,7 +3138,8 @@ function startTown(
       }
       // (The baked files handed to the painter whole, each picture where its file has it, once every job has put its pictures in place:
       // uploaded below, a file at a time. Kept decoded until the town closes, as a later visit's pages were.)
-      if (made && alive) painter.adopt?.(made.pages(), made.fill);
+      // (Pages the painter can't take whole: each picture kept alone, `adoptOrKeep`.)
+      if (made && alive) adoptOrKeep(painter, made.pages(), made.fill);
       // (The pawns' crate items, Nov 26: waited for, up to loadSheetWaitMs from here, and kept with the rest.)
       const sheetsBy = performance.now() + f.loadSheetWaitMs;
       const until = () => new Promise((go) => setTimeout(go, Math.max(0, sheetsBy - performance.now())));
@@ -3466,6 +3486,7 @@ function startTown(
     },
     stop: () => {
       alive = false;
+      townClosed.abort();
       kept?.close();
       kept = null;
       baked?.close();

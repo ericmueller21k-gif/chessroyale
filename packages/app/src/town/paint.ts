@@ -124,9 +124,10 @@ export interface Painter {
    * (With `keep`, the loading screen, before `kept`; Nov 25) Whole pages (the build's baked files, or a later visit's kept pages),
    * uploaded whole by `kept`, each placed on the atlas's layers: each picture on them kept as `keep` keeps one, where its page put it,
    * never uploaded alone. `fill` puts a picture's pixels on its canvas (empty until then) should it need uploading again (a lost
-   * context, `changed`). Pages it can't take (too many) leave their pictures to `keep`.
+   * context, `changed`). Says whether it took them: false (too many for the atlas, or `kept` has started), and none is placed: hand each
+   * picture to `keep` then (baked.ts `adoptOrKeep`; a later visit's kept ones are, as each is put in place).
    */
-  adopt?(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): void;
+  adopt?(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): boolean;
   /**
    * (WebGL, the loading screen's warm-up, Nov 28) Waits until the GPU has done everything sent so far (one pixel read back): a frame drawn
    * under the loading card pays its textures' and shaders' first use there, not in the first frames you see.
