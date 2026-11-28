@@ -72,6 +72,14 @@ if (en.recluse?.noResults) attention.push(`${count(en.recluse.noResults, "Hidden
 if (share(h.fairplay.searches, h.fairplay.cap) >= 0.8) attention.push(`Fair play's deep re-checks have used ${h.fairplay.searches} of today's ${h.fairplay.cap} searches.`);
 if (h.alerts?.paging.length) attention.push(`Alerts paging: ${h.alerts.paging.join(", ")}.`);
 if (h.reports.day.bug) attention.push(`${count(h.reports.day.bug, "bug report")} in the last 24 hours to read: /admin/ops?kind=bug.`);
+// A scheduled job's failure needs someone at once (nothing runs it again before its next turn): listed apart from the top errors,
+// which a busy day would push a once-a-day failure off. (The daily ledger check failed every day from Nov 7 to Nov 28 unseen.)
+// A server older than this has no `cron`.
+const jobName = (j) => (/^[a-z0-9-]{1,30}$/.test(j ?? "") ? j : "(unnamed)");
+for (const c of h.cron ?? []) {
+  const where = c.job === "ledger" ? " Which accounts and assets: docs/areas/shop.md, \"The daily ledger check\"." : "";
+  attention.push(`The scheduled job "${jobName(c.job)}" failed ${c.day === 1 ? "once" : `${c.day} times`} in the last 24 hours and on ${c.days} of the last 7 days (the first ${utc(c.firstSeen)} UTC), message ${quote("error message", c.message)}.${where}`);
+}
 
 const lines = [];
 lines.push(`HunChess health at ${utc(h.at)} UTC (${base})`);
@@ -87,6 +95,7 @@ if (h.live) {
   lines.push(`Live: ${h.live.online} online, ${h.live.players} in lobbies${modes.length ? `; ${modes.join("; ")}` : "; no lobbies"}`);
 }
 lines.push(`Errors: ${e.thisHour} this hour, ${e.lastHour} the hour before, ${e.day} in 24 hours (${e.kinds} kinds)`);
+if (h.cron) lines.push(`Scheduled jobs: ${h.cron.length ? `${h.cron.map((c) => jobName(c.job)).join(", ")} failed in the last 24 hours (above)` : "none failed in the last 24 hours"}`);
 for (const x of e.top.slice(0, 5)) {
   // (A device's error names its own kind; the server's kinds are its code's.)
   const what = x.source === "server" ? `server ${x.kind}` : `client error ${quote("a device's name for its error", x.kind)}`;
