@@ -596,9 +596,11 @@ function townRefJob(): number {
  * when its runs read 13.4 to 18.1). Since the paint workers (Nov 23, town/paint-pool.ts): 12, the median of a first visit's runs (8.9 to
  * 11.0 over 3 runs of both towns, median 9.6) and a quarter. docs/decisions/2026-11-23-town-paint-workers.md. Nov 28: 14, for the
  * warm-up under the loading card and the box tops worked out there (about 1.5 s at 4x on a first visit; Eric, Nov 27: a couple of seconds
- * more loading is fine if it then plays smooth): 11.1 and 12.9 measured. docs/decisions/2026-11-28-town-load-smooth.md.
+ * more loading is fine if it then plays smooth): 11.1 and 12.9 measured. docs/decisions/2026-11-28-town-load-smooth.md. Nov 28, later: 16,
+ * for a first visit's pictures kept under the card (about 1 s at 4x; it was a hitch after the card lifted, Eric: "load the town first so it
+ * doesn't lag"): 12.8 and 14.1 measured.
  */
-const TOWN_LOAD_REFS = 14;
+const TOWN_LOAD_REFS = 16;
 /**
  * (`?paintslow=4`, Nov 23) The paint workers slowed as the page is: CDP's CPU slowing reaches the page's own thread, not its workers, so
  * each worker's picture is made to take 4 times as long (test-switches.ts TOWN_PAINT_ASKED), as on a phone's slower cores.
