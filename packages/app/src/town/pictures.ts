@@ -101,7 +101,7 @@ export interface TownArt {
 }
 
 /** The art of the town of `homes` (this town's: world.ts HOMES), its figures out front `figures` (the town's bosses' homes, in order). */
-export function townArt(homes: readonly Home[] = HOMES, figures: readonly HomeId[] = homes.filter(hasFigure).map((h) => h.id)): TownArt {
+export function makeTownArt(homes: readonly Home[] = HOMES, figures: readonly HomeId[] = homes.filter(hasFigure).map((h) => h.id)): TownArt {
   const places: readonly Place[] = [...homes, COLISEUM_PLACE];
   const boxes = streetBoxes(PROPS);
   const homeBox = places.map((h) => boxes.find((b) => b.home === h.id) ?? null);

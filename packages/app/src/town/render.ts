@@ -47,7 +47,7 @@ import { P, REC, upName, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { Pictures, type Restored } from "./keep-pictures.ts";
 import { framePixels, glowPixels, type GlowPixels, type PaintSpec, type Pixels } from "./paint-jobs.ts";
-import { BOSS_ART, figureArt, roofKey, townArt, townWants, type ArtCache, type TownArt } from "./pictures.ts";
+import { BOSS_ART, figureArt, roofKey, makeTownArt, townWants, type ArtCache, type TownArt } from "./pictures.ts";
 import type { PaintPool } from "./paint-pool.ts";
 import type { Cut } from "./kit/bake.ts";
 import { stepChar } from "./kit/bake.ts";
@@ -856,6 +856,7 @@ export class Renderer {
   private readonly homeBox: readonly (BoxInst | null)[];
   private readonly propBox: readonly (BoxInst | null)[];
   private readonly partItems: Item[];
+  private readonly wallFrames = new Map<Character, FrameCache>();
   /** The town's art (pictures.ts), and the frame cache of each of its characters' caches (made the first time it's asked for). */
   private readonly art: TownArt;
   private readonly fcs = new Map<ArtCache, FrameCache>();
@@ -890,7 +891,7 @@ export class Renderer {
     // and roof items of their own (sorted with everything else); a shed's and a hedge's drawn with their front.
     // (The town's art, Nov 28: its boxes and the character behind every frame cache, from the picture list's module, pictures.ts, which
     // the loading screen (`plan`) and the build's bake read too.)
-    const art = (this.art = townArt(homes, town.bosses.map((bs) => bs.home.id)));
+    const art = (this.art = makeTownArt(homes, town.bosses.map((bs) => bs.home.id)));
     this.boxes = art.boxes;
     this.plans = this.boxes.map((b) => newPlan(b.box));
     this.warmAt = [new Int32Array(this.boxes.length), new Int32Array(this.boxes.length)];
@@ -2134,7 +2135,9 @@ export class Renderer {
     return this.wallFc(ch).get(0);
   }
   private wallFc(ch: Character): FrameCache {
-    return this.fcOf(this.art.wall(ch));
+    let fc = this.wallFrames.get(ch);
+    if (!fc) this.wallFrames.set(ch, (fc = this.fcOf(this.art.wall(ch))));
+    return fc;
   }
   /** A side's windows lit at dusk and night (the art's: its own lights, baked as a front's are), once a picture. */
   private wallGlowOf(ch: Character, lights: readonly LightSpot[]): Glow | null {

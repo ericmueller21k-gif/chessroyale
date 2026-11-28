@@ -8,7 +8,7 @@ import { solidTop } from "./boxes.ts";
 import type { Cut } from "./kit/bake.ts";
 import { packCuts } from "./kit/draw.ts";
 import { paintSpec, type GlowPixels, type Pixels } from "./paint-jobs.ts";
-import { townArt, townSheets, townWants } from "./pictures.ts";
+import { makeTownArt, townSheets, townWants } from "./pictures.ts";
 
 export { packPictures } from "./keep-pictures.ts";
 export { ATLAS } from "./paint.ts";
@@ -39,7 +39,7 @@ const samePixels = (a: Pixels, b: Pixels): boolean => a.w === b.w && a.h === b.h
 
 /** Paints this town's list. Throws if one name comes with two different pictures or numbers (a name must mean one thing, in every town). */
 export function bakeList(): TownBake {
-  const art = townArt();
+  const art = makeTownArt();
   const pictures: TownBake["pictures"] = new Map();
   const order: string[] = [];
   const roofs: TownBake["roofs"] = {};

@@ -1,0 +1,33 @@
+Town phase 1a done (claude/town-phase1a, from origin/main a615f7bf with origin/claude/town-phase0 merged in). PR title and body:
+.pr-body.md. No PR opened; CI has not run (it runs on a PR). About 2.5 hours; nothing split off.
+
+- The list: packages/app/src/town/pictures.ts (makeTownArt, townWants, townSheets). render.ts `plan` runs a job a want from it; its
+  constructor takes its boxes and frame caches' characters from it. No pixel changes: against main's own build the device's
+  __townPictureSum is identical (player n 2250 hash 81fb216 gpu 8f62dba3; admin n 2398 hash 76475003 gpu c432b637).
+- The bake: scripts/bake-town.ts (+ town/bake.ts, scripts/png.ts). npm run build runs it (vite.config.ts `townPictures`, build only).
+  12.3 s; 61 files, 3.28 MB in packages/app/public/town-pictures/ (ignored, not committed); a player's town 49 files, 2.54 MB.
+- The tests: packages/app/test/town-bake.test.ts (26 s: both towns, every picture byte for byte from the PNGs) and two in
+  e2e/town-street.spec.ts (the device's picture hash = the baked files', player and admin). No existing check changed.
+- Local: typecheck; 3,080 app unit tests; e2e/town-street.spec.ts on the phone, 14 of 14. CI will run every spec (vite.config.ts is `full`).
+- No stills: nothing looks different (pixel hashes equal).
+
+For phase 1b to know:
+- manifest.json has a fixed name: an app kept by the service worker could read a newer one. Name it by its contents and hand the name
+  to the app (a `define`, as __TOWN_ART__) when the app starts reading it.
+- The dev server doesn't bake (the plugin is build-only), and the service worker's precache leaves /town-pictures/ out: both are one
+  line each in vite.config.ts.
+- A file is a group's page, as wide as its pictures reach (not a whole 2048 atlas page), padded as the atlas pads: the device places
+  pages on its layers. Names with the same pixels share one place (two stand-ins on one rectangle).
+- A roof's sheets are pictures `<roof>/<n>`; its pieces' first number is that n. A glow with no pieces has no picture.
+- The sidekicks' sheets are keyed by their name in SIDEKICK_SHEETS (the file's name), not by the sheet's id.
+- order.json is only for the e2e check (each town's loading screen's order); the app doesn't need it.
+- Not in the list, as today's loading screen doesn't keep them either: the signs' lettering, the statues' close-ups, the chips' icon,
+  the sky's pictures, the tables' boards. They're the same for every player and could be baked later.
+
+Noticed, not changed (not in the brief):
+- An admin's town never draws Rivet (Timber's kid). render.ts looks his sheet up by its id ("sidekick-beaver" -> "beaver"), but the file
+  is timber.png, so the page asks for /undefined (seen in an admin's town's requests on main's code path too). One line to fix, with a
+  still, in its own PR.
+- The @perf "Chess Town on a slow phone" budgets fail on this machine on main as well (its reference job varies 0.9 to 1.5 s between
+  runs); the load itself is unchanged (pr body). CI leaves @perf out.
+- After it's live: nothing for Eric to see yet; the /town?report ask belongs to phase 1b.
