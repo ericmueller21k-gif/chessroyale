@@ -50,3 +50,5 @@
 - Nov 28 · Shop: rank piece sets (K+Q or full set; white/black clear: gradient piece vs gradient border, solid border to compare); setting 'Always default board and pieces' (main + in-game) · DROPPED Nov 28 03:25 (Eric: no artwork for now, usage); was B gradient rim
 - Nov 28 · Rank nameplates instead of piece sets: your name in a game in your rank's colors (Eric: "give the names when you're in a game… nameplates"; he can't see his own name in a boss battle today). IDEA, LATER (usage): first find where names show in each mode; mockup before any build.
 - Nov 28 · God King chromas: one per rank (Gold+), plus other chromas later. IDEA, LATER.
+- Nov 28 · Town load stutter ("I don't want it to lag at all when the town loads") · IN PROGRESS (town-load-smooth.md)
+- Nov 28 · Menu sounds (item tap, magnifier) half as loud · PR #1034
