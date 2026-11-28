@@ -19,7 +19,7 @@ import { momentKey, type BoardLayerProps, type BossUi, type Moment, type MomentP
  * - **The oven timers** (`OvenTimers`, the boss bar's prop slot, right of his bars, the same place on a phone and a computer): one
  *   slot for each lump the rules allow on the board at once (doughLive), each a kitchen timer with its dough's kind on it showing
  *   its minutes (`kNN`). Each move its minute drops (`kRollNN`, a quarter second, as the view's `left` goes down); at 00:00 it rings
- *   (`kDing`) as the dough rises. An empty slot is a faint outline. Drawn on a timer of their own frames: nothing per frame.
+ *   (`kDing`) as the dough rises. An empty slot keeps its room, drawn empty. Drawn on a timer of their own frames: nothing per frame.
  * - **A drop** (`doughDrop`, as your turn after his begins): his `drop` (the lump from his apron pocket, lobbed), and as it lands the
  *   dough's `land` on its square, then its kind proofing (`k`) until it rises or is squashed. The God King: "Squash it before it rises!"
  * - **A rise** (`doughRise`: as your turn begins after his move, or at the start of his turn after yours): the timer's ding, then the
@@ -217,7 +217,7 @@ function TimerCanvas({ kind, left, ding, seen }: { kind: DoughPiece; left: numbe
 /**
  * His oven timers: a slot for each lump the rules allow at once (doughLive), in the boss bar's prop slot. A lump's slot shows its
  * minutes, rolling down each move; at 00:00 it rings as its dough rises (the rise's moment: after his move, from the screen's
- * moments; after yours, as he thinks, from his turn's own, zebraTurnMoments); an empty slot is a faint outline.
+ * moments; after yours, as he thinks, from his turn's own, zebraTurnMoments); an empty slot keeps its room, drawn empty.
  */
 export function OvenTimers({ boss, moments, crowdMoved = false }: { boss: BossView; moments: () => Moment[]; crowdMoved?: boolean }) {
   const z = boss.powers?.zebra;
