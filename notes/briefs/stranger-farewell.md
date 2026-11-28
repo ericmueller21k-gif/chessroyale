@@ -21,3 +21,8 @@ down the other way, the way we exit, and right before he disappears at the door,
 Tests: unit (the flag set on the first win only, cleared after the scene), one e2e (beat him on his floor via the test switch → Back to
 the tower → he's there, the two lines, he leaves by the exit, the pop-up; a reload in the middle: it plays again from the start).
 A GIF for Eric (orphan `stills/stranger-farewell`). `.pr-body.md` (at most 40 lines), decision note, area pages, `.done`.
+
+**Also fix in this job (the quick review of #1029, `claude/stranger-polish-review` REVIEW.md):** should-fix 1, the unlock notice can claim
+"now available" for a boss already unlocked (party floors read the picker's module cache; a solo floor with a failed GET counts every boss
+as new): read the unlocks as the floor STARTS and keep them with the floor; no answer means no notice, never a wrong one. Should-fix 2:
+his floors' result waits on that extra GET before it's sent: gone with the same change (the result settles first). Nits there too.
