@@ -44,7 +44,7 @@
 - Nov 27 · Tower: Back to town loaded the town twice and dropped him in the plaza; land in the tower at the clerk; remember the last town spot (account) · LIVE #1028 5a3d65a (memory: 780 MB -> 40 MB; tower its own load; last building kept on the device). Account-saved spot: full-lane follow-up
 - Nov 27 · Stranger polish: ult frame by frame (no ring before the leap, the ring builds), size on hop-down, dim everything but the board, rift 50%, blue 'now available' pop-up, elevator entrance · BUILDING (stranger-polish.md, Fable)
 - Nov 27 · Stranger farewell in the tower lobby after the first win (stays until it plays, even across reloads; 'not my real strength', walks out the exit door, 'look forward to our next battle'; then the blue pop-up) · QUEUED (stranger-farewell.md), after town-return + stranger-polish merge
-- Nov 28 · Town shop building (a facade near the center gets a door): board keeper (board skins: one per rank Gold+, a few basic; list + preview with an opening; lazy loaded), Apple-store display tables, more keepers later (God King, seasonal) · OK'D Nov 28 03:10 ("there's no questions": my picks stand) · QUEUED: brief town-shop-build.md (xhigh, full lane), after #1027
+- Nov 28 · Town shop building (a facade near the center gets a door): board keeper (board skins: one per rank Gold+, a few basic; list + preview with an opening; lazy loaded), Apple-store display tables, more keepers later (God King, seasonal) · OK'D Nov 28 03:10 ("there's no questions": my picks stand) · QUEUED: brief town-shop-build.md (xhigh, full lane), after town phase 1 (built the new way)
 - Nov 28 · Admin: set the Battle Tower floor from Settings (a number box) · PR #1030 (CI)
 - Nov 28 · Tower: bots in a party (admin playtests), friends can join a solo climb up to floor 10 (locked solo after), profile best solo + best squad · QUEUED (tower-party-bots-solo.md, xhigh, full lane)
 - Nov 28 · Shop: rank piece sets (K+Q or full set; white/black clear: gradient piece vs gradient border, solid border to compare); setting 'Always default board and pieces' (main + in-game) · DROPPED Nov 28 03:25 (Eric: no artwork for now, usage); was B gradient rim
@@ -52,4 +52,4 @@
 - Nov 28 · God King chromas: one per rank (Gold+), plus other chromas later. IDEA, LATER.
 - Nov 28 · Town load stutter ("I don't want it to lag at all when the town loads") · IN PROGRESS (town-load-smooth.md)
 - Nov 28 · Menu sounds (item tap, magnifier) half as loud · PR #1034
-- Nov 28 · Town structure overhaul for loading + drawing (Eric: "permanent change… might make the town bigger… ask Fable") · DESIGN DONE Nov 28 05:30 (sent); phase 0 queued; WAITING ON ERIC: go for phases 1-2 (no visible change), 3 (stills first), 4 later
+- Nov 28 · Town structure overhaul for loading + drawing (Eric: "permanent change… might make the town bigger… ask Fable") · DESIGN DONE Nov 28 05:30; Eric 05:40: do ALL phases, no questions · IN PROGRESS: town-phases.md (0 → 1a/1b/1c → 2 → 3 → 4), Fable each
