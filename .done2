@@ -1,0 +1,3 @@
+Delta re-review of town phase 1b's fixes: done (REVIEW2.md on claude/town-phase1b-review). Read-only.
+Blockers: none. Should-fix: 1 (the town closing mid-load still starts the paint workers, Town.tsx:3130; not a regression, one line). Nits: 7.
+CI on PR #1043 when checked: `check` success; the full e2e on the head was still running.
