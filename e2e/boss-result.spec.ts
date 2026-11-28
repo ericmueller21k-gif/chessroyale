@@ -38,6 +38,8 @@ async function watchDuo(page: Page) {
         const pawn = document.querySelector(".results-duo .you-pawn-hop")?.getBoundingClientRect();
         const jolt = document.querySelector(".results-duo .rd-pawn");
         w.__duo.push({
+          // (The row's place in the page: nothing above it changes size as the XP comes, Nov 28.)
+          top: Math.round((duo.getBoundingClientRect().top + scrollY) * 10) / 10,
           stage: duo.getAttribute("data-attack") ?? "none",
           frame: attack?.getAttribute("data-frame") ?? null,
           figureHidden: !!fig && getComputedStyle(fig).visibility === "hidden",
@@ -52,7 +54,7 @@ async function watchDuo(page: Page) {
     requestAnimationFrame(frame);
   });
 }
-type DuoSample = { stage: string; frame: string | null; figureHidden: boolean; shift: number; gap: number | null; past: number | null };
+type DuoSample = { top: number; stage: string; frame: string | null; figureHidden: boolean; shift: number; gap: number | null; past: number | null };
 const duoSamples = (page: Page) => page.evaluate(() => (window as unknown as { __duo: DuoSample[] }).__duo);
 
 async function resultOf(page: Page, project: string, name: string) {
@@ -122,6 +124,7 @@ test("a boss battle's victory and defeat screens: the title in the pixel type, n
   expect(on.every((x) => x.figureHidden), "his usual figure hidden while he attacks").toBe(true);
   expect(on.some((x) => x.shift > 3), "your pawn jolts back").toBe(true);
   expect(s.at(-1)!.stage).toBe("done");
+  for (const x of s) expect(x.top, "the row where it first showed (nothing over it changes size)").toBe(s[0]!.top);
   for (const x of s) {
     if (x.stage !== "on" && x.gap !== null) expect(x.gap, `16 px between the boss and your pawn (${x.stage})`).toBeGreaterThanOrEqual(16);
     if (x.stage === "on" && x.past !== null) expect(x.past, `his attack never passes your pawn (${x.frame})`).toBeLessThanOrEqual(0);
@@ -145,6 +148,7 @@ test("a boss battle won: Victory!, no trophy or skull, no record text, the boss'
   // A win: no attack (his defeat as before), and the two 16 px apart throughout.
   const s = await duoSamples(page);
   expect(s.some((x) => x.stage === "on"), "no attack on a win").toBe(false);
+  for (const x of s) expect(x.top, "the row where it first showed (nothing over it changes size)").toBe(s[0]!.top);
   for (const x of s) if (x.gap !== null) expect(x.gap, "16 px between the boss and your pawn").toBeGreaterThanOrEqual(16);
 });
 
