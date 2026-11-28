@@ -765,7 +765,7 @@ async function busyTown(page: Page, wearing: boolean) {
   await page.goto(`/town?sky=day&report=120&townroom=busy${Date.now().toString(36)}`);
   const canvas = page.locator("canvas.town-canvas");
   await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
-  type W = { __townHush: (on: boolean) => void; __townWalk: (s: readonly [number, number]) => boolean; __townYou: () => { moving: boolean } | null; __townHere: () => { you: boolean; here: boolean }[]; __townSay: (n: string, l: string, k?: string) => void; __townReport: () => { state: string; summary: { frames: number; uploads: number; resets: number; uploadsBy: [string, number][]; segs: { avg: number[]; mean: number }[]; long: { n: number; ms: number; scripts: number; layout: number; by: [string, number][] } | null } | null } | null; __chat?: number };
+  type W = { __townHush: (on: boolean) => void; __townWalk: (s: readonly [number, number]) => boolean; __townYou: () => { moving: boolean } | null; __townHere: () => { you: boolean; here: boolean }[]; __townSay: (n: string, l: string, k?: string) => void; __townReport: () => { state: string; summary: { frames: number; uploads: number; resets: number; uploadsBy: [string, number][]; between: { made: number; madeMs: number; ups: number; upMs: number }; segs: { avg: number[]; mean: number }[]; long: { n: number; ms: number; scripts: number; layout: number; by: [string, number][] } | null } | null } | null; __chat?: number };
   await page.evaluate(() => (window as unknown as W).__townHush(true));
   // (Nothing is saved after the card since phase 1c: the build's pictures are kept by the worker, so neither walk waits for it.)
   const cdp = await page.context().newCDPSession(page);
@@ -782,13 +782,17 @@ async function busyTown(page: Page, wearing: boolean) {
     // (Ours: every part of a frame but the time outside our code.)
     const ours = s.segs[0]!.avg.slice(0, P.outside).reduce((a, b) => a + b, 0);
     await page.locator(".tfr-panel").getByRole("button", { name: "Again" }).click();
-    return { ours, frames: s.frames, mean: s.segs[0]!.mean, long: s.long, parts: s.segs[0]!.avg.slice(0, P.outside).map((x) => +x.toFixed(2)).join(" "), uploads: `${s.uploads} uploads: ${s.uploadsBy.map(([k, n]) => `${k} ${n}`).join(", ")}; ${s.resets} pages started again`, frameUps: s.uploadsBy.find(([k]) => k === "dressed pawn frame")?.[1] ?? 0 };
+    // (Nov 28, phase 2) Inside frames: nothing uploaded, ever (the painter can't), no page started again. Between them, the picture
+    // service's work: counted apart, no frame's time.
+    const sv = await page.evaluate(() => (window as unknown as { __townPaint: () => { resets: number; atlas: { pages: number; unkept: number; groups: { pages: number; pictures: number; px: number }[] }; service: { stuck: number; evicted: number } } }).__townPaint());
+    return { ours, frames: s.frames, mean: s.segs[0]!.mean, long: s.long, parts: s.segs[0]!.avg.slice(0, P.outside).map((x) => +x.toFixed(2)).join(" "), uploads: `${s.uploads} uploads in frames${s.uploadsBy.length ? `: ${s.uploadsBy.map(([k, n]) => `${k} ${n}`).join(", ")}` : ""}; ${s.resets} pages started again; between frames ${s.between.made} pictures made (${s.between.madeMs.toFixed(0)} ms), ${s.between.ups} uploaded (${s.between.upMs.toFixed(0)} ms)`, inFrames: s.uploads, resets: s.resets + sv.resets, between: s.between, service: sv.service, atlas: sv.atlas };
   };
   const empty = await walk();
   if (!wearing) {
     const ride = await page.evaluate(() => (window as unknown as { __townRide: () => { you: { ride: string | null; ready: boolean } } }).__townRide().you);
     expect(ride, "on the Chirp, its frames ready").toMatchObject({ ride: "riding-chirp", ready: true });
     expect(empty.uploads, "the first walk after the loading screen uploads nothing (its ride's frames and marks kept there)").toMatch(/^0 uploads/);
+    expect(empty.between.ups, "nor between its frames: everything the walk shows was on the GPU before the first frame").toBe(0);
   }
   busy = true;
   await expect.poll(() => page.evaluate(() => (window as unknown as W).__townHere().filter((h) => !h.you && h.here).length), { timeout: 30_000, message: "the other players in the town" }).toBeGreaterThanOrEqual(50);
@@ -798,8 +802,9 @@ async function busyTown(page: Page, wearing: boolean) {
     let k = 0;
     w.__chat = window.setInterval(() => w.__townSay(`Walker ${(k % 55) + 1}`, `hello everyone, line ${k++}`, "player"), 250);
   });
-  // (Their name tags made between frames as they came, Nov 27: render.ts queueTags. Once made, the busy town's walk is measured.)
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __townPaint: () => { tagsQueued: number } }).__townPaint().tagsQueued), { timeout: 60_000, message: "newcomers' tags still to make" }).toBe(0);
+  // (Their name tags asked for as they came and made between frames, Nov 27; by the picture service since Nov 28, phase 2: render.ts
+  // askTags. Once made, the busy town's walk is measured.)
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __townPaint: () => { tagsQueued: number } }).__townPaint().tagsQueued), { timeout: 60_000, message: "newcomers' pictures still to make" }).toBe(0);
   // (Wearing: the eight looks dressed, their frames painted off the frame loop, before the walk is measured.)
   if (wearing) await expect.poll(() => page.evaluate(() => (window as unknown as { __townHere: () => { you: boolean; look: unknown; dressed: boolean }[] }).__townHere().filter((h) => !h.you && h.look && !h.dressed).length), { timeout: 60_000, message: "wearers still being dressed" }).toBe(0);
   const beats = beat;
@@ -809,10 +814,18 @@ async function busyTown(page: Page, wearing: boolean) {
   await page.evaluate(() => clearInterval((window as unknown as W).__chat));
   const fmt = (x: typeof empty) => `our parts ${x.ours.toFixed(1)} ms a frame of ${x.mean.toFixed(0)} (${x.frames} frames; ${x.parts}; ${x.uploads})${x.long ? `, the browser's long frames' other scripts ${Math.round(x.long.scripts)} ms (${x.long.by.map(([k, n]) => `${k} ${Math.round(n)}`).join(", ")})` : ""}`;
   console.log(`Chess Town busy (slowed phone${wearing ? ", half wearing the tube or the cane" : ""}): empty ${fmt(empty)}; with 55 others, six seated games and a chat line every 250 ms ${fmt(full)}${again ? `; again ${fmt(again)}` : ""}; ${beat - beats} server answers`);
+  // (Nov 28, the town's structure, phase 2) No frame of any walk uploaded a picture, and no atlas page was started again: the 55
+  // players' tags, one picture each, are on the text's own pages (until then five sizes each, about 9 million pixels, overflowed the 2
+  // spare pages, which started again and uploaded everything on them again), with room for all: none waited, none was let go.
+  const walks = [empty, full, ...(again ? [again] : [])];
+  expect(walks.map((x) => x.inFrames), "pictures uploaded inside frames: the empty town's walk, the busy town's, and its second").toEqual(walks.map(() => 0));
+  expect(walks.map((x) => x.resets), "atlas pages started again").toEqual(walks.map(() => 0));
+  const end = walks[walks.length - 1]!;
+  expect({ stuck: end.service.stuck, evicted: end.service.evicted, unkept: end.atlas.unkept }, "pictures that waited for room, were let go to make some, or found none").toEqual({ stuck: 0, evicted: 0, unkept: 0 });
+  console.log(`Chess Town busy: the atlas ${end.atlas.pages} pages; the text ${end.atlas.groups[1]!.pictures} pictures, ${(end.atlas.groups[1]!.px / 1e6).toFixed(2)} M pixels on ${end.atlas.groups[1]!.pages} pages; the looks ${end.atlas.groups[2]!.pictures} pictures, ${(end.atlas.groups[2]!.px / 1e6).toFixed(2)} M pixels on ${end.atlas.groups[2]!.pages}`);
   if (again) {
-    // (Uploaded again for their own sake: none. After a spare page starts again they are, as everything on it is: the 55 players' tags at
-    // five sizes nearly fill the 2 spare pages, and any wearers' pictures tip them over, on main too; logged above, not checked here.)
-    expect(again.frameUps, "their frames uploaded on the second walk (not counting a page started again)").toBe(0);
+    // (The second walk: every look that plays was on the GPU by the first's end, so nothing more is made or uploaded for it.)
+    expect(again.between.ups, "pictures uploaded between the second walk's frames").toBeLessThanOrEqual(2);
     expect(again.ours, "our parts a frame, busy and playing, the second walk, against the empty town's").toBeLessThan(empty.ours * 1.25);
   }
   expect(beat - beats, "the server's answers while the busy town walked (each moving everyone)").toBeGreaterThan(0);

@@ -202,6 +202,37 @@ test("Smudgy's Art Gallery: a tap walks you to its door square (19, 16); from th
   expect(errors, "no page or console errors").toEqual([]);
 });
 
+test("a boss's line starts with its bubble there (Nov 28, the town's structure, phase 2): the bubble's picture is made ahead of the line, between frames, so every frame that draws a speaking boss draws its bubble, from the line's first, and no frame uploads anything", async ({ page }) => {
+  type W = { __townCam: () => { speechLine: string; speechWanted: boolean; speechBubble: boolean }; __townPaint: () => { uploads: number }; __townHush: (on: boolean) => void; __townWalk: (s: readonly [number, number]) => boolean; __townYou: () => { moving: boolean } | null; __said?: [string, boolean, boolean, number][] };
+  const errors = watchErrors(page);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  // To Smudgy's front: he stands there, on screen, near enough to talk.
+  await page.evaluate(() => (window as unknown as W).__townWalk([19, 15]));
+  await page.waitForTimeout(300);
+  await page.waitForFunction(() => !(window as unknown as W).__townYou()?.moving, null, { timeout: 30_000 });
+  // Every frame from here, after the town's own draw: the line being said, whether the frame drew its speaker (so had a bubble to
+  // draw), whether it drew the bubble, and the frame's uploads. (The bosses' turn to talk is brought forward until one does: a boss
+  // talks only once its line's bubble is made.)
+  await page.evaluate(() => {
+    const w = window as unknown as W;
+    const said: [string, boolean, boolean, number][] = (w.__said = []);
+    const f = () => {
+      const c = w.__townCam();
+      said.push([c.speechLine, c.speechWanted, c.speechBubble, w.__townPaint().uploads]);
+      if (!said.some((l) => l[0])) w.__townHush(false);
+      requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  await expect.poll(() => page.evaluate(() => (window as unknown as W).__said!.filter((l) => l[0] && l[1]).length), { message: "frames drawing a boss as it speaks", timeout: 45_000 }).toBeGreaterThan(5);
+  const said = await page.evaluate(() => (window as unknown as W).__said!);
+  const lines = said.filter((l) => l[0] && l[1]);
+  expect(lines.filter((l) => !l[2]).length, `frames that drew the speaker of "${lines[0]![0]}" and not its bubble (of ${lines.length})`).toBe(0);
+  expect(said.reduce((n, l) => n + l[3], 0), "pictures uploaded inside a frame, the line's first frame among them").toBe(0);
+  expect(errors).toEqual([]);
+});
+
 test("a park table: a tap on the one ahead on your left walks you to a free stool and you sit; its card shows 'Ranked' (Nov 27: live) and 'Casual' greyed; a tap elsewhere closes it and you stand", async ({ page }) => {
   const errors = watchErrors(page);
   await openStreet(page);
@@ -399,7 +430,7 @@ test("the street town's WebGL context lost: nothing drawn until it's back, then 
  * handed to the painter during the loss, the labels', was dropped and uploaded as it first showed.)
  */
 test("the WebGL context lost while the town loads, at either step of its loading screen: the load goes on once it's back, and everything it keeps is on the GPU as on an undisturbed load (Nov 28)", { tag: "@phone-only" }, async ({ page }) => {
-  type W = { __townPaint: () => { lost: boolean; pictures: { baked: boolean; open: boolean }; atlas: { pages: number; kept: number; unkept: number } }; __townPictureSum: (each: boolean) => { each: number[] }; __lostAt?: string };
+  type W = { __townPaint: () => { lost: boolean; pictures: { baked: boolean; open: boolean }; atlas: { pages: number; unkept: number; groups: { pictures: number }[] }; service: { stuck: number } }; __townPictureSum: (each: boolean) => { each: number[] }; __lostAt?: string };
   const errors = watchErrors(page);
   // (Loses the context the first frame the loading card names step `__loseAt`, its bar past 15% for the first; back 400 ms later.)
   await page.addInitScript(() => {
@@ -430,12 +461,15 @@ test("the WebGL context lost while the town loads, at either step of its loading
       const w = window as unknown as W;
       const p = w.__townPaint();
       // (`off`: pictures of the loading screen's list not on the GPU. `atlas`: its pages, and the pictures kept on them for good.)
-      return { lostAt: w.__lostAt ?? null, lost: p.lost, pictures: { baked: p.pictures.baked, open: p.pictures.open }, atlas: { pages: p.atlas.pages, kept: p.atlas.kept, unkept: p.atlas.unkept }, off: w.__townPictureSum(true).each.filter((k) => !k).length };
+      // (Nov 28, phase 2: `kept` counts the town's own, the build's baked pictures. What the device makes itself is on pages of its own,
+      // and how many are there by now varies a little: a boss on screen as the town opens has its next line's bubble made. Its labels
+      // and its pawns and sky are all there: `made`.)
+      return { lostAt: w.__lostAt ?? null, lost: p.lost, pictures: { baked: p.pictures.baked, open: p.pictures.open }, atlas: { pages: p.atlas.pages, kept: p.atlas.groups[0]!.pictures, unkept: p.atlas.unkept }, made: { labels: p.atlas.groups[1]!.pictures >= 55, looks: p.atlas.groups[2]!.pictures >= 30, stuck: p.service.stuck }, off: w.__townPictureSum(true).each.filter((k) => !k).length };
     });
     return got;
   };
   const plain = await load(null);
-  expect(plain).toMatchObject({ lostAt: null, lost: false, off: 0, pictures: { baked: true, open: false } });
+  expect(plain).toMatchObject({ lostAt: null, lost: false, off: 0, pictures: { baked: true, open: false }, made: { labels: true, looks: true, stuck: 0 } });
   expect(plain.atlas.kept, "pictures kept on an undisturbed load").toBeGreaterThan(2500);
   for (const step of ["Loading the town's pictures", "Building"]) {
     const got = await load(step);
@@ -512,7 +546,7 @@ test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of 
 });
 
 test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking across the town at night among the bots and a crowd's tags (Nov 26), a full turn and zooming in and out paint nothing new, upload nothing (Nov 25) and start no atlas page again, on a first visit and a second (both load the build's baked pictures, Nov 28); a lost context brings the card back until every picture is on the GPU again", { tag: "@phone-only" }, async ({ page }) => {
-  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number; uploadsBy: [string, number][] } | null } | null; __townYou: () => { moving: boolean } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townChips: () => { faces: number }; __townPaint: () => { loading: boolean; lost: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number }; pictures: { baked: boolean; open: boolean; count: number } } };
+  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number; uploadsBy: [string, number][]; between: { made: number; ups: number } } | null } | null; __townTags: () => { text: string; size: number; made: number }[]; __townYou: () => { moving: boolean } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townChips: () => { faces: number }; __townPaint: () => { loading: boolean; lost: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number; groups: { pages: number; pictures: number; px: number }[] }; service: { ready: number[]; waiting: number; stuck: number; evicted: number }; pictures: { baked: boolean; open: boolean; count: number } } };
   const errors = watchErrors(page);
   const bar = page.locator(".town-loading").getByRole("progressbar", { name: "Loading Chess Town" });
   // The bar's share as it shows (sampled every frame until it goes): it only goes up. And the step named under it (Nov 14), each new one.
@@ -546,6 +580,17 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   expect(paint.loading).toBe(false);
   expect(paint.atlas.kept, "the town's pictures kept").toBeGreaterThan(1000);
   expect(paint.atlas.unkept, "all of them").toBe(0);
+  // (Nov 28, phase 2) What the device makes itself comes through the picture service, onto atlas pages of its own: the labels (group
+  // 1) and the pawns, outfits and sky (group 2), all there before the first frame. The text is one picture a name, scaled by the GPU:
+  // on a phone 8.7 million pixels until then (a picture for each of a tag's five sizes and a name's nine), about 1.5 million now with
+  // this crowd's tags.
+  expect(paint.atlas.groups[1]!.pictures, "the labels' pictures, on their own pages").toBeGreaterThan(40);
+  expect(paint.atlas.groups[2]!.pictures, "the pawns', outfits' and sky's pictures, on theirs").toBeGreaterThan(10);
+  expect(paint.atlas.groups[1]!.px, "the text's pixels").toBeLessThan(2_500_000);
+  expect({ stuck: paint.service.stuck, evicted: paint.service.evicted }, "none waited for room, none was let go to make any").toEqual({ stuck: 0, evicted: 0 });
+  const tags = (await page.evaluate(() => (window as unknown as R).__townTags())).filter((t) => t.made);
+  expect(tags.length, "tags drawn in the first frame").toBeGreaterThan(0);
+  expect([...new Set(tags.map((t) => t.made))], `every tag from its one picture, made at 12 px, drawn at ${[...new Set(tags.map((t) => t.size))].sort().join(", ")}`).toEqual([12]);
   // (Nov 28, phase 1) None of them painted here: the build's baked files, fetched and uploaded whole (town/baked.ts), then their decoded
   // copies let go: the GPU holds them (phase 1c).
   expect({ baked: paint.pictures.baked, open: paint.pictures.open }, "the first visit loads the build's baked pictures, and lets their decoded files go once uploaded").toEqual({ baked: true, open: false });
@@ -589,7 +634,11 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
     expect(s.bakes, `${visit}: pictures painted after the loading screen`).toBe(0);
     expect(s.uploads, `${visit}: pictures uploaded after the loading screen (${(s.uploadsBy ?? []).map(([k, n]) => `${k} ${n}`).join(", ")})`).toBe(0);
     expect(s.resets, `${visit}: atlas pages started again`).toBe(0);
-    expect((await page.evaluate(() => (window as unknown as R).__townPaint())).resets).toBe(0);
+    const after = await page.evaluate(() => (window as unknown as R).__townPaint());
+    expect(after.resets).toBe(0);
+    // (Nov 28, phase 2) What the roam did need made, a boss's next line's bubble as it came on screen, was made and uploaded between
+    // frames by the picture service (never in one: `uploads` above), with room for all of it.
+    expect({ stuck: after.service.stuck, evicted: after.service.evicted, unkept: after.atlas.unkept }, `${visit}: pictures that waited for room or were let go to make some (${s.between.made} made, ${s.between.ups} uploaded between frames)`).toEqual({ stuck: 0, evicted: 0, unkept: 0 });
     // (Nov 28) The chips' faces: each place's drawn once, on a canvas of its own, however often the chips changed places on the way
     // (until then a chip's one canvas was cleared and drawn again at every change: 151 times on a walk like this one, where 15 places
     // had a chip). Every home and the Colosseum, at most.
@@ -604,6 +653,10 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
     type S = { __townPictureSum: (each: boolean) => { each: number[] | null } };
     const sums = () => page.evaluate(() => (window as unknown as S).__townPictureSum(true).each!);
     await page.evaluate(() => (window as unknown as { __townHold: (on: boolean) => void }).__townHold(true));
+    // (Nov 28, phase 2) And what the device made itself (the labels, the pawns, the sky): the picture service's, on its own pages.
+    const made = () => page.evaluate(() => (window as unknown as R).__townPaint().atlas.groups.slice(1).map((g) => g.pictures));
+    await expect.poll(() => page.evaluate(() => (window as unknown as R).__townPaint().service.waiting), { message: `${visit}: the picture service at rest`, timeout: 15_000 }).toBe(0);
+    const madeBefore = await made();
     const before = await sums();
     expect(before.every((k) => k !== 0), `${visit}: every kept picture on the GPU`).toBe(true);
     const card = await page.evaluate(async () => {
@@ -624,6 +677,7 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
     await expect.poll(() => page.evaluate(() => (window as unknown as R).__townPaint().lost), { message: `${visit}: the pictures on the GPU again`, timeout: 30_000 }).toBe(false);
     await expect(page.locator(".town-loading")).toHaveCount(0);
     expect(await sums(), `${visit}: every picture on the GPU again, as before the context was lost`).toEqual(before);
+    expect(await made(), `${visit}: and every picture the device made, uploaded again under the card`).toEqual(madeBefore);
     expect((await page.evaluate(() => (window as unknown as R).__townPaint())).pictures.open, `${visit}: the files' decoded copies let go again`).toBe(false);
     await page.evaluate(() => (window as unknown as { __townHold: (on: boolean) => void }).__townHold(false));
   };

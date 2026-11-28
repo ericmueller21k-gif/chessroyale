@@ -2832,6 +2832,10 @@ function startTown(
           speech: town.speech.boss?.home.id ?? null,
           // (The line in that bubble, "" for none: a boss's goodbye on the way back from its battle, Eric, Nov 7.)
           speechLine: town.speech.boss ? town.speech.line : "",
+          // (Whether the last frame had the speaker's bubble to draw, the speaker drawn in it, and drew it: its picture is made ahead of
+          // the line, Nov 28.)
+          speechWanted: r.bubbleWanted,
+          speechBubble: r.bubbleShown,
         }
       : null;
   // ... and `__townGather()` sends the three bots nearest you to stand beside you (to see a ring form).
@@ -3149,8 +3153,13 @@ function startTown(
       // the rides each had 3 s, `loadSheetWaitMs`, and the card lifted without what was late): each is waited for until it's in or has
       // failed. The only way out is the no-progress guard (`settledOrStalled`: nothing of them in for `TOWN_PICTURES.stallMs`, the page
       // showing): then the town shows without, they show when they land, and the page says so (`reportTownLate`).
+      // (One stall for the three of them, the review of phase 1c: once nothing has come for `stallMs`, the waits after it get a second
+      // each, not `stallMs` again: a dead connection held the card for up to three times it.)
+      let stalled = false;
       const wait = async (what: "fonts" | "items" | "rides", all: readonly Promise<unknown>[]) => {
-        if (!(await settledOrStalled(all, undefined, townClosed.signal)) && alive) reportTownLate(what);
+        if (await settledOrStalled(all, stalled ? 1000 : undefined, townClosed.signal)) return;
+        stalled = true;
+        if (alive) reportTownLate(what);
       };
       await wait("fonts", fonts);
       // (Each picture put in its place, the labels made: the bar's share left after the files' bytes.)

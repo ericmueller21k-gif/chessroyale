@@ -389,11 +389,10 @@ describe("the loading screen's waits with no time cap (baked.ts settledOrStalled
 });
 
 describe("the baked pictures in the loading screen's list (keep-pictures.ts Pictures)", () => {
-  it("a baked picture is listed once, never handed to the painter's keep (its file is adopted whole); a roof's pieces come from the manifest, each sheet one canvas a roof", async () => {
+  it("a baked picture is listed once (the list has no way to hand one to the painter: its file is adopted whole); a roof's pieces come from the manifest, each sheet one canvas a roof", async () => {
     const m = manifest();
     const b = (await loadBaked("player", net(m), io(m))) as Baked;
-    const kept: unknown[] = [];
-    const P = new Pictures((c) => kept.push(c), b);
+    const P = new Pictures(b);
     const a0 = b.pic("a#0");
     P.add(a0);
     P.add(a0);
@@ -410,7 +409,6 @@ describe("the baked pictures in the loading screen's list (keep-pictures.ts Pict
     expect(P.bakedRoof("roof:a:flat").faces[0]!.whole.cv).not.toBe(roof.faces[0]!.whole.cv);
     for (const f of roof.faces) for (const p of [f.whole, ...f.tris]) P.add(p.cv as HTMLCanvasElement);
     expect(P.list.length).toBe(2);
-    expect(kept).toEqual([]);
   });
   it("pictures are packed as the WebGL atlas holds them (Nov 25; the bake packs each group's with it): pages no bigger than its, the padding clear round each, a big one alone", () => {
     const { page, pad, big } = ATLAS;

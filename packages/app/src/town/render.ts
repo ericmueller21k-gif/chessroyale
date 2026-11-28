@@ -1127,6 +1127,7 @@ export class Renderer {
     this.nZzz = 0;
     this.nClear = 0;
     this.bubble.on = false;
+    this.bubbleShown = false;
     this.drawMarks(now); // on the ground, under everyone: the trail, your destination, the pressed square
     REC?.mark(P.ground);
     const lit = this.beginLights();
@@ -1702,7 +1703,8 @@ export class Renderer {
         this.fade = 1;
         // (Its next line's bubble asked for now, ahead of the line (Nov 28, phase 2): a boss on screen talks only once it's made,
         // world.ts `updateSpeech`. Until then a line's bubble was made and uploaded in the frame it first showed.)
-        if (b.onScreen) {
+        // (With the bosses hushed, a test's switch, no line is coming: none asked for.)
+        if (b.onScreen && town.speech.next < Infinity) {
           const next = bossNextLine(town, b);
           b.lineReady = !next || !!this.bubblePic(next);
         }
@@ -3639,6 +3641,7 @@ export class Renderer {
     const b = this.bubblePic(text);
     const tail = this.tailArt();
     if (!b || !tail) return;
+    this.bubbleShown = true;
     const bx = Math.round(clamp(ax - b.w / 2, 6, W - b.w - 6) * DPR);
     const by = Math.round(Math.max(6, ay - b.h - 9) * DPR);
     this.keepFree(bx / DPR, by / DPR, b.w, b.h + 7);
@@ -3651,6 +3654,11 @@ export class Renderer {
     ctx.drawImage(tail.cv, (tx - BUBBLE_PAD * (DPR / tail.dpr)) / DPR, (ty - BUBBLE_PAD * (DPR / tail.dpr)) / DPR, tail.cv.width / tail.dpr, tail.cv.height / tail.dpr);
   }
 
+  /** (Tests) Whether the last frame drew the speech bubble; and whether it had one to draw (a line being said by a boss it drew). */
+  bubbleShown = false;
+  get bubbleWanted(): boolean {
+    return this.bubble.on;
+  }
   /** A line's bubble (`paintBubble`): the picture service's, asked for ahead of its line; the least lately said make room when the text's pages fill. */
   private bubblePic(text: string): BubbleArt | null {
     let key = this.bubbleKeys.get(text);
