@@ -29,7 +29,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import type * as Bake from "../packages/app/src/town/bake.ts";
-import { png } from "./bake-sidekicks.ts";
+import { png } from "./png.ts";
 
 const APP = fileURLToPath(new URL("../packages/app/", import.meta.url));
 /** Where the build serves the baked town from (under the app's public folder). */
