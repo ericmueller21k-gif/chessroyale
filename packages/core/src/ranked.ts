@@ -58,6 +58,8 @@ export interface HiddenRating {
 
 const Q = Math.LN10 / 400;
 const g = (rd: number) => 1 / Math.sqrt(1 + (3 * Q * Q * rd * rd) / (Math.PI * Math.PI));
+/** Glicko-1's q and g(RD), for the mode ranks' update against a whole field (mode-ranks.ts). */
+export { Q as GLICKO_Q, g as glickoG };
 
 /** The expected score of `me` against `opp` (0-1), as Glicko-1 has it (the opponent's uncertainty flattens it). */
 export function expectedScore(me: HiddenRating, opp: HiddenRating): number {
