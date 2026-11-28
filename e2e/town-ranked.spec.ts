@@ -34,6 +34,9 @@ async function into(page: Page, name: string, room: string, pool: string) {
   // (Up to three towns load one after another here, beside the other project's: longer than townReady's 40 s on a busy runner.)
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
   await page.waitForFunction(() => typeof (window as unknown as { __townHere?: unknown }).__townHere === "function");
+  // (The town's bots held where they stand, as it opens: off the stools, their first walk 2.5 s in. Free, they sit at the tables now and
+  // then, and two at table 3 made its card the bots' game's (Spectate greyed, no Ranked): main e95a01d5, desktop.)
+  await page.evaluate(() => (window as unknown as { __townStill: () => void }).__townStill());
   // (CPU_THROTTLE=4: a CI runner's pace, to try a timing locally.)
   if (process.env.CPU_THROTTLE) await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.CPU_THROTTLE) });
   return id;
