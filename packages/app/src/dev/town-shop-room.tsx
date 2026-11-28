@@ -51,8 +51,8 @@ const fin = (def: string, color: string, color2 = "pearl") => ({ def, color, col
 const ITEMS = [fin("pirate-hat", "red"), fin("little-crown", "yellow"), fin("wizard-hat", "cobalt"), fin("santa-hat", "red"), fin("dark-shades", "midnight"), fin("party-hat", "emerald", "yellow")];
 const KEEPER: ItemLook = { head: fin("top-hat", "midnight"), skin: fin("suit-and-tie", "midnight", "yellow") };
 const SHOPPERS: { look: ItemLook; side: "w" | "b"; at: readonly [number, number] }[] = [
-  { look: { head: fin("beanie", "cobalt"), face: fin("scarf", "red") }, side: "w", at: [1.15, 7.2] },
-  { look: { head: fin("party-hat", "yellow", "red") }, side: "w", at: [7.2, 4.3] },
+  { look: { head: fin("beanie", "cobalt"), face: fin("scarf", "red") }, side: "w", at: [1.7, 3.3] },
+  { look: { head: fin("party-hat", "yellow", "red") }, side: "w", at: [7.45, 3.2] },
 ];
 
 /** An ItemArt as a picture: drawn once off screen, its SVGs made into one canvas `px` square. */
@@ -111,7 +111,7 @@ async function makeFx(): Promise<RoomFx> {
   const keeper = (await dressedPawn(KEEPER, pawnImage("light", null), PX, "w")) ?? pawnImage("light", null);
   const shoppers = await Promise.all(SHOPPERS.map(async (s) => ({ ...s, art: (await dressedPawn(s.look, pawnImage(s.side === "w" ? "light" : "dark", null), PX, s.side)) ?? pawnImage(s.side === "w" ? "light" : "dark", null) })));
   const items = await Promise.all(ITEMS.map((f) => itemPicture(f, 96)));
-  const ITEM_PX = 24; // an item's box on its block, in room pixels
+  const ITEM_PX = 22; // an item's box on its block, in room pixels
   const figs: { z: number; draw: (d: FxDraw) => void }[] = [walls];
   if (q.get("keeper") !== "0") figs.push({ z: M.SHOP_MARKET_KEEPER_AT[1], draw: (d) => pawnAt(d, keeper, M.SHOP_MARKET_KEEPER_AT[0], M.SHOP_MARKET_KEEPER_AT[1]) });
   M.SHOP_MARKET_ITEM_SPOTS.forEach((sp, i) =>
@@ -157,7 +157,7 @@ export function ShopMock({ talkCard, atKeeper }: { talkCard: ComponentChildren; 
       onZoom={() => {}}
       onOut={() => {}}
       onReady={() => {
-        if (q.get("zoom") === "in") (ctl.current as unknown as { zoom?: (n: number) => void })?.zoom?.(1);
+        if (q.get("zoom") === "in") ctl.current?.zoom(false);
         setTimeout(() => document.documentElement.setAttribute("data-room", "1"), 1200);
       }}
       ctl={ctl}

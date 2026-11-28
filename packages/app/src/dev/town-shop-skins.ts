@@ -59,17 +59,17 @@ export const SKINS: readonly Skin[] = [
   },
   {
     id: "radiant", name: "Radiant Board", kind: "rank", tier: "Radiant", emblem: "radiant-d5", light: "#ffedc7", dark: "#e58a6a",
-    last: "rgba(255, 236, 80, 0.58)", ...marks("#2c040c"), coordOnDark: "rgba(44, 4, 12, 0.9)", coordOnLight: "rgba(112, 16, 32, 0.8)",
+    last: "rgba(30, 185, 165, 0.5)", ...marks("#2c040c"), coordOnDark: "rgba(44, 4, 12, 0.9)", coordOnLight: "rgba(112, 16, 32, 0.8)",
     frame: { deep: "#701020", metal: "#ffd23c", motif: "rays", stud: "#fff6b8" }, price: 400,
   },
   {
     id: "pearlescent", name: "Pearlescent Board", kind: "rank", tier: "Pearlescent", emblem: "pearlescent", light: "#fdf9fc", dark: "#bdb5d8",
-    last: "rgba(240, 140, 195, 0.46)", ...marks("#2c2440"), coordOnDark: "rgba(44, 36, 64, 0.9)", coordOnLight: "rgba(76, 70, 118, 0.8)",
+    last: "rgba(226, 84, 152, 0.5)", ...marks("#2c2440"), coordOnDark: "rgba(44, 36, 64, 0.9)", coordOnLight: "rgba(76, 70, 118, 0.8)",
     frame: { deep: "#5c5486", metal: "#fbe9b4", motif: "pearls", stud: "#ffffff" }, price: 400,
   },
   {
     id: "transcendent", name: "Transcendent Board", kind: "rank", tier: "Transcendent", emblem: "transcendent", light: "#e3e8ff", dark: "#7f84e2",
-    last: "rgba(90, 225, 255, 0.5)", ...marks("#0f0829"), coordOnDark: "rgba(255, 255, 255, 0.92)", coordOnLight: "rgba(39, 23, 102, 0.8)",
+    last: "rgba(60, 230, 255, 0.64)", ...marks("#0f0829"), coordOnDark: "rgba(255, 255, 255, 0.92)", coordOnLight: "rgba(39, 23, 102, 0.8)",
     frame: { deep: "#1d1052", metal: "#b9a1ff", motif: "stars", stud: "#ffffff" }, price: 400,
   },
   // ---- The basic colors: two squares, no frame.

@@ -118,37 +118,36 @@ function BoardRow({ skin }: { skin: Skin }) {
   const open = reached(skin);
   const afford = YOU.coins >= skin.price;
   return (
-    <div class={`ff-window crate-row bk-row${open ? "" : " bk-locked"}`}>
+    <div class={`ff-window crate-row bk-row${open ? "" : " bk-locked"}`} role="button" aria-label={`Preview ${skin.name}`}>
       <span class="crate-row-art bk-art">
         <Swatch skin={skin} />
-        {skin.emblem && (
-          <span class="bk-emblem">
-            <RankEmblem id={skin.emblem} />
-          </span>
-        )}
-      </span>
-      <span class="crate-row-text">
-        <strong>{skin.name}</strong>
-        <span class="crate-row-blurb">{skin.tier ? `${skin.tier}'s colors, an inlaid frame` : "Two colors, no frame"}</span>
-        <span class="crate-row-held">{on ? "On your board" : owned ? "Owned" : open ? (afford ? " " : `You need ${skin.price - YOU.coins} more coins`) : `Reach ${skin.tier} in 1 v 1 to buy`}</span>
-      </span>
-      <span class="bk-side">
-        <button type="button" class="bk-peek" aria-label={`Preview ${skin.name}`}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+        <span class="bk-peek" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
             <circle cx="10.5" cy="10.5" r="6.5" />
             <path d="M15.5 15.5 21 21" />
           </svg>
-        </button>
-        {owned ? (
-          <button type="button" class="ff-button small bk-buy" disabled={on}>
-            {on ? "✓ On" : "Put on"}
-          </button>
-        ) : (
-          <button type="button" class="ff-button small bk-buy" disabled={!open || !afford}>
-            <Coin size={14} /> {skin.price}
-          </button>
-        )}
+        </span>
       </span>
+      <span class="crate-row-text">
+        <span class="bk-name">
+          {skin.emblem && (
+            <span class="bk-emblem">
+              <RankEmblem id={skin.emblem} />
+            </span>
+          )}
+          <strong>{skin.name}</strong>
+        </span>
+        <span class="crate-row-held">{on ? "On your board" : owned ? "Owned" : open ? (afford ? (skin.tier ? `${skin.tier}'s colors, framed` : "Two colors, no frame") : `You need ${skin.price - YOU.coins} more coins`) : `Reach ${skin.tier} to buy`}</span>
+      </span>
+      {owned ? (
+        <button type="button" class="ff-button small bk-buy" disabled={on}>
+          {on ? "✓ On" : "Put on"}
+        </button>
+      ) : (
+        <button type="button" class="ff-button small bk-buy" disabled={!open || !afford}>
+          <Coin size={14} /> {skin.price}
+        </button>
+      )}
     </div>
   );
 }
@@ -275,26 +274,29 @@ body { margin: 0; }
 
 .town-card.town-mid:has(.bk-panel) { width: min(372px, calc(100% - 16px)); max-width: none; padding: 10px; box-sizing: border-box; }
 .town-card.town-mid:has(.bk-panel) > h2 { display: none; }
+.town-card.town-mid:has(.bk-panel)::after, .town-card.town-mid:has(.bk-panel)::before { display: none; }
 .bk-panel { display: grid; gap: 8px; }
 .bk-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 0; color: #fff; }
 .bk-coins { display: inline-flex; align-items: center; gap: 5px; font-weight: 800; font-size: 15px; }
-.bk-list { display: grid; gap: 8px; height: min(430px, 52vh); overflow-y: auto; padding: 3px 5px 3px 3px; scrollbar-width: thin; }
-.bk-row { grid-template-columns: 56px 1fr auto; gap: 10px; padding: 8px 10px; cursor: default; min-height: 76px; box-sizing: border-box; }
-.bk-row .crate-row-text strong { font-size: 10px; }
+.bk-list { display: grid; gap: 8px; align-content: start; height: min(376px, 50vh); overflow-y: auto; padding: 3px 5px 3px 3px; scrollbar-width: thin; }
+.bk-row { grid-template-columns: 56px 1fr auto; gap: 10px; padding: 8px 10px; cursor: pointer; height: 74px; box-sizing: border-box; }
+.bk-row .crate-row-text { gap: 5px; min-width: 0; }
+.bk-row .crate-row-text strong { font-size: 9px; line-height: 1.45; }
+.bk-row .crate-row-held { font-size: 12px; line-height: 1.25; }
+.bk-name { display: flex; align-items: center; gap: 6px; min-height: 26px; }
 .bk-art { width: 56px; height: 56px; }
 .bk-swatch { display: block; box-sizing: border-box; border-radius: 3px; overflow: hidden; }
-.bk-emblem { position: absolute; right: -12px; bottom: -14px; width: 48px; height: 48px; transform: scale(0.62); transform-origin: 100% 100%; }
-.bk-locked .bk-swatch { filter: saturate(0.55) brightness(0.8); }
+.bk-emblem { flex: none; width: 26px; height: 26px; }
+.bk-emblem .re-box { transform: scale(0.5417); transform-origin: 0 0; }
 .bk-locked .crate-row-held { color: #ffd877; }
-.bk-side { display: grid; grid-template-columns: 40px auto; align-items: center; gap: 6px; }
-.bk-peek { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; color: #fff; background: rgba(255, 255, 255, 0.12); border: 2px solid rgba(255, 255, 255, 0.7); border-radius: 50%; }
-.bk-buy { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 76px; min-height: 40px; padding: 8px 6px; }
+.bk-peek { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; width: 22px; height: 22px; color: #0b0b1a; background: #f4f4f4; border: 2px solid #0b0b1a; border-radius: 50%; }
+.bk-buy { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 78px; min-height: 40px; padding: 8px 6px; }
 .bk-close { justify-self: center; min-width: 120px; }
 .bk-back { position: absolute; z-index: 60; }
 .bk-preview { gap: 7px; }
 .bk-stage { display: grid; place-items: center; background: #0a1150; border: 3px solid #f4f4f4; border-radius: 6px; box-sizing: content-box; }
 .bk-loading { font: 12px "Press Start 2P", ui-monospace, monospace; color: #fff; opacity: 0.9; }
-.bk-moves { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 7px; font-size: 13px; font-weight: 700; min-height: 36px; align-content: center; }
+.bk-moves { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 5px; font-size: 12px; font-weight: 700; min-height: 36px; align-content: center; }
 .bk-move.bk-next { opacity: 0.38; }
 .bk-move.bk-now { color: #ffd877; }
 .bk-title { display: inline-flex; align-items: center; gap: 4px; font-family: "Press Start 2P", ui-monospace, monospace; font-size: 12px; text-shadow: 2px 2px 0 #0b0b1a; min-height: 48px; }

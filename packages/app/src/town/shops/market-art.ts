@@ -503,12 +503,12 @@ tableDef("table-boards", 4, (c) => {
   });
 });
 /** Where an item stands on an item table: its block's middle (px from the table's left edge). */
-const ITEM_X = [13, 37, 61];
+const ITEM_X = [14, 33, 52];
 const itemTable = (name: string) =>
   tableDef(name, 2, (c) => {
     for (const x of ITEM_X) {
-      rect(c, x - 8, TTOP + 1, 16, 3, "W");
-      rect(c, x - 8, TTOP + 4, 16, 1, "c");
+      rect(c, x - 7, TTOP + 1, 14, 3, "W");
+      rect(c, x - 7, TTOP + 4, 14, 1, "c");
       rect(c, x - 2, TTOP + 6, 5, 1, "W");
     }
   });
@@ -757,10 +757,10 @@ at("counter", 3, 3, true);
 // -- The display tables: boards in the middle (row 5), items either side of the way in (row 7): nothing stands behind the doors.
 export const SHOP_MARKET_TABLES = { west: { col: 2, row: 7 }, east: { col: 6, row: 7 }, boards: { col: 3, row: 5 } } as const;
 at("table-items", SHOP_MARKET_TABLES.west.col, SHOP_MARKET_TABLES.west.row, true);
-at("table-items", SHOP_MARKET_TABLES.east.col, SHOP_MARKET_TABLES.east.row, true);
+at("table-items", SHOP_MARKET_TABLES.east.col, SHOP_MARKET_TABLES.east.row, true, { flip: true });
 at("table-boards", SHOP_MARKET_TABLES.boards.col, SHOP_MARKET_TABLES.boards.row, true);
 /** The plinths' squares. */
-export const SHOP_MARKET_PLINTHS = [{ c: 1, r: 5 }, { c: 8, r: 5 }] as const;
+export const SHOP_MARKET_PLINTHS = [{ c: 2, r: 5 }, { c: 7, r: 5 }] as const;
 for (const sq of SHOP_MARKET_PLINTHS) at("plinth", sq.c, sq.r, true);
 at("plant", 1, N - 2, true);
 at("plant", N - 2, N - 2, true, { flip: true });
@@ -773,7 +773,7 @@ at("entrance", 4, N - 1, false, { exit: true });
 export const SHOP_MARKET_LAYOUT: readonly ShopPlace[] = [...LAYOUT.slice(0, FLOOR_COUNT), ...LAYOUT.slice(FLOOR_COUNT).sort((a, b) => a.row - b.row || a.col - b.col)];
 export const SHOP_MARKET_PIECES: Readonly<Record<string, Character>> = Object.fromEntries(Object.values(PIECES).map((p) => [p.name, toChar(p)]));
 /** Where each item on the two item tables stands (squares): the tables' blocks, west table first. */
-export const SHOP_MARKET_ITEM_SPOTS: readonly { c: number; r: number }[] = [SHOP_MARKET_TABLES.west, SHOP_MARKET_TABLES.east].flatMap((t) => ITEM_X.map((x) => ({ c: t.col + 0.5 + (x - 37) / T, r: t.row })));
+export const SHOP_MARKET_ITEM_SPOTS: readonly { c: number; r: number }[] = [SHOP_MARKET_TABLES.west, SHOP_MARKET_TABLES.east].flatMap((t, i) => ITEM_X.map((x) => ({ c: t.col + 0.5 + ((i ? -1 : 1) * (x - 37)) / T, r: t.row })));
 /** The board keeper's squares (behind the counter, row 2) and where he stands. */
 export const SHOP_MARKET_KEEPER: readonly { c: number; r: number }[] = [{ c: 4, r: 2 }, { c: 5, r: 2 }];
 export const SHOP_MARKET_KEEPER_AT = [4.5, 2.35] as const;
