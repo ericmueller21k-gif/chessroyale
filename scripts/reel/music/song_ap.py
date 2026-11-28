@@ -48,6 +48,14 @@ the voice, chords and strings covered), with the band's kick and hats under it f
 2 dB up again; her line 2 dB down in the swell, the chords and strings 4. The loop and pattern together now sit 2 to
 5 dB over the held voices all the way from 0:17 to 1:14 (at 1:06 they were 7.5 under).
 
+The theme as the game has it, from a try he asked for on top of the third go: "bring back the woman's voice, the
+choir, and ... double so it runs alongside the version 3 in the same spots ... wherever the other one plays, that now
+this plays as well ... We don't want to do anything with the man's voice." At half the voice's level he heard
+"literally no difference"; with the two as loud as each other: "this should be the new one ... replace the old one".
+So every note the one-voice sample has (her line, the answers, the chords' three notes) the bank's choir's women
+have too, at its level, each 3 dB under where the one voice was alone: the pair is as loud as it was, and the beat
+is where the third go had it against them. `vox` as the second argument makes the third go; `choir`, the first.
+
   0:00  a low held tone (E and B), one bell; from 0:03 the voice alone
   0:17  the breakbeat, filtered and crushed, a throbbing low bass, a fast chip pattern; the voice sings five bars of
         the tune and answers itself, lower, for three; three times, the pattern louder each time
@@ -59,7 +67,7 @@ the voice, chords and strings covered), with the band's kick and hats under it f
   2:11  everything stops: a flute and an oboe over soft strings, G major turning to G minor
   2:23  a violin climbs in 16ths; a drum fill
   2:29  the last part, a minor third up: the guitars' tune, the voice over it; the last chord rings into the loop
-  python3 song_ap.py <out.wav> [both|choir]
+  python3 song_ap.py <out.wav> [vox|choir]
 """
 import itertools
 import sys
@@ -174,11 +182,12 @@ def voicings(chords, shift=0, top=(64, 67, 71), mid=59, floor=99):
     return out
 
 
-def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
-    """The song (stereo, at the mix's own level). `voice`: "vox", the Stranger's theme as the game has it (her line
-    and the chords on the bank's one-voice sample, no men); "both", that with the choir's women alongside it, note
-    for note, as loud as it is (each 3 dB under where the one voice is alone, so the pair is as loud as it was and
-    the beat stays where it was against them); or "choir", the first go's recorded choir, men and all. `parts`: a dict to fill
+def render(voice: str = "both", parts: dict | None = None) -> np.ndarray:
+    """The song (stereo, at the mix's own level). `voice`: "both", the Stranger's theme as the game has it (her line
+    and the chords on the bank's one-voice sample with the choir's women alongside, note for note, as loud as it:
+    each 3 dB under where the one voice was alone, so the pair is as loud as it was and the beat stays where it was
+    against them; no men); "vox", the third go, the game's file before that (the one-voice sample alone); or
+    "choir", the first go's recorded choir, men and all. `parts`: a dict to fill
     with each recorded part as mixed, by name (for measuring)."""
     men, both = voice == "choir", voice == "both"
     pair = 10 ** (-3 / 20) if both else 1.0
@@ -573,9 +582,9 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
     return out + sum(got.values())
 
 
-def main(out: str, voice: str = "vox") -> None:
+def main(out: str, voice: str = "both") -> None:
     write_wav(out, render(voice))
 
 
-if __name__ == "__main__":  # song_ap.py <out.wav> [both|choir]
-    main(sys.argv[1], next((v for v in ("both", "choir") if v in sys.argv[2:]), "vox"))
+if __name__ == "__main__":  # song_ap.py <out.wav> [vox|choir]
+    main(sys.argv[1], next((v for v in ("vox", "choir") if v in sys.argv[2:]), "both"))

@@ -877,7 +877,7 @@ together on top of it. So not to worry. We'll leave the hollow as is."
 - **Lesson:** twice, bars written to sit inside a finished song he likes came out as "thrown in" or not musical. A
   song he has passed is finished; a longer one is a new song to write whole, not an insert.
 
-## The Stranger's theme (Nov 27, song_ap.py, the gothic hybrid): chips and sampled voices; third go APPROVED, handed over
+## The Stranger's theme (Nov 27, song_ap.py, the gothic hybrid): APPROVED with both voices (Nov 28), handed over; the third go before it
 
 Eric, with a write-up made with another assistant ("Full Song Deconstruction & IP-Free Master Blueprint": a timeline
 of a reference track, then a plan for one like it): "trying to work with Gemini to help me come up with a song, but
@@ -1028,6 +1028,18 @@ sometimes it'll bite us if you're not 100% sure."
 - **Lesson:** "50%" for a doubling voice is his guess, not a spec: a voice doubling another on the same notes has
   to be about as loud as it to be heard as a second voice. When a layer is added, keep the pair's level where the
   single voice was, or the balance under it moves.
+
+**Both voices approved; it replaces the third go in the game (Nov 28).** Eric, of the full song with the two voices
+equal: "this one is, I think this should be the new one. Go ahead and set it to the director to replace the old one."
+(Two files had gone out, the song and a clip with another blend, so he was asked which: the full song.)
+- `song_ap.py`'s default is now this (`voice="both"`); `vox` makes the third go, `choir` the first.
+- Rebuilt with `handoff.py --stereo --kbps 192 <folder> stranger`: same names, same length (one loop of 160.0 s, no
+  intro piece), -16.6 LUFS, peak -1.2 dBFS. Checked: the built file is the approved one (correlation 1.00000; 0.954
+  against the third go, as it should differ); the loop point is clean on the MP3 and the OGG.
+- Told the director: same files and entry, new audio; the credit line already added covers it (the choir is the
+  same bank).
+- What passed, for the next songs: two sampled voices on the same notes, a soft single voice and a choir's women,
+  as loud as each other; the pair kept at the level the single voice had.
 
 ## Sheet music: the town's first piano solo (Nov 26)
 
