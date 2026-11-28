@@ -244,6 +244,13 @@ export const TOWN_FEEL = {
   loadPaintShare: 0.5,
   /** How long it waits for the sidekicks' sheets (ms; they load as the town opens): past it, one not in yet is drawn when it's in, as before. */
   loadSheetWaitMs: 3000,
+  /**
+   * (Nov 28, Eric: "I don't want it to lag at all when the town loads"; Nov 27: a couple of seconds more loading is fine) The warm-up: frames
+   * drawn under the loading card, each waited for on the GPU (`settle`), so the first use of the textures and shaders is paid there; and the
+   * most it may add (ms) before the card lifts anyway.
+   */
+  loadWarmFrames: 3,
+  loadWarmMs: 2000,
   /** A home's floating name: how far over its roof it floats (px), and the step it drops by to keep off the buildings behind. */
   nameOverRoof: 6,
   nameDropStep: 3,

@@ -125,6 +125,11 @@ export interface Painter {
    * then) should it need uploading again (a lost context, `changed`). Pages it can't take (too many) leave their pictures to `keep`.
    */
   adopt?(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): void;
+  /**
+   * (WebGL, the loading screen's warm-up, Nov 28) Waits until the GPU has done everything sent so far (one pixel read back): a frame drawn
+   * under the loading card pays its textures' and shaders' first use there, not in the first frames you see.
+   */
+  settle?(): void;
   /** `src`, drawn before, has been drawn on again: the next draw shows its new pixels (the WebGL backend uploads it again). */
   changed(src: CanvasImageSource): void;
   /**

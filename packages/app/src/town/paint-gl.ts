@@ -644,6 +644,14 @@ class GLPainter implements Painter {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
+  /** (paint.ts `settle`) The GPU's queue done: one pixel of the canvas read back. */
+  settle(): void {
+    if (this.lost) return;
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+    this.gl.readPixels(0, 0, 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.onePx);
+  }
+  private readonly onePx = new Uint8Array(4);
+
   changed(src: CanvasImageSource): void {
     const e = this.reg.get(src);
     if (e) e.dirty = true;

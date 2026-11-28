@@ -2910,7 +2910,7 @@ function startTown(
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 }, tagsQueued: r.tagsQueued };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, topsMs, warmMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 }, tagsQueued: r.tagsQueued };
   };
   /** (Tests) A hash of every picture the loading screen kept, their pixels in order: a later visit's must be the first's. */
   const hookPictureSum = (each = false) => {
@@ -3010,12 +3010,23 @@ function startTown(
       loadPaintMs = performance.now() - t0;
       // (Each box's solid top, Nov 28: here, not in idle slices once the town shows, where one took 44 ms on Eric's computer.)
       onLoading(f.loadPaintShare, "building");
+      const tt = performance.now();
       while (alive && !r.warmTops(f.loadSliceMs)) await tick();
+      topsMs = performance.now() - tt;
       for (let share = 0; share < 1 && alive; ) {
         share = painter.kept?.(f.loadSliceMs) ?? 1;
         onLoading(f.loadPaintShare + (1 - f.loadPaintShare) * share, "building");
         if (share < 1) await tick();
       }
+      // The warm-up (Nov 28): the town's first frames drawn under the loading card and waited for on the GPU, then the card lifts.
+      const tw = performance.now();
+      const warmBy = tw + f.loadWarmMs;
+      for (let i = 0; i < f.loadWarmFrames && alive && !painter.lost && performance.now() < warmBy; i++) {
+        r.draw(performance.now(), camX, camY, zoomCur, 0, heading);
+        painter.settle?.();
+        await tick();
+      }
+      warmMs = performance.now() - tw;
     } catch (e) {
       console.warn("town load:", e);
     }
@@ -3047,6 +3058,9 @@ function startTown(
   };
   let loadMs = 0;
   let loadPaintMs = 0;
+  /** (`loadTown`, tests) How long the box tops and the warm-up took on the loading screen (ms). */
+  let topsMs = 0;
+  let warmMs = 0;
   /** (`loadTown`) The last visit's pictures, if they were kept: their pages let go as the town closes. */
   let kept: Restored | null = null;
   /** (Tests, `hookPaint`) The kept pictures: loaded from the last visit; how long reading them took (ms); what this visit kept (bytes;

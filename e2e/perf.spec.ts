@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { ITEM_DEFS, RECLUSE_PHASE2, adminCopy } from "@chessroyale/core";
 import { SAW_SWAP_TEST_CHECK } from "@chessroyale/chess";
-import { BOARD_SEL, asAdmin, test, bossAloneFromHome } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, giveItems, test, bossAloneFromHome, wearItem } from "./helpers.ts";
 import { counts, frameStats, instrument } from "./perf-probe.js";
 import { MOCKUP_LOOK, demoProfile, routeProfile } from "./public-profile-data.ts";
 import { START, walkable } from "../packages/app/src/town/world.ts";
@@ -749,6 +749,14 @@ async function busyTown(page: Page, wearing: boolean) {
     const others = busy ? Array.from({ length: 55 }, (_, i) => { const [c, r] = spots[(i * 7 + beat * 3) % spots.length]!; return { id: `busy-${i}`, name: `Walker ${i + 1}`, c, r, zzz: false, pawn: i % 2 ? "black" : "white", look: wear(i) }; }) : [];
     await route.fulfill({ json: { others } });
   });
+  // (Nov 28, Eric's frame report: his ride's frames and trail marks uploaded as each first showed. Not wearing: you ride the Chirp, whose
+  // frames and marks the loading screen keeps, so the first walk uploads nothing.)
+  if (!wearing) {
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+    const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
+    await wearItem(page, "ride", chirp!);
+  }
   await page.goto(`/town?sky=day&report=120&townroom=busy${Date.now().toString(36)}`);
   const canvas = page.locator("canvas.town-canvas");
   await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
@@ -773,6 +781,11 @@ async function busyTown(page: Page, wearing: boolean) {
     return { ours, frames: s.frames, mean: s.segs[0]!.mean, long: s.long, parts: s.segs[0]!.avg.slice(0, P.outside).map((x) => +x.toFixed(2)).join(" "), uploads: `${s.uploads} uploads: ${s.uploadsBy.map(([k, n]) => `${k} ${n}`).join(", ")}; ${s.resets} pages started again`, frameUps: s.uploadsBy.find(([k]) => k === "dressed pawn frame")?.[1] ?? 0 };
   };
   const empty = await walk();
+  if (!wearing) {
+    const ride = await page.evaluate(() => (window as unknown as { __townRide: () => { you: { ride: string | null; ready: boolean } } }).__townRide().you);
+    expect(ride, "on the Chirp, its frames ready").toMatchObject({ ride: "riding-chirp", ready: true });
+    expect(empty.uploads, "the first walk after the loading screen uploads nothing (its ride's frames and marks kept there)").toMatch(/^0 uploads/);
+  }
   busy = true;
   await expect.poll(() => page.evaluate(() => (window as unknown as W).__townHere().filter((h) => !h.you && h.here).length), { timeout: 30_000, message: "the other players in the town" }).toBeGreaterThanOrEqual(50);
   await page.evaluate(() => {
