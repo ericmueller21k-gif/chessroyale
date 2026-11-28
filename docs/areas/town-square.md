@@ -1368,11 +1368,19 @@ when something reads it (its 2D context: hit tests, statue masks; a 2D context d
 `cutBeforeDraw`, Nov 25 round 2) or it must be uploaded alone (a lost context). The pages stay decoded
 until the town closes. Headless, repeat visit at 4x: 5.47 → 4.52 s to the first frame (a page upload is about 50 to 65 ms at 4x here).
 Anything odd paints as before and clears the entry. `?paintall` skips it.
-**Baked by the build (Nov 28, phase 1a; [decision](../decisions/2026-11-28-town-bake.md)):** the pictures' list is its own module, `town/pictures.ts`
-(`townWants`: each picture's name, group and how it's painted; `plan` runs a job a want), and `npm run build` paints it in Node
-(`scripts/bake-town.ts`, `town/bake.ts`; by hand `npx tsx scripts/bake-town.ts`, which prints each file's cost) into `/town-pictures/`: a PNG a
-group's page (a home, a street's row, the park, the Colosseum, the props; `.player` / `.admin` what one town alone draws), the sidekicks' sheets,
-`manifest.json` (places, roofs' and glows' pieces, frame times, box tops), `order.json`. Nothing reads them until phase 1b. Tests: `town-bake.test.ts`, `e2e/town-street.spec.ts` ("the build's baked pictures…").
+**Baked by the build, loaded as files (Nov 28, phases 1a and 1b; decisions: [the bake](../decisions/2026-11-28-town-bake.md), [the load](../decisions/2026-11-28-town-load-baked.md)):**
+the pictures' list is its own module, `town/pictures.ts` (`townWants`), and `npm run build` paints it in Node (`scripts/bake-town.ts`, `town/bake.ts`; by
+hand `npx tsx scripts/bake-town.ts`, which prints each file's cost) into `/town-pictures/`: a PNG a group's page (a home, a street's row, the park, the
+Colosseum, the props; `.player` / `.admin` what one town alone draws), the sidekicks' sheets, `manifest.<hash>.json` (`town/manifest.ts`), `order.json`.
+**Every visit loads them** (`town/baked.ts`, `loadTown`): the manifest by the name the build hands the app (`__TOWN_PICTURES__`), its town's pages fetched
+(`town/baked-files.ts`), decoded off the main thread, each picture a stand-in canvas by name (`takeBaked`, `plan`), each page uploaded whole onto the atlas's
+layers (`adopt`, `placePages`); frame counts and tops from the manifest. Nothing in the list is painted or kept on the device (but the sidekicks' sheets,
+still cut there). The service worker keeps the files across versions (`sw-template.js` `TOWN_FILE`). Home fetches them when idle (`fetchTownAhead`: by the
+names the build hands it, `__TOWN_PAGES__`, never reading the manifest; only while home shows no queue; once its worker answers the page; each file once a
+page; not on `saveData` or `homeFetchNotOn`'s slow connections; stopped, the file on its way too, as home closes). A file missing, `?paintall` or
+`TOWN_PICTURES.baked` off: the device paints, as the paragraphs here describe (until phase 1c). So does a load where no byte arrives for `stallMs` (15 s, the
+page showing). A fallback says why once a page (`reportBakedFallback`, `TOWN_BAKED_FALLBACK`); the town closing stops the fetching and decoding
+([the review's fixes](../decisions/2026-11-28-town-load-baked-fixes.md)). The dev server bakes when the town first asks, one bake at a time. Tests: `town-bake.test.ts`, `town-baked.test.ts`, `sw-versions.test.ts`, `e2e/town-street.spec.ts` ("the build's baked pictures…", "home fetches…").
 **Warm before it shows (Nov 28; [decision](../decisions/2026-11-28-town-load-smooth.md)):** the loading screen also waits for every rider it
 knows (yours, the bots') and keeps their frames and trail marks (`Rider.pictures`; "ride frame", "ride trail" in the report), works out each
 box's solid top (`warmTops`; kept between visits under the pictures' key, `brc.townTops`), then draws `loadWarmFrames` (3) frames under the

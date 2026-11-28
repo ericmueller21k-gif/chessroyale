@@ -41,6 +41,7 @@ import { Pic, Scene } from "../home-art/Pic.tsx";
 import { ARENA_AUTO_CARD } from "../home-art/arena-auto-card.ts";
 import { TOWN_PICTURE, TOWN_SCENE, TOWN_SKY } from "../home-art/town.ts";
 import { setSearchOnHome, type AwaySearch } from "../search.ts";
+import { fetchTownAhead } from "../town/baked-files.ts";
 import { clockShown } from "../clock-text.ts";
 
 const MODE_KEY = "brc.mode";
@@ -791,6 +792,13 @@ export function HomeScreen({
     void game.preload().then((m) => void (live && m && (stop = m.prewarmBoss(bossDef(pick)?.name))));
     return () => ((live = false), stop());
   }, [raid, pick]);
+  // Chess Town's pictures (Nov 28: the build's baked files, town/baked-files.ts), fetched quietly once home has shown a while, so the
+  // service worker has them before the first tap on Chess Town: your town's (an admin's has more homes). Only while home is home: never
+  // with the queue showing (a boss battle's lobby, a match loading, a 1 v 1's search: the network is the match's then), and the file on
+  // its way is stopped as the queue shows or home closes (the review of phase 1b, S1).
+  const adminTown = !!profile?.admin;
+  const inQueue = queue !== undefined && queue !== null;
+  useEffect(() => (inQueue ? undefined : fetchTownAhead(adminTown ? "admin" : "player")), [adminTown, inQueue]);
   // (Not while Solo and Boss alone rest: the hidden /bosses lands here too, and the Boss raid screen says why.)
   const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
   // Boss Battle's START: Maia's files fetched ahead as the old Boss alone menu did when it opened, then the battle.

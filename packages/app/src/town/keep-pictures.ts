@@ -16,6 +16,7 @@
  * docs/decisions/2026-11-23-town-keep-pictures.md.
  */
 import { TOWN_PICTURES } from "@chessroyale/core";
+import type { Baked } from "./baked.ts";
 import type { Piece, RoofArt } from "./box-draw.ts";
 import { ATLAS, type AtlasPage } from "./paint.ts";
 
@@ -83,7 +84,9 @@ export interface PageIO {
 
 /**
  * One visit's pictures, in the order the loading screen keeps them (render.ts `plan`), each once. On a later visit (`from`), a job's
- * picture is the last visit's at the same place in that order (`next`), and a roof's pieces its kept ones (`roof`).
+ * picture is the last visit's at the same place in that order (`next`), and a roof's pieces its kept ones (`roof`). With the build's
+ * baked town (`baked`, Nov 28: baked.ts) a job's picture is the baked one of its name, and a roof's pieces the manifest's (`bakedRoof`):
+ * none is handed to `keep`, as the painter is given their files whole once every job has run (`Painter.adopt`).
  */
 export class Pictures {
   readonly list: HTMLCanvasElement[] = [];
@@ -97,14 +100,23 @@ export class Pictures {
   constructor(
     readonly keep: (c: CanvasImageSource) => void,
     readonly from: Restored | null,
+    readonly baked: Baked | null = null,
   ) {}
-  /** A picture the loading screen keeps (the painter's `keep`), listed the first time. */
+  /** A picture the loading screen keeps (the painter's `keep`; a baked one is kept with its file), listed the first time. */
   add(c: HTMLCanvasElement): void {
     if (!this.at.has(c)) {
       this.at.set(c, this.list.length);
       this.list.push(c);
     }
-    this.keep(c);
+    if (!this.baked) this.keep(c);
+  }
+  /** (The baked town) The roof `name` as the build painted it: its pieces from the manifest, each sheet (`<name>/<n>`) a picture of its own here. */
+  bakedRoof(name: string): RoofArt {
+    const b = this.baked!;
+    const sheets = new Map<number, HTMLCanvasElement>();
+    const sheet = (n: number) => sheets.get(n) ?? sheets.set(n, b.pic(`${name}/${n}`)).get(n)!;
+    const piece = (f: readonly number[], k: number): Piece => ({ cv: sheet(f[k]!), sx: f[k + 1]!, sy: f[k + 2]!, w: f[k + 3]!, h: f[k + 4]!, ox: f[k + 5]!, oy: f[k + 6]! });
+    return { faces: b.manifest.roofs[name]!.map((f) => ({ whole: piece(f, 0), tris: Array.from({ length: f.length / 7 - 1 }, (_, j) => piece(f, 7 * (j + 1))) })) };
   }
   /** (A later visit) the next new picture: the last visit's at this place. */
   next(): HTMLCanvasElement {
@@ -119,7 +131,7 @@ export class Pictures {
   }
   /** A roof just made (its pieces added): kept for the next visit. */
   roofDone(a: RoofArt): void {
-    if (this.from) return;
+    if (this.from || this.baked) return;
     this.roofs.push(a.faces.map((f) => [f.whole, ...f.tris].flatMap((p) => [this.at.get(p.cv) ?? -1, p.sx, p.sy, p.w, p.h, p.ox, p.oy])));
   }
   /** (A later visit) the next glow baked, as the last visit baked it (`Manifest.glows`: its sheet is the next picture). */
@@ -130,7 +142,7 @@ export class Pictures {
   }
   /** A glow just baked (its sheet added, if it has pieces): kept for the next visit. */
   glowDone(row: number[]): void {
-    if (!this.from) this.glows.push(row);
+    if (!this.from && !this.baked) this.glows.push(row);
   }
   /** (A later visit, once every job ran) whether every kept picture, roof and glow was used: the layout was the last visit's. */
   matched(): boolean {

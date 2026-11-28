@@ -390,13 +390,12 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   await btn.click();
   await expect(small).toHaveCount(0);
   await expect(btn).toHaveAttribute("aria-pressed", "false");
-  // (Nov 25, round 2: the reload is a repeat visit, its pictures from the first visit's kept pages, each empty until something reads
-  // it. The first visit's are on the shelf before it reloads.)
-  type Kept = { __townPaint: () => { pictures: { kept: boolean; saved: number | null | undefined } } };
-  await expect.poll(() => page.evaluate(() => (window as unknown as Kept).__townPaint().pictures.saved), { timeout: 60_000 }).toBeGreaterThan(0);
+  // (Nov 25, round 2: the reload is a repeat visit, its pictures from whole pages, each empty until something reads it. Since Nov 28
+  // every visit's are: the build's baked files, town/baked.ts.)
+  type Kept = { __townPaint: () => { pictures: { baked: boolean } } };
   await page.reload();
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
-  expect(await page.evaluate(() => (window as unknown as Kept).__townPaint().pictures.kept), "a repeat visit: its pictures kept").toBe(true);
+  expect(await page.evaluate(() => (window as unknown as Kept).__townPaint().pictures.baked), "a repeat visit: its pictures from the baked files' pages").toBe(true);
   await expect(small, "still off after a reload").toHaveCount(0);
   // The chips' faces drawn on it: each shown chip's canvas has pixels (a 2D draw from a kept picture cuts it first).
   await expect

@@ -78,8 +78,9 @@ export type Backend = "2d" | "webgl";
 export const ATLAS = { page: 2048, pad: 2, big: 1024 } as const;
 
 /**
- * (A later visit, keep-pictures.ts) A kept page as the atlas would have packed it (`ATLAS`): its decoded pixels, its size, and each
- * picture on it (the canvas standing in for it, drawn by as any other, and its top left on the page).
+ * A whole page of pictures, packed as the atlas packs (`ATLAS`): one of the build's baked files (baked.ts: a group's page, as wide and
+ * tall as its pictures reach) or a later visit's kept page (keep-pictures.ts). Its decoded pixels, its size, and each picture on it
+ * (the canvas standing in for it, drawn by as any other, and its top left on the page; two may share a place).
  */
 export interface AtlasPage {
   readonly img: TexImageSource;
@@ -120,11 +121,13 @@ export interface Painter {
   /** (With `keep`) Uploads what it was handed, a slice of up to `budgetMs` at a time; says how much is done (0 to 1). */
   kept?(budgetMs: number): number;
   /**
-   * (With `keep`, a later visit's loading screen, before `kept`; Nov 25) The kept pages, uploaded whole by `kept`: each picture on them
-   * kept as `keep` keeps one, where its page put it, never uploaded alone. `fill` puts a picture's pixels on its canvas (empty until
-   * then) should it need uploading again (a lost context, `changed`). Pages it can't take (too many) leave their pictures to `keep`.
+   * (With `keep`, the loading screen, before `kept`; Nov 25) Whole pages (the build's baked files, or a later visit's kept pages),
+   * uploaded whole by `kept`, each placed on the atlas's layers: each picture on them kept as `keep` keeps one, where its page put it,
+   * never uploaded alone. `fill` puts a picture's pixels on its canvas (empty until then) should it need uploading again (a lost
+   * context, `changed`). Says whether it took them: false (too many for the atlas, or `kept` has started), and none is placed: hand each
+   * picture to `keep` then (baked.ts `adoptOrKeep`; a later visit's kept ones are, as each is put in place).
    */
-  adopt?(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): void;
+  adopt?(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): boolean;
   /**
    * (WebGL, the loading screen's warm-up, Nov 28) Waits until the GPU has done everything sent so far (one pixel read back): a frame drawn
    * under the loading card pays its textures' and shaders' first use there, not in the first frames you see.

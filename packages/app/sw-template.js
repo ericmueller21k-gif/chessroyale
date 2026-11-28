@@ -19,6 +19,17 @@ const MUSIC = "/music/";
 const MUSIC_CACHE = "brc-music";
 const MUSIC_HASHES = __MUSIC_HASHES__;
 
+// The baked town (/town-pictures/, Nov 28: Chess Town's pictures as the build painted them, and their manifest): not precached, as the
+// music isn't: fetched by the town's loading screen, or by home when idle (town/baked-files.ts), then kept in this version's cache. Each
+// is named by its contents (TOWN_FILE), so it's answered from any version's cache, and a new version copies over the ones an older
+// version keeps (precache): a deploy fetches only the groups it changed, and a deploy that leaves the town alone fetches none.
+const TOWN_FILES = __TOWN_FILES__;
+// (A baked file's path: filled in from the bake's own test of a name, the app's town/manifest.ts TOWN_FILE_PATH, so the two can't drift.)
+const TOWN_FILE = __TOWN_FILE_PATH__;
+
+// The app's page (the server sends it for any path it doesn't have: the single-page app's fallback), never kept as a file.
+const isPage = (res) => (res.headers.get("content-type") ?? "").includes("text/html");
+
 // Each precached file's contents' hash (but under /assets/, where Vite puts it in the name), kept on its cached copy as HASH_HEADER.
 const HASHES = __HASHES__;
 const HASH_HEADER = "x-brc-hash";
@@ -28,23 +39,38 @@ const HASH_HEADER = "x-brc-hash";
 // for those, 2.7 s now). After a deploy only what changed is downloaded: a file an older version keeps with the same contents (the
 // same name under /assets/, else the same hash) is copied over (a deploy's update: 3.8 MB before). A file already in this version's
 // cache (an install tried before) is left as it is.
+// Only the file itself is kept (Nov 28, the review of phase 1b): a 200, and under /assets/ never the app's page (a deploy caught half
+// way answers a file it doesn't have yet with the page; kept under a name that carries its contents' hash, every later version would
+// have copied it). Anything else fails this install, and the browser tries again at its next check.
 async function precache() {
   const cache = await caches.open(VERSION);
   for (const file of FILES) {
     if (await cache.match(file)) continue;
+    const hashed = file.startsWith("/assets/");
     const kept = await caches.match(file);
-    if (kept && (file.startsWith("/assets/") || (HASHES[file] && kept.headers.get(HASH_HEADER) === HASHES[file]))) {
+    if (kept && (hashed ? !isPage(kept) : HASHES[file] && kept.headers.get(HASH_HEADER) === HASHES[file])) {
       await cache.put(file, kept);
       continue;
     }
     const res = await fetch(file, { priority: "low" });
-    if (!res.ok) throw new Error(`precache: ${file} ${res.status}`);
+    if (res.status !== 200 || (hashed && isPage(res))) throw new Error(`precache: ${file} ${res.status}${res.status === 200 ? " (the app's page)" : ""}`);
     if (!HASHES[file]) await cache.put(file, res);
     else {
       const headers = new Headers(res.headers);
       headers.set(HASH_HEADER, HASHES[file]);
       await cache.put(file, new Response(res.body, { status: res.status, statusText: res.statusText, headers }));
     }
+  }
+  // (The baked town's files an older version keeps: copied, never fetched here. A saving only: a copy that fails (no room left) never
+  // fails the install, and the town fetches that file again.)
+  try {
+    for (const file of TOWN_FILES) {
+      if (await cache.match(file)) continue;
+      const kept = await caches.match(file);
+      if (kept) await cache.put(file, kept);
+    }
+  } catch {
+    // (Fetched again when the town asks.)
   }
 }
 
@@ -194,8 +220,9 @@ self.addEventListener("fetch", (event) => {
   }
 
   // A file under /assets/ (Vite's names carry their contents' hash) from any version kept: an older tab's own files are its version's.
+  // The baked town's files too (TOWN_FILE: named by their contents).
   // Any other file (one name, whatever the version) from this version only, as the server would answer it: never an older copy.
-  const hashed = url.pathname.startsWith("/assets/");
+  const hashed = url.pathname.startsWith("/assets/") || TOWN_FILE.test(url.pathname);
   event.respondWith(
     (hashed ? caches.match(request) : caches.open(VERSION).then((cache) => cache.match(request))).then(
       (cached) =>
@@ -203,10 +230,13 @@ self.addEventListener("fetch", (event) => {
         fetch(request).then((res) => {
           // (And a Vite asset fetched here, a new version's while the old worker still answers: the next version's precache copies it.
           // Not a page sent for a file the server no longer has.)
-          const page = (res.headers.get("content-type") ?? "").includes("text/html");
-          if ((LAZY.test(url.pathname) || hashed) && res.ok && res.status === 200 && !page) {
+          // (A request the page stopped part way, home's fetch ahead as home closes: its copy fails, and nothing is kept.)
+          if ((LAZY.test(url.pathname) || hashed) && res.ok && res.status === 200 && !isPage(res)) {
             const copy = res.clone();
-            void caches.open(VERSION).then((cache) => cache.put(request, copy));
+            void caches
+              .open(VERSION)
+              .then((cache) => cache.put(request, copy))
+              .catch(() => undefined);
           }
           return res;
         }),
