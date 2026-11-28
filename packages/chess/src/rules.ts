@@ -36,9 +36,17 @@ export function toSan(fen: string, uci: string): string {
  * The piece on a square: color and type (p, n, b, r, q, k), or null. The screens ask about many squares of the same
  * position, some on every redraw (the ice over every frozen piece in the blizzard), so a position is read once.
  */
+/** A board's placement as a FEN writes it: eight ranks of pieces and empty-square counts. */
+const PLACEMENT = /^(?:[pnbrqkPNBRQK1-8]+\/){7}[pnbrqkPNBRQK1-8]+$/;
 export function pieceAt(fen: string, square: string): { color: "w" | "b"; type: "p" | "n" | "b" | "r" | "q" | "k" } | null {
   let board = boards.get(fen);
-  if (!board) board = remember(boards, fen, new Chess(plainFen(fen)).board(), 32);
+  // (Read as drawn, never checked as a game: a position drawn for a moment can lack a king, a piece in the air. Nov 28: the Stranger's
+  // second Storm threw the white king, and the drawn board's "missing white king" took the screen down. Reading a square needs no rules.)
+  if (!board) {
+    // (Still refused: a placement that isn't one, eight ranks of pieces and counts. Only the game's rules are skipped.)
+    if (!PLACEMENT.test(fen.split(" ")[0] ?? "")) throw new Error(`Invalid FEN placement: ${fen}`);
+    board = remember(boards, fen, new Chess(plainFen(fen), { skipValidation: true }).board(), 32);
+  }
   const file = square.charCodeAt(0) - 97;
   const rank = square.charCodeAt(1) - 48;
   const p = square.length === 2 && file >= 0 && file < 8 && rank >= 1 && rank <= 8 ? board[8 - rank]![file] : null;
