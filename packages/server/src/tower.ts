@@ -197,6 +197,10 @@ export const TOWER_LINES = {
   saving: (name: string) => `${name}'s last floor is still being saved.`,
   changed: "Something changed. Check the plan and ready up again.",
   bad: "Bad request",
+  /** An admin's jump (setTowerFloor) while a floor is under way. */
+  floorUnderWay: (floor: number) => `Floor ${floor} is under way. Finish or leave it first.`,
+  /** An admin's jump taken (the app's own line says it too). */
+  floorNext: (floor: number) => `Floor ${floor} is next: talk to the clerk.`,
 } as const;
 
 const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
@@ -575,6 +579,49 @@ export async function stopTower(sql: Sql, userId: string, now: number, body: { f
   return { status: 200, body: { stopped: free ? "free" : "lost", floor: before.floors.length, status: after.status, ...livesNow(after.status, after.lost), run: open } };
 }
 
+/**
+ * A run dealt from `seed` up to `floor` (1 to BATTLE_TOWER.floors) as a climb winning every floor below it would be: core's newRun, then
+ * finishFloor "won" floor by floor, so the deck and deal are a real climb's. No floors lost (lives full). Null if the deal stops short
+ * (the pool too thin to deal a floor).
+ */
+export function runToFloor(seed: number, floor: number, pool: readonly string[]): TowerRun | null {
+  let run = newRun(seed, pool);
+  while (run.status === "open" && run.floors.length < floor && run.floors[run.floors.length - 1]?.length) run = finishFloor(run, "won", pool);
+  return run.status === "open" && run.floors.length === floor && run.floors[floor - 1]?.length ? run : null;
+}
+
+/**
+ * POST /api/tower/admin/floor {floor}: an admin's jump (Eric, Nov 28: "punch in a number, and whatever number is there, it goes to that
+ * level"; docs/decisions/2026-11-28-tower-admin-floor.md). The admin's own open SOLO run is set to fight `floor` next, its deal that of a
+ * climb from its own seed winning every floor below (runToFloor), its lives full and no floor under way; with no open solo run, one is
+ * made (as newTowerRun writes one, leaving any ended run for the next new run to clear). A floor under way: refused (409), nothing set.
+ * Only this row: never a best, an unlock, a crate, XP, a party copy or anyone else's run. The route checks the server's admin list
+ * (towerResponse: `admin`); this function trusts its caller.
+ */
+export async function setTowerFloor(sql: Sql, userId: string, now: number, body: { floor?: unknown }, opts: { pool: readonly string[] }): Promise<TowerAnswer> {
+  const floor = body.floor;
+  if (typeof floor !== "number" || !Number.isInteger(floor) || floor < 1 || floor > BATTLE_TOWER.floors) return { status: 400, body: { message: TOWER_LINES.bad } };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const row = await openRow(sql, userId, "solo");
+    const under = row ? fightOf(row.fight) : null;
+    if (row && under) return { status: 409, body: { message: TOWER_LINES.floorUnderWay(row.floor), fight: under, run: viewOf(row, opts.pool) } };
+    const seed = row ? row.seed >>> 0 : crypto.getRandomValues(new Uint32Array(1))[0]!;
+    const run = runToFloor(seed, floor, opts.pool);
+    if (!run) return { status: 503, body: { message: TOWER_LINES.resting } };
+    const id = row?.id ?? randomHex(12);
+    // (Over the run as it was read only: a start in between, and this one reads it again. A new run: the unique index keeps it one.)
+    const done = row
+      ? await sql.first("UPDATE tower_runs SET floor = ?, met = ?, updated_at = ? WHERE id = ? AND status = 'open' AND fight IS NULL AND met = ? RETURNING id", floor, metOf(run), now, row.id, row.met)
+      : await sql
+          .first(`INSERT INTO tower_runs (${RUN_COLUMNS}) VALUES (?, ?, 'solo', ?, ?, ?, NULL, NULL, NULL, 'open', ?, ?) RETURNING id`, id, userId, run.seed, floor, metOf(run), now, now)
+          .catch(() => null);
+    if (!done) continue;
+    const saved = await sql.first<RunRow>(`SELECT ${RUN_COLUMNS} FROM tower_runs WHERE id = ?`, id);
+    return { status: 200, body: { message: TOWER_LINES.floorNext(floor), floor, run: saved ? viewOf(saved, opts.pool) : null } };
+  }
+  return { status: 409, body: { message: TOWER_LINES.notUnderWay } };
+}
+
 /** Solo resting (PAUSE_SOLO): kill-switches.ts's pausedResponse, as an answer. */
 const SOLO_RESTING: TowerAnswer = { status: 503, body: { message: pausedLine("solo"), paused: "solo" } };
 
@@ -595,8 +642,10 @@ export interface TowerEnv {
   lobbyGone?: LobbyGone;
 }
 
+/** An admin's jump to a floor (setTowerFloor): admins only, by the server's own list (ADMIN_EMAILS); anyone else is answered 404. */
+const ADMIN_FLOOR = "/api/tower/admin/floor";
 /** The routes under /api/tower whose body is JSON (POST). */
-const POSTS = new Set(["/api/tower/run", "/api/tower/floor/start", "/api/tower/floor/finish", "/api/tower/stop"]);
+const POSTS = new Set(["/api/tower/run", "/api/tower/floor/start", "/api/tower/floor/finish", "/api/tower/stop", ADMIN_FLOOR]);
 
 /**
  * The tower's routes, for the account behind the request (api.ts, after its session: a guest's cookie as anyone's; the API's rate
@@ -609,6 +658,7 @@ const POSTS = new Set(["/api/tower/run", "/api/tower/floor/start", "/api/tower/f
  *   POST /api/tower/floor/finish {fight, outcome: "won" | "lost" | "drawn"} → {outcome, floor, status, lives, lost, run, best} (the same
  *     answer for the last result taken, sent again) | 409 {message, run, best, fight?} (read the run again) | 409 {message, confirm}
  *   POST /api/tower/stop {fight?, moves?} → {stopped: "between" | "free" | "lost", run, status?, lives?, lost?, …} | 409
+ *   POST /api/tower/admin/floor {floor} → {message, floor, run} | 400 | 404 (not an admin) | 409 {message, fight, run} (a floor under way)
  */
 export async function towerResponse(request: Request, sql: Sql, userId: string, env: TowerEnv, now: number): Promise<Response | null> {
   const path = new URL(request.url).pathname;
@@ -619,6 +669,11 @@ export async function towerResponse(request: Request, sql: Sql, userId: string, 
   const answer = (a: TowerAnswer) => json(a.body, a.status);
   if (path === "/api/tower") return request.method === "GET" ? json(await towerState(sql, userId, pool)) : null;
   if (request.method !== "POST") return null;
+  if (path === ADMIN_FLOOR) {
+    if (!env.admin) return json({ message: "Not found" }, 404);
+    const body = ((await request.json().catch(() => null)) ?? {}) as { floor?: unknown };
+    return answer(await setTowerFloor(sql, userId, now, body, { pool }));
+  }
   const b = ((await request.json().catch(() => null)) ?? {}) as { kind?: unknown; confirm?: unknown; fight?: unknown; outcome?: unknown; moves?: unknown; free?: unknown; device?: unknown };
   if (b.kind !== undefined && b.kind !== "solo" && b.kind !== "party") return json({ message: TOWER_LINES.bad }, 400);
   const kind: TowerKind = b.kind === "party" ? "party" : "solo";
