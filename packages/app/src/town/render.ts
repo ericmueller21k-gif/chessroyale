@@ -3295,7 +3295,8 @@ export class Renderer {
   labelFonts(): Promise<unknown>[] {
     const fonts = typeof document === "undefined" ? undefined : document.fonts;
     if (!fonts?.load) return [];
-    return [TAG_FONT[11]!, NAME_FONT[16]!, BUBBLE_FONT].map((f) => fonts.load(f));
+    // (One that fails has settled too; caught here, as nothing may be waiting on it yet.)
+    return [TAG_FONT[11]!, NAME_FONT[16]!, BUBBLE_FONT].map((f) => fonts.load(f).catch(() => undefined));
   }
 
   /** Whether the box (x, y, w, h) on screen lies under a street-town building standing nearer than `dz` (drawn this frame): it'd hide it. */

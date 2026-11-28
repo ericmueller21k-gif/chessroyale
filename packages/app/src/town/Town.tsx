@@ -3110,12 +3110,12 @@ function startTown(
       // (The town this device painted and saved before the build baked it: let go, once a page.)
       if (!savedCleared) {
         savedCleared = true;
-        try {
-          indexedDB.deleteDatabase(SAVED_DB);
-          localStorage.removeItem(TOPS_KEY);
-        } catch {
-          // (No storage: nothing kept there.)
-        }
+        for (const drop of [() => localStorage.removeItem(TOPS_KEY), () => void indexedDB.deleteDatabase(SAVED_DB)])
+          try {
+            drop();
+          } catch {
+            // (No storage: nothing kept there.)
+          }
       }
       Object.assign(pictures, { baked: true, bakedMs: performance.now() - t0, files: got.files, bytes: got.bytes });
       // No time caps from here (Eric, Nov 27-28: "load first, then show"; until phase 1c the labels' fonts, the pawns' crate items and

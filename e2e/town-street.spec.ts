@@ -392,6 +392,59 @@ test("the street town's WebGL context lost: nothing drawn until it's back, then 
   await expect(box).toHaveCount(0);
 });
 
+/**
+ * The context lost while the town is still loading (Nov 28, phase 1c): the load waits for it and goes on, and the town shows with
+ * everything the loading screen keeps on the GPU, as an undisturbed load has it: nothing left to upload in a frame as it first shows.
+ * (The files' decoded copies are let go once uploaded, so nothing could be uploaded later from them; and until phase 1c a picture
+ * handed to the painter during the loss, the labels', was dropped and uploaded as it first showed.)
+ */
+test("the WebGL context lost while the town loads, at either step of its loading screen: the load goes on once it's back, and everything it keeps is on the GPU as on an undisturbed load (Nov 28)", { tag: "@phone-only" }, async ({ page }) => {
+  type W = { __townPaint: () => { lost: boolean; pictures: { baked: boolean; open: boolean }; atlas: { pages: number; kept: number; unkept: number } }; __townPictureSum: (each: boolean) => { each: number[] }; __lostAt?: string };
+  const errors = watchErrors(page);
+  // (Loses the context the first frame the loading card names step `__loseAt`, its bar past 15% for the first; back 400 ms later.)
+  await page.addInitScript(() => {
+    const w = window as unknown as W;
+    const f = () => {
+      const note = document.querySelector(".town-loading .boss-loading-note")?.textContent ?? "";
+      const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas");
+      const share = Number(document.querySelector(".town-loading [role=progressbar]")?.getAttribute("aria-valuenow") ?? 0);
+      const want = sessionStorage.getItem("loseAt");
+      if (want && cv && note.startsWith(want) && (want === "Building" || share > 15)) {
+        const ext = (cv.getContext("webgl2") as WebGL2RenderingContext | null)?.getExtension("WEBGL_lose_context");
+        w.__lostAt = note;
+        ext?.loseContext();
+        setTimeout(() => ext?.restoreContext(), 400);
+        return;
+      }
+      requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  const load = async (loseAt: string | null) => {
+    await page.goto("/version.json");
+    await page.evaluate((at) => (at ? sessionStorage.setItem("loseAt", at) : sessionStorage.removeItem("loseAt")), loseAt);
+    await page.goto("/town?sky=day");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
+    await expect(page.locator(".town-loading")).toHaveCount(0);
+    const got = await page.evaluate(() => {
+      const w = window as unknown as W;
+      const p = w.__townPaint();
+      // (`off`: pictures of the loading screen's list not on the GPU. `atlas`: its pages, and the pictures kept on them for good.)
+      return { lostAt: w.__lostAt ?? null, lost: p.lost, pictures: { baked: p.pictures.baked, open: p.pictures.open }, atlas: { pages: p.atlas.pages, kept: p.atlas.kept, unkept: p.atlas.unkept }, off: w.__townPictureSum(true).each.filter((k) => !k).length };
+    });
+    return got;
+  };
+  const plain = await load(null);
+  expect(plain).toMatchObject({ lostAt: null, lost: false, off: 0, pictures: { baked: true, open: false } });
+  expect(plain.atlas.kept, "pictures kept on an undisturbed load").toBeGreaterThan(2500);
+  for (const step of ["Loading the town's pictures", "Building"]) {
+    const got = await load(step);
+    expect(got.lostAt, `the context was lost during "${step}…"`).toContain(step);
+    expect({ ...got, lostAt: null }, `lost during "${step}…": the town as an undisturbed load has it`).toEqual(plain);
+  }
+  expect(errors).toEqual([]);
+});
+
 test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of walking and turning, and Done shows one panel with the numbers, inside the box; without ?report there's no pill and no panel", { tag: "@phone-only" }, async ({ page }) => {
   type R = { __townReport: () => { state: string; frames: number; summary: { frames: number; p50: number; segs: { name: string; frames: number }[]; worst: unknown[] } | null } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean };
   const errors = watchErrors(page);

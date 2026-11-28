@@ -699,7 +699,9 @@ class GLPainter implements Painter {
    * (tags, boards, bubbles) go on pages of their own, which start again when full.
    */
   keep(src: CanvasImageSource): void {
-    if (this.lost || this.layers.has(src)) return;
+    // (With the context lost too, since Nov 28: it waits for `kept` once the context is back, `init`. Until then a picture handed over
+    // during a loss, the labels made in that moment of the loading screen, was dropped, and uploaded in a frame as it first showed.)
+    if (this.layers.has(src)) return;
     const e = this.entryOf(src);
     if (e.kept) return;
     e.kept = true;
