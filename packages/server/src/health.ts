@@ -56,7 +56,7 @@ export interface Health {
   /**
    * The schedule's jobs that failed in the last 24 hours (index.ts `failed(job)`: kind "cron", the job as its route), by job and
    * message, apart from `errors.top`, which a busy day would push a once-a-day failure off: `day` times in 24 hours, on `days` of the
-   * last 7, the first of them `firstSeen`. (The daily ledger check failed every day from Nov 7 to Nov 28 unseen:
+   * last 7 UTC days (today's included), the first of them `firstSeen`. (The daily ledger check failed every day from Nov 7 to Nov 28 unseen:
    * docs/decisions/2026-11-28-ledger-check-unseen.md.)
    */
   cron: { job: string; message: string; day: number; days: number; firstSeen: number; lastSeen: number }[];
@@ -85,6 +85,8 @@ export async function health(env: ProblemsEnv & EngineEnv & Pick<Env, "LIVE">, s
   const lastHour = thisHour - HOUR;
   const since = hourOf(now - 24 * HOUR);
   const week = hourOf(now - 7 * 24 * HOUR);
+  // (The 7 UTC days ending today, for "on how many of the last 7 days": never an 8th day's run at the same hour.)
+  const sevenDays = Math.floor(now / (24 * HOUR)) * 24 * HOUR - 6 * 24 * HOUR;
   const fallback = TOWN_GL_FALLBACK.kind;
   // (A database that doesn't answer leaves zeros: the view still says what's deployed, who's playing and D1's error.)
   const safe = <T>(p: Promise<T>, none: T) => p.catch(() => none);
@@ -135,7 +137,7 @@ export async function health(env: ProblemsEnv & EngineEnv & Pick<Env, "LIVE">, s
          COUNT(DISTINCT hour / ${24 * HOUR}) AS days, MIN(first_seen) AS firstSeen, MAX(last_seen) AS lastSeen
        FROM ops_errors WHERE hour >= ? AND source = 'server' AND kind = 'cron' GROUP BY fingerprint HAVING day > 0 ORDER BY lastSeen DESC LIMIT 10`,
       since,
-      week,
+      sevenDays,
     ), []),
   ]);
   const durableObjects: Health["durableObjects"] = { thisHour: 0, lastHour: 0, day: 0, byClass: {}, byEntry: {} };

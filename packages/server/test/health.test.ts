@@ -355,6 +355,8 @@ describe("the health view", () => {
     const LEDGER = "Error: ledger check: 4 accounts' balances and ledger disagree";
     const nine = NOW - 9.5 * HOUR; // (09:00 today)
     for (let d = 6; d >= 0; d--) await add(nine - d * 24 * HOUR, "ledger", "cron", "server", LEDGER, "ledger");
+    // (And once a week ago in this clock hour: within 7 × 24 hours by the hour, but an 8th UTC day, so not one of the 7.)
+    await add(NOW - 7 * 24 * HOUR - 25 * 60_000, "ledger", "cron", "server", LEDGER, "ledger");
     // (Another job's failure, past the last 24 hours: not listed. A device can't send a server's cron.)
     await add(NOW - 30 * HOUR, "prune", "cron", "server", "Error: D1 is busy", "prune");
     await add(NOW - HOUR, "fake", "cron", "client", "Error: made up", "ledger");

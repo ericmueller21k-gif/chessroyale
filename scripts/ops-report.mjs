@@ -78,7 +78,7 @@ if (h.reports.day.bug) attention.push(`${count(h.reports.day.bug, "bug report")}
 const jobName = (j) => (/^[a-z0-9-]{1,30}$/.test(j ?? "") ? j : "(unnamed)");
 for (const c of h.cron ?? []) {
   const where = c.job === "ledger" ? " Which accounts and assets: docs/areas/shop.md, \"The daily ledger check\"." : "";
-  attention.push(`The scheduled job "${jobName(c.job)}" failed ${c.day === 1 ? "once" : `${c.day} times`} in the last 24 hours and on ${c.days} of the last 7 days (the first ${utc(c.firstSeen)} UTC), message ${quote("error message", c.message)}.${where}`);
+  attention.push(`The scheduled job "${jobName(c.job)}" failed ${c.day === 1 ? "once" : `${c.day} times`} in the last 24 hours and on ${c.days} of the last 7 days (the earliest of them ${utc(c.firstSeen)} UTC), message ${quote("error message", c.message)}.${where}`);
 }
 
 const lines = [];

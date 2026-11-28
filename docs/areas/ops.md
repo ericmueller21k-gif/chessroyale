@@ -480,7 +480,7 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
     attention";
   - fair play's deep re-checks used of today's budget (`fairplay_budget`);
   - **the schedule's failed jobs** (Nov 28, `cron`; [2026-11-28-ledger-check-unseen.md](../decisions/2026-11-28-ledger-check-unseen.md)): each job
-    that failed in the last 24 hours (kind `cron`, the job its route), how often, on how many of the last 7 days and since when, apart from the top 10;
+    that failed in the last 24 hours (kind `cron`, the job its route), how often, on how many of the last 7 UTC days and the earliest, apart from the top 10;
   - a timed D1 read (a database that doesn't answer leaves zeros and its error; the rest still shows).
 - **Who may read it:** an admin (`isAdmin`, the session), or a script whose request came through Cloudflare Access for
   its application with a service token: Access's own token (`Cf-Access-Jwt-Assertion`, exactly three parts) is checked
