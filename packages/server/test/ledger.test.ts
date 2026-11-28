@@ -611,8 +611,8 @@ describe("reconciliation: each balance is its ledger's sum", () => {
   });
 });
 
-/** The balance tables: only ledger.ts writes them. */
-const BALANCE_TABLES = ["wallets", "inventory", "items", "boss_tokens", "boss_crates", "welcome_crates", "purchases"];
+/** The balance tables: only ledger.ts writes them. (series_crates since Nov 28: a balance since Nov 9, the guard never had it.) */
+const BALANCE_TABLES = ["wallets", "inventory", "items", "boss_tokens", "boss_crates", "welcome_crates", "purchases", "series_crates"];
 const WRITE = new RegExp(`\\b(?:INSERT(?:\\s+OR\\s+\\w+)?\\s+INTO|UPDATE|DELETE\\s+FROM|REPLACE\\s+INTO)\\s+(${BALANCE_TABLES.join("|")})\\b`, "g");
 /** Writes to them elsewhere, each with why: none is a balance. (Part II moved the last paths, grantReward and openCrate.) */
 const NOT_YET: Record<string, Record<string, { n: number; why: string }>> = {

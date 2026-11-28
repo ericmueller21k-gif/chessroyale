@@ -37,6 +37,11 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   `applySpend` (purchases.ts), which takes earned coins and then the oldest bought coins in the same batch, guarded on what it read and
   planned again once if something changed meanwhile ("That didn't go through. Try again." if it changes twice). Coins bought with money
   (none yet: Stripe is PR 8) are a balance of their own in the ledger, beside the wallet's coins.
+- **The daily ledger check** (`ledgerCheck`, the 15-minute cron at 09:00 UTC, [ops.md](ops.md)): each account whose balances and ledger
+  disagree, in full in the Workers logs (`"ops":"ledger"`: user, ledger id, each asset's difference), one error on /admin/ops and, since Nov 28,
+  a line under ops:report's "Needs attention" ([2026-11-28-ledger-check-unseen.md](../decisions/2026-11-28-ledger-check-unseen.md)). Without the
+  logs: its own difference queries (`differences`, ledger.ts) as SELECTs through `wrangler d1 execute hunchess --remote`. Until the backfill
+  runs (shelved Nov 7), it finds the 4 accounts holding rows from before the ledger (Oct 4 to Nov 6 07:04 UTC).
 - **The inventory layer** (Nov 22; [2026-11-22-inventory-layer.md](../decisions/2026-11-22-inventory-layer.md); `InventoryLayer` in `components/PageLayer.tsx`, the page layer Chess Town's side menu pages use on a computer too, [town-square.md](town-square.md)):
   the same `ShopScreen` (opened on Crates) in the shop page's own frame (it looks the same as from the main menu; on a computer the
   same middle column, without the side menu and chat rail, whose links would leave), opaque, over whatever screen you're on, from the end screen's reward card ("Go to inventory"), so
