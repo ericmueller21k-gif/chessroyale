@@ -33,6 +33,8 @@ async function into(page: Page, name: string, room: string, pool: string) {
   // (Up to three towns load one after another here, beside the other project's: longer than townReady's 40 s on a busy runner.)
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
   await page.waitForFunction(() => typeof (window as unknown as { __townHere?: unknown }).__townHere === "function");
+  // (CPU_THROTTLE=4: a CI runner's pace, to try a timing locally.)
+  if (process.env.CPU_THROTTLE) await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.CPU_THROTTLE) });
   return id;
 }
 
@@ -46,15 +48,19 @@ async function another(browser: Browser) {
 const TABLE_COL: Record<number, number> = { 3: 19, 4: 26 };
 async function walkUpTo(page: Page, i: number) {
   const c = TABLE_COL[i]!;
-  expect(await townTap(page, "square", [c, 29]), `the square before table ${i}`).toBe(true);
-  // (There, or beside it if someone stands on it: within a square or two.)
-  await expect
-    .poll(async () => {
-      const [x, y] = (await youAt(page)).split(",").map(Number);
-      const still = await page.evaluate(() => !(window as unknown as { __townYou: () => { moving: boolean } | null }).__townYou()?.moving);
-      return still && Math.abs(x! - c) <= 2 && Math.abs(y! - 29) <= 2;
-    }, { timeout: 10_000, message: `you walk up to table ${i}` })
-    .toBe(true);
+  // (There, or beside it if someone stands on it: within a square or two, standing.)
+  const near = async () => {
+    const [x, y] = (await youAt(page)).split(",").map(Number);
+    const still = await page.evaluate(() => !(window as unknown as { __townYou: () => { moving: boolean } | null }).__townYou()?.moving);
+    return still && Math.abs(x! - c) <= 2 && Math.abs(y! - 29) <= 2;
+  };
+  // (A tap that didn't take, on a CI runner's slow frames, is tapped again: waiting for the state, not a short window. #1027's first CI
+  // run: the one tap's 10 s ran out.)
+  await expect(async () => {
+    if (await near()) return;
+    expect(await townTap(page, "square", [c, 29]), `the square before table ${i}`).toBe(true);
+    await expect.poll(near, { timeout: 15_000 }).toBe(true);
+  }, `you walk up to table ${i}`).toPass({ timeout: 45_000 });
 }
 
 /**
