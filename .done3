@@ -1,0 +1,3 @@
+PR #1027 review fixes done: S1-S7, N1-N4, N9 (N5-N8, N10 noted as follow-ups in .pr-body-add.md).
+Local: typecheck; server + app unit tests (328 files, 4755 tests); e2e town-ranked.spec.ts both projects, 4 passed.
+Still (phone, a guest's greyed Spectate): /tmp/claude-0/-home-user-chessroyale/7f507922-e0dc-5888-b6c5-79d1bc4a5652/scratchpad/stills/guest-spectate-phone.png
