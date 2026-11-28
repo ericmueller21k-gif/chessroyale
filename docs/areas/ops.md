@@ -443,7 +443,7 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   (`pruneProblems`), sign-in code records an hour old (`purgeEmailCodes`), chat moderators' decisions past keeping
   (`pruneChatMod`, [chat.md](chat.md)), once a day at `OPS.ledgerCheck.hourUtc` the item ledger's check (`ledgerCheck`: each account whose
   balances and ledger disagree logged, one error on /admin/ops), then fair play's deep re-check. The ledger's one-off backfill:
-  an admin's `POST /api/admin/ledger/backfill` from the site (re-runnable: it adds nothing the second time).
+  an admin's `POST /api/admin/ledger/backfill` from the site (re-runnable: it adds nothing the second time; not run yet, shelved Nov 7).
 - The privacy policy (`/privacy`, `screens/Legal.tsx`) says the same in plain words.
 
 ## Health
@@ -482,6 +482,8 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
     8 am Central, 14:00 UTC, so today's row alone missed most of the US day), and `npm run ops:report` lists today's under "Needs
     attention";
   - fair play's deep re-checks used of today's budget (`fairplay_budget`);
+  - **the schedule's failed jobs** (Nov 28, `cron`; [2026-11-28-ledger-check-unseen.md](../decisions/2026-11-28-ledger-check-unseen.md)): each job
+    that failed in the last 24 hours (kind `cron`, the job its route), how often, on how many of the last 7 UTC days and the earliest, apart from the top 10;
   - a timed D1 read (a database that doesn't answer leaves zeros and its error; the rest still shows).
 - **Who may read it:** an admin (`isAdmin`, the session), or a script whose request came through Cloudflare Access for
   its application with a service token: Access's own token (`Cf-Access-Jwt-Assertion`, exactly three parts) is checked
@@ -495,7 +497,8 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
 - **`npm run ops:report`** (`scripts/ops-report.mjs`): reads the view from hunchess.com with the Access service token
   in `CF_ACCESS_CLIENT_ID2` / `CF_ACCESS_CLIENT_SECRET2` (sent as headers, never printed) and prints a short summary,
   "Needs attention" first: D1 failing, no live hub, errors up (20 or more this hour, or 3 times the hour before),
-  Durable Object errors this hour, the engine server's last search failed, a budget 80% used, bug reports to read. The
+  Durable Object errors this hour, the engine server's last search failed, a budget 80% used, bug reports to read, a
+  scheduled job that failed in the last 24 hours (once is enough: nothing runs it again before its next turn). The
   token goes only to `https://hunchess.com`: any other URL is refused, whoever suggests it (a local Worker has no
   Access in front of it, so its view isn't readable this way anyway). Text players wrote (error messages, a device's
   name for its error, report notes: anyone can send them through `POST /api/problems`) is printed apart, numbered, one
