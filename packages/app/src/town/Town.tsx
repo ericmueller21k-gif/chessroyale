@@ -1567,6 +1567,8 @@ export const GATE_YOUNG = "Accounts are for players 13 and older.";
  * sidekicks' sheets downloaded (`TOWN_FEEL.loadPaintShare` of the bar); "building": the pictures put on the GPU for good. (The music
  * is no step since Nov 14: it comes after the first frame.)
  */
+/** (Nov 28) The boxes' solid tops kept between visits, by the kept pictures' key (`loadTown`). */
+const TOPS_KEY = "brc.townTops";
 const LOAD_STEPS = { pictures: "Loading the town's pictures…", building: "Building the town…" } as const;
 type LoadStep = keyof typeof LOAD_STEPS;
 
@@ -2972,7 +2974,7 @@ function startTown(
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 }, tagsQueued: r.tagsQueued };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, topsMs, warmMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 }, tagsQueued: r.tagsQueued };
   };
   /** (Tests) A hash of every picture the loading screen kept, their pixels in order: a later visit's must be the first's. */
   const hookPictureSum = (each = false) => {
@@ -3045,7 +3047,14 @@ function startTown(
         await tick();
       }
       // (The pawns' crate items, Nov 26: waited for, up to loadSheetWaitMs from here, and kept with the rest.)
-      await Promise.race([Promise.allSettled(dressing), new Promise((go) => setTimeout(go, f.loadSheetWaitMs))]);
+      const sheetsBy = performance.now() + f.loadSheetWaitMs;
+      const until = () => new Promise((go) => setTimeout(go, Math.max(0, sheetsBy - performance.now())));
+      await Promise.race([Promise.allSettled(dressing), until()]);
+      // (The rides' frames and trail marks too, Nov 28: Eric's first 6 s uploaded 35 frames of his ride and 19 of its marks as each first
+      // showed. Waited for within the same time and kept.)
+      const riders = new Set([r.youSoon, ...r.ridersSoon.values()].filter((rd): rd is Rider => !!rd));
+      await Promise.race([Promise.all([...riders].map((rd) => new Promise<void>((go) => (rd.coming ? rd.then(() => go()) : go())))), until()]);
+      for (const rd of riders) for (const c of rd.pictures()) keep(c);
       for (const a of new Set([r.youArt, ...r.botArt.values()]))
         if (a) {
           keep(upName(a.img, "dressed pawn"));
@@ -3060,14 +3069,55 @@ function startTown(
         console.warn("town: kept pictures didn't match; painting next time");
         void shelf?.clear().catch(() => undefined);
       }
-      // A first visit's pictures kept for the next, after the first frame (`keepPictures`).
+      // A first visit's pictures kept for the next (`keepPictures`), under the card after the box tops (below).
       if (!from && r.warmClean && alive) keepLater = () => keepPictures(shelf, key);
       loadPaintMs = performance.now() - t0;
+      // (Each box's solid top, Nov 28: here, not in idle slices once the town shows, where one took 44 ms on Eric's computer.)
+      onLoading(f.loadPaintShare, "building");
+      // (Kept under the pictures' key, so a later visit on this build and layout has them at once: 1.6 s of a slowed phone's load.)
+      const tt = performance.now();
+      let had: { key?: string; tops?: number[] } | null = null;
+      try {
+        had = shelf ? JSON.parse(localStorage.getItem(TOPS_KEY) ?? "null") : null;
+      } catch {
+        // (None kept, or no storage: worked out.)
+      }
+      if (!(had?.key === key && had.tops && r.takeTops(had.tops))) {
+        while (alive && !r.warmTops(f.loadSliceMs)) await tick();
+        try {
+          if (shelf && alive) localStorage.setItem(TOPS_KEY, JSON.stringify({ key, tops: r.topsList() }));
+        } catch {
+          // (No storage: worked out again next time.)
+        }
+      }
+      topsMs = performance.now() - tt;
       for (let share = 0; share < 1 && alive; ) {
         share = painter.kept?.(f.loadSliceMs) ?? 1;
         onLoading(f.loadPaintShare + (1 - f.loadPaintShare) * share, "building");
         if (share < 1) await tick();
       }
+      // A first visit's pictures kept for the next, here under the card (Nov 28: kept after the first frame, it was a 38-62 ms hitch
+      // about 2 s in; Eric: "load the town first so it doesn't lag").
+      if (keepLater) {
+        onLoading(1, "building");
+        await keepLater();
+        keepLater = null;
+      }
+      // The warm-up (Nov 28): the town's first frames drawn under the loading card, each waited for on the GPU, until loadWarmFrames in a
+      // row are settled: under loadWarmSmoothMs, or within loadWarmSettled of the quickest so far (a device slow at its steady speed: its
+      // one-time costs paid, nothing left to warm). Then the card lifts. No time cap (Eric, Nov 28: "That doesn't mean so it lags for a few
+      // seconds… It means load the town so it doesn't lag"); loadWarmMaxFrames only stops a device whose frames never settle.
+      const tw = performance.now();
+      for (let i = 0, smooth = 0, best = Infinity; smooth < f.loadWarmFrames && i < f.loadWarmMaxFrames && alive && !painter.lost; i++) {
+        const t1 = performance.now();
+        r.draw(t1, camX, camY, zoomCur, 0, heading);
+        painter.settle?.();
+        const ms = performance.now() - t1;
+        best = Math.min(best, ms);
+        smooth = ms < f.loadWarmSmoothMs || ms <= best * f.loadWarmSettled ? smooth + 1 : 0;
+        await tick();
+      }
+      warmMs = performance.now() - tw;
     } catch (e) {
       console.warn("town load:", e);
     }
@@ -3095,10 +3145,12 @@ function startTown(
       townMusic(true, testParams().has("townsolo"));
       void preloadMusic();
     }, MUSIC.townPreloadAfterMs);
-    if (keepLater) setTimeout(keepLater, TOWN_PICTURES.afterMs);
   };
   let loadMs = 0;
   let loadPaintMs = 0;
+  /** (`loadTown`, tests) How long the box tops and the warm-up took on the loading screen (ms). */
+  let topsMs = 0;
+  let warmMs = 0;
   /** (`loadTown`) The last visit's pictures, if they were kept: their pages let go as the town closes. */
   let kept: Restored | null = null;
   /** (Tests, `hookPaint`) The kept pictures: loaded from the last visit; how long reading them took (ms); what this visit kept (bytes;
@@ -3106,11 +3158,11 @@ function startTown(
   const pictures: { kept: boolean; restoreMs: number; saved: number | null | undefined; saveMs: number; workers: number; byWorkers: number; whileWaiting: number } = { kept: false, restoreMs: 0, saved: undefined, saveMs: 0, workers: 0, byWorkers: 0, whileWaiting: 0 };
   /** (`loadTown`) The first visit's paint workers while its loading screen runs. */
   let pool: PaintPool | null = null;
-  let keepLater: (() => void) | null = null;
+  let keepLater: (() => Promise<void>) | null = null;
   /** This visit's pictures kept for the next (keep-pictures.ts `save`), in the background: a page at a time, encoded in a worker. */
   const keepPictures = async (shelf: Shelf | null, key: string) => {
     const t = performance.now();
-    const io = domSaveIO(art2d, () => alive);
+    const io = domSaveIO(art2d, () => alive, TOWN_FEEL.loadSliceMs);
     pictures.saved = alive && r.pics ? await save(shelf, key, r.pics, io) : null;
     io?.done();
     pictures.saveMs = performance.now() - t;

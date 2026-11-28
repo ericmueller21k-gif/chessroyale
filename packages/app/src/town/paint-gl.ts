@@ -644,6 +644,14 @@ class GLPainter implements Painter {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
+  /** (paint.ts `settle`) The GPU's queue done: one pixel of the canvas read back. */
+  settle(): void {
+    if (this.lost) return;
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+    this.gl.readPixels(0, 0, 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.onePx);
+  }
+  private readonly onePx = new Uint8Array(4);
+
   changed(src: CanvasImageSource): void {
     const e = this.reg.get(src);
     if (e) e.dirty = true;
@@ -1906,7 +1914,7 @@ class GLCtx {
       const blur = this.shadowBlur;
       const pad = Math.ceil(blur * 1.6 + Math.max(Math.abs(this.shadowOffsetX), Math.abs(this.shadowOffsetY)) * this.unit()) + 2;
       const old = this.baked.length >= BAKE_MAX ? this.baked.reduce((a, e) => (a.used <= e.used ? a : e)) : null;
-      const cv = old?.cv ?? document.createElement("canvas");
+      const cv = old?.cv ?? upName(document.createElement("canvas"), "shadowed fill");
       cv.width = Math.ceil(x1 - bx) + 2 * pad + 1;
       cv.height = Math.ceil(y1 - by) + 2 * pad + 1;
       const g = art2d(cv);

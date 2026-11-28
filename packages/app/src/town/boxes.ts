@@ -585,6 +585,10 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
 const solidTops = new WeakMap<TownBox, number>();
 /** (Nov 27) Each front's first frame's drawn pixels (1 a pixel, row by row), shared by every box with that front. */
 const frontPixels = new WeakMap<object, Uint8Array>();
+/** (Nov 28) A box's solid top as a visit on this build and layout worked it out (Town.tsx keeps them for the next visit). */
+export function setSolidTop(box: TownBox, t: number): void {
+  solidTops.set(box, t);
+}
 export function solidTop(box: TownBox): number {
   let t = solidTops.get(box);
   if (t === undefined) {
