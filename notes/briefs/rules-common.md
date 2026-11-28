@@ -61,3 +61,7 @@ realize, organize, meter, canceled, traveled. Don't rename existing code identif
 **Hand-off files must be committed and pushed (Nov 28):** `.pr-body.md` and `.done` (and `.done2`, `.mockup`) are how the director knows
 you've finished: `git add -f` them, commit and push. A `.done` left in your working tree is never seen (Nov 28: a finished flake fix sat
 unseen for 90 minutes while main stayed red). Check with `git ls-remote` / `git show origin/<branch>:.done` before you stop.
+
+**Load first, then show (Eric, Nov 27-28, many times):** a screen that draws a world (the town, a battle, an entrance) stays behind its
+loading screen until everything it draws at the start is loaded, uploaded to the GPU and warmed, and frames under the curtain run smooth.
+No time cap that lifts it early, no "a little lag for a few seconds": a longer load is fine, lag after it shows is not.
