@@ -9,6 +9,10 @@ pixels; the computer's are 3 times over (nearest), so a pixel can be seen.
 - `text-tags-computer.png`, `text-names-computer.png`
 - `text-smallest-tags-computer-7x.png`: the hardest case, the smallest tags (8 px) on the 1x computer, 7 times over: before, one size, two sizes.
 
-My reading: on the phone the three can't be told apart. On the 1x computer the smallest tags (8 px) are a touch softer with one size
-(the strokes a little dimmer), and two sizes doesn't improve them (9 scaled to 8 is as soft as 12 scaled to 8); the names read the same.
-So the branch ships one size. Two sizes is one line each in `packages/app/src/town/feel.ts`: `tagPicSizes: [9, 12]`, `namePicSizes: [14, 20]`.
+My reading: on the phone the three can't be told apart. On the 1x computer the smallest tags (8 px) are softer with one size (the
+strokes dimmer: e2e/town-tags.spec.ts's own check, a sidekick's pill's fully white pixels, read 3% before and 0.6% scaled), and two sizes
+doesn't improve them (9 scaled to 8 is as soft as 12 scaled to 8); the names read the same.
+
+So the branch ships one size from a device pixel ratio of 1.5 up (every phone, a 2x laptop) and, on a 1x screen, a picture for every
+size as before (the left column). One line: `packages/app/src/town/feel.ts` `picOneSizeFrom` (0: one size everywhere);
+`tagPicSizes: [9, 12]`, `namePicSizes: [14, 20]` for two sizes.
