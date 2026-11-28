@@ -95,7 +95,7 @@ export async function bakedManifest(o: FileAsk = {}): Promise<TownManifest | nul
  */
 function workerAnswers(signal: AbortSignal): Promise<void> {
   const sw = typeof navigator === "undefined" ? undefined : (navigator as Partial<Navigator>).serviceWorker;
-  if (!sw || sw.controller) return Promise.resolve();
+  if (!sw || sw.controller || signal.aborted) return Promise.resolve();
   return new Promise((go) => {
     const done = () => {
       sw.removeEventListener("controllerchange", done);

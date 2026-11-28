@@ -3127,7 +3127,8 @@ function startTown(
       // A first visit paints on the device's other cores too (paint-pool.ts; Nov 23): workers paint the pictures ahead, the main thread
       // puts them on their canvases and paints what's left. (`?paintworkers=N` sets how many, 0 none; `?paintslow=K`, tests: slower cores.)
       const n = TOWN_PAINT_ASKED.workers ?? workerCount(navigator.hardwareConcurrency);
-      pool = from || made ? null : domPaintPool(r.paintSpecs(), n, testSwitchesAllowed() ? TOWN_PAINT_ASKED.slow : 1);
+      // (Not once the town has closed: workers started then would paint for nobody; the delta re-review of phase 1b, should-fix 1.)
+      pool = !alive || from || made ? null : domPaintPool(r.paintSpecs(), n, testSwitchesAllowed() ? TOWN_PAINT_ASKED.slow : 1);
       pictures.workers = pool?.workers ?? 0;
       // (The baked pictures: the bar's share left after their bytes, while each is put in its place.)
       const had = made ? f.loadFetchShare : 0;
