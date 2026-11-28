@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
 import { legalMoves } from "@chessroyale/chess";
-import { BATTLE_TOWER } from "@chessroyale/core";
-import { test, asAdmin, asSignedIn, submitMove, tapInTown, localSql } from "./helpers.ts";
+import { BATTLE_TOWER, floorBossCount } from "@chessroyale/core";
+import { test, asAdmin, asServerAdmin, asSignedIn, submitMove, tapInTown, localSql } from "./helpers.ts";
 import { frameStats, instrument } from "./perf-probe.js";
 import { memProbe } from "./mem-probe.js";
 
@@ -390,6 +390,27 @@ test("the elevator tapped from across the lobby (Eric, Nov 20): its card at once
   const walked: string[] = await page.evaluate(() => (window as any).__walked);
   expect(walked.length, `walked ${walked.join(" ")}`).toBeGreaterThan(3);
   expect(walked[walked.length - 1], `walked ${walked.join(" ")}`).toMatch(/^[45],1$/);
+});
+
+test("an admin's Battle Tower floor in Settings (Eric, Nov 28: \"I want to go back to level 9\"): Set 9, the clerk offers floor 9 with both lives, Continue plays floor 9", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  // (A real admin on the server, its list: playwright.config.ts' ADMINS. The route is refused for anyone else: server tower.test.ts.)
+  await asServerAdmin(page);
+  await page.goto("/settings");
+  const box = page.getByRole("spinbutton", { name: "Battle Tower floor" });
+  await expect(box).toBeVisible({ timeout: 30_000 });
+  await box.fill("9");
+  await page.getByRole("button", { name: "Set", exact: true }).click();
+  await expect(page.locator(".tower-jump-line")).toHaveText("Floor 9 is next: talk to the clerk.", { timeout: 20_000 });
+  if (STILLS) await page.locator(".tower-jump").scrollIntoViewIfNeeded();
+  await still(page, "admin-floor-set");
+  await intoTower(page);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await expect(clerk.getByRole("button", { name: "Continue: floor 9" })).toBeEnabled({ timeout: 20_000 });
+  await heartsAre(clerk.locator(".tw-desk-lives .tw-hearts"), 2);
+  await still(page, "admin-floor-clerk");
+  await clerk.getByRole("button", { name: "Continue: floor 9" }).click();
+  await floorThenMatch(page, 9, floorBossCount(9));
 });
 
 test("no Last Stand on a floor; a free leave before your 2nd move goes down to the lobby, and the clerk says Continue after a reload", { tag: "@phone-only" }, async ({ page }) => {

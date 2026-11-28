@@ -211,7 +211,7 @@ function SoundReport() {
  * tower.ts setTowerFloor, admins only there too). Its line keeps its space, so nothing moves when it says what happened.
  */
 function TowerFloorJump() {
-  const [floor, setFloor] = useState("9");
+  const [floor, setFloor] = useState("");
   const [busy, setBusy] = useState(false);
   const [line, setLine] = useState("");
   const n = Number(floor);
@@ -225,14 +225,15 @@ function TowerFloorJump() {
   };
   return (
     <div class="tower-jump">
-      <div class="fd-field">
-        <span>Battle Tower floor (1 to {BATTLE_TOWER.floors}): your solo climb goes on from it, lives full</span>
-        <span class="tower-jump-row">
-          <input type="number" inputMode="numeric" min={1} max={BATTLE_TOWER.floors} step={1} value={floor} aria-label="Battle Tower floor" onInput={(e) => setFloor(e.currentTarget.value)} />
-          <button type="button" class="fd-btn small primary" disabled={!ok || busy} onClick={() => void set()}>
-            Set
-          </button>
-        </span>
+      <span class="fd-toggle-text">
+        <strong>Battle Tower floor</strong>
+        <span>1 to {BATTLE_TOWER.floors}. Your solo climb goes on from this floor, lives full.</span>
+      </span>
+      <div class="fd-field tower-jump-row">
+        <input type="number" inputMode="numeric" min={1} max={BATTLE_TOWER.floors} step={1} value={floor} aria-label="Battle Tower floor" placeholder="Floor" onInput={(e) => setFloor(e.currentTarget.value)} />
+        <button type="button" class="fd-btn small primary" disabled={!ok || busy} onClick={() => void set()}>
+          Set
+        </button>
       </div>
       <p class="fd-note tower-jump-line" role="status">
         {line}

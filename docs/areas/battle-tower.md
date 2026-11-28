@@ -328,6 +328,14 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   floor: the room's `winFormTrigger`, an admin's seat only; the floor is then a test game (no XP), its ends written as for real.
   [2026-11-20-admin-win-match.md](../decisions/2026-11-20-admin-win-match.md).
 
+## Admins: jump to a floor (Nov 28)
+
+- Settings, Testing (admins only): "Battle Tower floor", a number (1 to 99) and **Set** → `POST /api/tower/admin/floor {floor}` (server
+  `setTowerFloor`; 404 unless the server's ADMIN_EMAILS). The admin's open solo run (made if none) fights that floor next: its own seed's deal
+  won up to there (`runToFloor`), lives full; a floor under way: 409, nothing set. No best, unlock, crate, XP or party copy written.
+  Checks: server `tower.test.ts` ("an admin's jump"), `e2e/battle-tower.spec.ts` ("an admin's Battle Tower floor in Settings").
+  [2026-11-28-tower-admin-floor.md](../decisions/2026-11-28-tower-admin-floor.md).
+
 ## The audit
 
 An independent auditor (Fable, high) checks the build three times (after PRs 6, 10 and 12): its brief is
