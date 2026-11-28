@@ -1,1 +1,0 @@
-done: test-only fix (the town's bots held via __townStill as each test town opens). Cause: two bots playing at table 3 gave its bots'-game card (no Casual/Ranked); the card never closed. Before 1/6 failed, after 12/12 desktop + 2/2 phone passed.
