@@ -52,4 +52,4 @@
 - Nov 28 · God King chromas: one per rank (Gold+), plus other chromas later. IDEA, LATER.
 - Nov 28 · Town load stutter ("I don't want it to lag at all when the town loads") · IN PROGRESS (town-load-smooth.md)
 - Nov 28 · Menu sounds (item tap, magnifier) half as loud · PR #1034
-- Nov 28 · Town structure overhaul for loading + drawing (Eric: "permanent change… might make the town bigger… ask Fable") · QUEUED: Fable design (brief town-architecture-fable.md) after town-load-smooth finishes; then build in phases
+- Nov 28 · Town structure overhaul for loading + drawing (Eric: "permanent change… might make the town bigger… ask Fable") · DESIGN DONE Nov 28 05:30 (sent); phase 0 queued; WAITING ON ERIC: go for phases 1-2 (no visible change), 3 (stills first), 4 later
