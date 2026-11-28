@@ -6,6 +6,7 @@ import { inflateSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { BOSS_ADMIN_FIRST } from "@chessroyale/core";
 import { TOWNS, bakeTown, type BakeResult, type TownKind, type TownManifest, type TownOrder } from "../../../scripts/bake-town.ts";
+import { BAKED_NAME, filesOf, manifestFrom } from "../src/town/manifest.ts";
 import { ATLAS } from "../src/town/paint.ts";
 
 /**
@@ -56,7 +57,7 @@ const page = (i: number) => {
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "town-bake-test-"));
   baked = await bakeTown(dir);
-  manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as TownManifest;
+  manifest = JSON.parse(readFileSync(join(dir, baked.manifestName), "utf8")) as TownManifest;
   order = JSON.parse(readFileSync(join(dir, "order.json"), "utf8")) as TownOrder;
 }, 180_000);
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -171,5 +172,19 @@ describe("the build bakes Chess Town's pictures (Nov 28, phase 1a)", () => {
     expect(baked.totals.bytes).toBe(manifest.files.reduce((s, f) => s + f.bytes, 0));
     expect(baked.totals.files).toBe(manifest.files.length);
     expect(baked.totals.names).toBe(Object.keys(manifest.pictures).length);
+  });
+
+  it("the manifest is named by its contents (phase 1b: the build hands the app that name), reads as the app reads one, and every file is named as the service worker keeps one", () => {
+    const text = readFileSync(join(dir, baked.manifestName), "utf8");
+    expect(baked.manifestName).toBe(`manifest.${createHash("sha256").update(text).digest("hex").slice(0, 12)}.json`);
+    expect(order.manifest, "order.json names it (a check's and a tool's way in)").toBe(baked.manifestName);
+    expect(manifestFrom(JSON.parse(text)), "the app's own check of a manifest (town/manifest.ts)").toEqual(manifest);
+    for (const name of [baked.manifestName, ...manifest.files.map((f) => f.name)]) expect(BAKED_NAME.test(name), name).toBe(true);
+    // A player's town's pages: what its loading screen fetches (not the sidekicks' sheets, nor an admin's own files).
+    const fetched = filesOf(manifest, "player").map((i) => manifest.files[i]!);
+    expect(fetched.length).toBeGreaterThan(20);
+    expect(fetched.filter((f) => f.group.startsWith("sidekick:") || !f.towns.includes("player"))).toEqual([]);
+    // (The bake's inputs, for the dev server: the list's module and a house's among them.)
+    expect(baked.inputs.some((p) => p.endsWith("/src/town/pictures.ts")) && baked.inputs.some((p) => p.includes("/src/town/houses/"))).toBe(true);
   });
 });

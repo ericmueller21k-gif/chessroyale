@@ -56,12 +56,13 @@ const tab = (entry: string | null) => ({
  * The worker of version `current`, with `caches` as the device has them and `tabs` open; the network has nothing (`net`, else 404; an
  * Error: no answer at all, the fetch fails as it does offline).
  */
-function worker(current: string, store: FakeCaches, tabs: ReturnType<typeof tab>[], net: (path: string) => Response | Error | null = () => null) {
+function worker(current: string, store: FakeCaches, tabs: ReturnType<typeof tab>[], net: (path: string) => Response | Error | null = () => null, townFiles: string[] = []) {
   const code = readFileSync(new URL("../sw-template.js", import.meta.url), "utf8")
     .replace("__VERSION__", current)
     .replace("__FILES__", "[]")
     .replace("__HASHES__", "{}")
     .replace("__MUSIC_HASHES__", JSON.stringify({ "/music/kept.mp3": "aaaaaaaaaaaa" }))
+    .replace("__TOWN_FILES__", JSON.stringify(townFiles))
     .replace("__MAIA__", "brc-maia-new")
     .replace("__KEEP_VERSIONS__", "3")
     // (A tab that doesn't answer is given up on in 20 ms here, not 1.5 s.)
@@ -91,6 +92,7 @@ function worker(current: string, store: FakeCaches, tabs: ReturnType<typeof tab>
   };
   return {
     fetched,
+    install: () => fire("install", {}),
     activate: () => fire("activate", {}),
     loaded: () => fire("message", { data: { type: "brc-loaded" } }),
     get: (path: string) => fire("fetch", { request: { method: "GET", mode: "no-cors", url: ORIGIN + path } }),
@@ -180,6 +182,50 @@ describe("a deploy while a tab is open: the new worker takes over", () => {
     expect((await sw.get("/assets/Gone-x.js"))!.headers.get("content-type")).toContain("text/html");
     await new Promise((ok) => setTimeout(ok, 0));
     expect(await store.match("/assets/Gone-x.js")).toBeUndefined();
+  });
+});
+
+describe("the baked town's files (Nov 28: Chess Town's pictures, each named by its contents)", () => {
+  const HOME = "/town-pictures/home-alfil.0123456789ab.png";
+  const ROW = "/town-pictures/row-south-st-s.player.ba9876543210.png";
+  const LIST = "/town-pictures/manifest.00112233aabb.json";
+  it("a new version, as it installs, copies over the ones an older version keeps and fetches none: a deploy that leaves the town alone downloads nothing of it", async () => {
+    const [a, b] = [V("a"), V("b")];
+    const store = await device([a]);
+    await (await store.open(a)).put(HOME, new Response("home"));
+    await (await store.open(a)).put(LIST, new Response("list"));
+    // (This version's town: the same home and list, and a row the device never fetched.)
+    const sw = worker(b, store, [], () => null, [HOME, LIST, ROW]);
+    await sw.install();
+    expect([...store.named.get(b)!.files.keys()].sort()).toEqual([HOME, LIST].sort());
+    expect(sw.fetched).toEqual([]);
+    // The old version gone (no tab runs it): the town's files stay, in this version's cache.
+    await sw.activate();
+    expect(await store.keys()).not.toContain(a);
+    expect(await (await sw.get(HOME))!.text()).toBe("home");
+    expect(sw.fetched).toEqual([]);
+  });
+  it("one is answered from any version's cache; one not kept yet is fetched once, then kept; a page sent for one the server no longer has is never kept", async () => {
+    const [a, b] = [V("a"), V("b")];
+    const store = await device([a, b]);
+    await (await store.open(a)).put(HOME, new Response("home"));
+    const sw = worker(b, store, [tab(entry(a)), tab(entry(b))], (p) => (p === ROW ? new Response("row", { headers: { "content-type": "image/png" } }) : p === LIST ? new Response("<!doctype html>", { headers: { "content-type": "text/html" } }) : null), [HOME, ROW]);
+    await sw.activate();
+    expect(await (await sw.get(HOME))!.text()).toBe("home");
+    expect(sw.fetched).toEqual([]);
+    expect(await (await sw.get(ROW))!.text()).toBe("row");
+    expect(await (await sw.get(ROW))!.text()).toBe("row");
+    expect(sw.fetched).toEqual([ROW]);
+    expect(store.named.get(b)!.files.has(ROW)).toBe(true);
+    await sw.get(LIST);
+    expect(store.named.get(b)!.files.has(LIST)).toBe(false);
+  });
+  it("a file there with one name in every version (order.json) is this version's, never an older copy", async () => {
+    const [a, b] = [V("a"), V("b")];
+    const store = await device([a, b]);
+    await (await store.open(a)).put("/town-pictures/order.json", new Response("old order"));
+    const sw = worker(b, store, [tab(entry(a))], (p) => (p === "/town-pictures/order.json" ? new Response("new order") : null));
+    expect(await (await sw.get("/town-pictures/order.json"))!.text()).toBe("new order");
   });
 });
 
