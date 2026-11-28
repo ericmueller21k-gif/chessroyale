@@ -229,3 +229,8 @@ waited out, or its result fetched later), and any red one is fixed forward befor
 - **Nov 27 ~01:55 UTC, Eric: "For the next exact 60 minutes, run as much as we can... make a hard shut off in 60 minutes."** Shut-off scheduled for 02:56 UTC (trig_01QX7qKPqzmUAoNGcguESm37): interrupt and archive every helper, start none. The cap is lifted for that hour only.
 - Eric ~02:00 UTC Nov 27: after the 02:55 shut-off, keep ONE Opus running ("whatever one you think wants to keep running"); the director keeps the Stranger (rules first, else art). Then one Opus at a time.
 - Nov 27: when Eric says a mockup looks good, that IS the OK: queue the build at once and mark ASKS.md (Turf sat 5 days on an OK I didn't record). When Eric asks what to build with spare usage, read ASKS.md's waiting items first.
+
+**Load first, then show: never lag on arrival (Eric, Nov 27 and Nov 28, said many times).** A screen that draws a world (the town, a
+battle, a boss's entrance) stays behind its loading screen until everything it draws at the start is loaded, uploaded and warmed, and a run
+of frames under the curtain is smooth. Never a time cap that lifts it while still loading; never "a little lag for a few seconds". A longer
+load is fine; lag after it shows is not. Every brief touching loading says this.

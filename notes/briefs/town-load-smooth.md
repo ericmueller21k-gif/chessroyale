@@ -18,8 +18,10 @@ Read `notes/briefs/rules-common.md`, `.claude/LESSONS.md`, `docs/areas/` (the to
    step. Name the sources in the report (no more "other") so the next report says what it is.
 2. **The idle callback:** find it; split it into slices under ~4 ms, or do it behind the curtain, or not at all if nothing needs it.
 3. **Warm up behind the loading curtain:** before the town shows, every atlas and texture it will draw at the start is uploaded, every
-   shader program used once (draw a frame offscreen or under the curtain), fonts ready, and the curtain lifts only when that's done (cap it
-   at about 2 extra seconds, then lift anyway). Reuse the existing loading screen; nothing new to draw.
+   shader program used once (draw a frame offscreen or under the curtain), fonts ready, idle work done, then a run of smooth frames drawn
+   under the curtain; only then does it lift. **No time cap** (Eric, Nov 28, after the first brief said "cap it at 2 s": "Load the town
+   first so it doesn't lag. That doesn't mean so it lags for a few seconds… It means load the town so it doesn't lag."). Reuse the existing
+   loading screen; nothing new to draw.
 4. Prove it: the frame report (or a @perf spec) from a cold load, on a slowed phone (CPU ×4) and the computer project: no frame over 33 ms
    after the curtain lifts, and say the 5th percentile before and after. Add one focused check to the existing busy-town @perf spec, not a
    new spec. Watch the first seconds frame by frame (`LESSONS.md`).
