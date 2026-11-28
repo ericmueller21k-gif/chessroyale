@@ -2,7 +2,7 @@
  * The health view (docs/areas/ops.md, "Health"): one snapshot of the game for an admin or a script
  * (`GET /api/admin/health`, and the top of `/admin/ops`). What's deployed, who's playing (Squads included), errors
  * this hour, last hour and today by fingerprint, the Durable Objects' errors, the town's WebGL fallbacks by reason, players'
- * reports, the engine server's and fair play's budgets, and a quick D1 check. Reads only: a handful of D1 reads and one
+ * reports, the engine server's and fair play's budgets, the schedule's failed jobs, and a quick D1 check. Reads only: a handful of D1 reads and one
  * call to the live hub.
  */
 import { FAIRPLAY, TOWN_GL_FALLBACK, type TownGlFallback } from "@chessroyale/core";
@@ -53,6 +53,13 @@ export interface Health {
   engine: Awaited<ReturnType<typeof engineHealth>>;
   /** Fair play's deep re-checks: searches used of today's budget. */
   fairplay: { searches: number; cap: number };
+  /**
+   * The schedule's jobs that failed in the last 24 hours (index.ts `failed(job)`: kind "cron", the job as its route), by job and
+   * message, apart from `errors.top`, which a busy day would push a once-a-day failure off: `day` times in 24 hours, on `days` of the
+   * last 7, the first of them `firstSeen`. (The daily ledger check failed every day from Nov 7 to Nov 28 unseen:
+   * docs/decisions/2026-11-28-ledger-check-unseen.md.)
+   */
+  cron: { job: string; message: string; day: number; days: number; firstSeen: number; lastSeen: number }[];
   /** One timed D1 read. */
   d1: { ok: boolean; ms: number; error?: string };
 }
@@ -82,7 +89,7 @@ export async function health(env: ProblemsEnv & EngineEnv & Pick<Env, "LIVE">, s
   // (A database that doesn't answer leaves zeros: the view still says what's deployed, who's playing and D1's error.)
   const safe = <T>(p: Promise<T>, none: T) => p.catch(() => none);
   const hours = `SUM(CASE WHEN hour = ? THEN count ELSE 0 END) AS thisHour, SUM(CASE WHEN hour = ? THEN count ELSE 0 END) AS lastHour, SUM(count) AS day`;
-  const [deploy, live, totals, top, entries, fallbacks, reportKinds, latest, engine, fair] = await Promise.all([
+  const [deploy, live, totals, top, entries, fallbacks, reportKinds, latest, engine, fair, cron] = await Promise.all([
     deployed(env),
     env.LIVE ? liveHub(env).health().catch(() => null) : Promise.resolve(null),
     safe(
@@ -122,6 +129,14 @@ export async function health(env: ProblemsEnv & EngineEnv & Pick<Env, "LIVE">, s
     safe(sql.all<{ id: string; kind: string; at: number; note: string }>("SELECT id, kind, at, substr(note, 1, 200) AS note FROM ops_reports WHERE at > ? ORDER BY at DESC LIMIT 5", now - 24 * HOUR), []),
     engineHealth(env, now),
     safe(sql.first<{ searches: number }>("SELECT searches FROM fairplay_budget WHERE day = ?", new Date(now).toISOString().slice(0, 10)), null),
+    // (The schedule's failures: the server's own rows, kind "cron", their job in the sample's route.)
+    safe(sql.all<Health["cron"][number]>(
+      `SELECT MAX(CASE WHEN json_valid(sample) THEN json_extract(sample, '$.route') END) AS job, message, SUM(CASE WHEN hour >= ? THEN count ELSE 0 END) AS day,
+         COUNT(DISTINCT hour / ${24 * HOUR}) AS days, MIN(first_seen) AS firstSeen, MAX(last_seen) AS lastSeen
+       FROM ops_errors WHERE hour >= ? AND source = 'server' AND kind = 'cron' GROUP BY fingerprint HAVING day > 0 ORDER BY lastSeen DESC LIMIT 10`,
+      since,
+      week,
+    ), []),
   ]);
   const durableObjects: Health["durableObjects"] = { thisHour: 0, lastHour: 0, day: 0, byClass: {}, byEntry: {} };
   for (const e of entries) {
@@ -152,6 +167,7 @@ export async function health(env: ProblemsEnv & EngineEnv & Pick<Env, "LIVE">, s
     reports: { day: Object.fromEntries(reportKinds.map((r) => [r.kind, r.n])), latest },
     engine,
     fairplay: { searches: fair?.searches ?? 0, cap: FAIRPLAY.deep.dailySearches },
+    cron: cron.map((c) => ({ ...c, job: c.job ?? "" })),
     d1,
   };
 }

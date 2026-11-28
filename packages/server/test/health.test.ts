@@ -344,6 +344,27 @@ describe("the health view", () => {
     expect(h.errors.top.map((e) => e.kind)).not.toContain(TOWN_GL_FALLBACK.kind);
   });
 
+  it("the schedule's failed jobs: by job, apart from the top 10, how often in 24 hours, on how many of the last 7 days, since when", async () => {
+    // (The daily ledger check failed every day from Nov 7 to Nov 28, once a day, and never reached "Needs attention".)
+    const { sql, d1 } = await seeded();
+    const t = new ErrorTally();
+    const add = async (at: number, fp: string, kind: string, source: "client" | "server", message: string, route = "") => {
+      t.add({ fingerprint: fp, source, kind, message, version: "abc1234def56", sample: JSON.stringify({ stack: "", route, code: null }) }, at);
+      await t.flush(sql);
+    };
+    const LEDGER = "Error: ledger check: 4 accounts' balances and ledger disagree";
+    const nine = NOW - 9.5 * HOUR; // (09:00 today)
+    for (let d = 6; d >= 0; d--) await add(nine - d * 24 * HOUR, "ledger", "cron", "server", LEDGER, "ledger");
+    // (Another job's failure, past the last 24 hours: not listed. A device can't send a server's cron.)
+    await add(NOW - 30 * HOUR, "prune", "cron", "server", "Error: D1 is busy", "prune");
+    await add(NOW - HOUR, "fake", "cron", "client", "Error: made up", "ledger");
+    // A busy hour: more kinds than the top 10 holds, each more often than the check.
+    for (let i = 0; i < 12; i++) for (let n = 0; n < 2; n++) await add(NOW - 5 * 60_000, `busy-${i}`, "error", "client", `Error busy ${i}`);
+    const h = await health({ DB: d1, ASSETS }, sql, NOW);
+    expect(h.errors.top.map((e) => e.fingerprint)).not.toContain("ledger");
+    expect(h.cron).toEqual([{ job: "ledger", message: LEDGER, day: 1, days: 7, firstSeen: nine - 6 * 24 * HOUR, lastSeen: nine }]);
+  });
+
   it("a database that doesn't answer: D1's error, zeros, and still what's deployed", async () => {
     const broken = {
       first: async () => Promise.reject(new Error("D1 is down")),
