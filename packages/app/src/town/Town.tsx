@@ -76,7 +76,7 @@ import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
 import { ADMIN_TOWN } from "./admin-town.ts";
 import { loadBaked, type Baked } from "./baked.ts";
-import { bakedFile, bakedManifest } from "./baked-files.ts";
+import { TOWN_MANIFEST, bakedFile, bakedManifest } from "./baked-files.ts";
 import { domPageIO, domSaveIO, idbShelf, pictureKey, restore, save, type Restored, type Shelf } from "./keep-pictures.ts";
 import { domPaintPool, workerCount, type PaintPool } from "./paint-pool.ts";
 import type { TownGlFallback } from "@chessroyale/core";
@@ -3080,8 +3080,9 @@ function startTown(
       // `?paintall`, which paints on the device as before.) A file missing, or anything else odd: none of it is used, and the device
       // paints (below), as before.
       const io = domPageIO(art2d);
+      const bakedBuild = !!TOWN_MANIFEST && TOWN_PICTURES.baked;
       let made: Baked | null = null;
-      if (painter.keep && painter.adopt && !TOWN_ASKED.paintAll)
+      if (bakedBuild && painter.keep && painter.adopt && !TOWN_ASKED.paintAll)
         made = await loadBaked(ADMIN_TOWN ? "admin" : "player", { manifest: bakedManifest, file: bakedFile }, io, (share) => alive && onLoading(share * f.loadFetchShare * f.loadPaintShare, "pictures"));
       if (made && !(alive && r.takeBaked(made))) {
         made.close();
@@ -3089,10 +3090,12 @@ function startTown(
       }
       baked = made;
       Object.assign(pictures, { baked: !!made, bakedMs: performance.now() - t0, files: made?.files ?? 0, bytes: made?.bytes ?? 0 });
-      // (Without them:) the pictures as the last visit painted them, if they're kept and the town's art is what it was (keep-pictures.ts,
-      // Nov 23; by the art's fingerprint since Nov 28, not the build's commit, so a deploy that leaves the art alone keeps them): then none is painted.
-      // (Not in the dev server, whose code changes under the same name; nor on a 2D painter, which never loads; nor with `?paintall`.)
-      const shelf = !made && painter.keep && !import.meta.env.DEV && !TOWN_ASKED.paintAll ? idbShelf() : null;
+      // (A build with no baked town, `TOWN_PICTURES.baked` off:) the pictures as the last visit painted them, if they're kept and the
+      // town's art is what it was (keep-pictures.ts, Nov 23; by the art's fingerprint since Nov 28, not the build's commit, so a deploy that
+      // leaves the art alone keeps them): then none is painted. (Not in the dev server, whose code changes under the same name; nor on a 2D
+      // painter, which never loads; nor with `?paintall`. Nor in a build with a baked town whose files didn't load this once: it paints
+      // this visit and keeps nothing, as the next visit loads the files.)
+      const shelf = !bakedBuild && painter.keep && !import.meta.env.DEV && !TOWN_ASKED.paintAll ? idbShelf() : null;
       const key = made ? "" : pictureKey(TOWN_ART, r.pictureSig());
       const from = made ? null : (kept = await restore(shelf, key, io));
       if (!alive) from?.close();

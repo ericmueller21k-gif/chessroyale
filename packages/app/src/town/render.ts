@@ -48,7 +48,7 @@ import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import type { Baked } from "./baked.ts";
 import { Pictures, type Restored } from "./keep-pictures.ts";
 import { framePixels, glowPixels, type GlowPixels, type PaintSpec, type Pixels } from "./paint-jobs.ts";
-import { BOSS_ART, figureArt, roofKey, makeTownArt, townWants, type ArtCache, type TownArt } from "./pictures.ts";
+import { BOSS_ART, figureArt, roofKey, makeTownArt, townWants, type ArtCache, type TownArt, type Want } from "./pictures.ts";
 import type { PaintPool } from "./paint-pool.ts";
 import type { Cut } from "./kit/bake.ts";
 import { stepChar } from "./kit/bake.ts";
@@ -905,6 +905,8 @@ export class Renderer {
    * (`plan`), and its manifest has each animation's frame times (`frameTimes`: no animation built to count its frames) and each box's top.
    */
   private baked: Baked | null = null;
+  /** (`takeBaked`) The town's list as it was checked against the baked town: `plan`'s, read once. */
+  private wants: Want[] | null = null;
   private readonly frameTimes: FrameTimes = (id) => this.baked?.manifest.anims[id];
   /** How many frames `ch`'s idle has: the manifest's count where it knows the art, else its animation's. */
   private readonly frameCount = (ch: Character): number => this.frameTimes(ch.id)?.length ?? ch.anims.idle!.frames.length;
@@ -916,8 +918,8 @@ export class Renderer {
   takeBaked(b: Baked): boolean {
     if (this.pics || this.warmJobs || this.baked) return false;
     const m = b.manifest;
-    const times: FrameTimes = (id) => m.anims[id];
-    for (const w of townWants(this.art, (ch) => times(ch.id)?.length ?? ch.anims.idle!.frames.length)) {
+    const wants = townWants(this.art, (ch) => m.anims[ch.id]?.length ?? ch.anims.idle!.frames.length);
+    for (const w of wants) {
       if (w.kind === "roof") {
         const r = m.roofs[w.name];
         if (!r || !r.every((f) => f.every((v, j) => j % 7 !== 0 || b.has(`${w.name}/${v}`)))) return false;
@@ -928,6 +930,7 @@ export class Renderer {
     }
     if (!this.boxes.every((bx) => typeof m.tops[bx.box.id] === "number")) return false;
     this.baked = b;
+    this.wants = wants;
     for (const bx of this.boxes) setSolidTop(bx.box, m.tops[bx.box.id]!);
     this.topsAt = this.boxes.length;
     return true;
@@ -1860,7 +1863,7 @@ export class Renderer {
     this.pool?.pump(budgetMs / 2);
     while (this.warmAt0 < jobs.length) {
       // (A job that can't be done yet (a sidekick's sheet still loading) waits for the next slice, up to `loadSheetWaitMs` all told.)
-      let done: boolean | "wait" | void = true;
+      let done: boolean | "wait" | "more" | void = true;
       try {
         done = jobs[this.warmAt0]!();
       } catch (e) {
@@ -1875,14 +1878,15 @@ export class Renderer {
         continue;
       }
       if (done === false && t0 - (this.warmWait ||= t0) < TOWN_FEEL.loadSheetWaitMs) break;
-      this.warmAt0++;
+      // (A job in steps, the labels: its next step now, or in the next slice.)
+      if (done !== "more") this.warmAt0++;
       if (performance.now() - t0 > budgetMs) break;
     }
     return jobs.length ? this.warmAt0 / jobs.length : 1;
   }
   /** (`warm`) The first visit's paint workers (paint-pool.ts), while the loading screen runs. */
   private pool: PaintPool | null = null;
-  private warmJobs: { jobs: (() => boolean | "wait" | void)[]; sig: string; specs: PaintSpec[] } | null = null;
+  private warmJobs: { jobs: (() => boolean | "wait" | "more" | void)[]; sig: string; specs: PaintSpec[] } | null = null;
   private warmAt0 = 0;
   private warmWait = 0;
   /** The loading screen's pictures, painted or kept from the last visit (keep-pictures.ts; set by the first `warm`). */
@@ -1905,14 +1909,14 @@ export class Renderer {
    * list the build bakes from too). Each picture is painted, or on a later visit taken from the last visit's (`pics.from`, in the same
    * order: keep-pictures.ts), and handed to `pics.add` (the painter's `keep`).
    */
-  private plan(): { jobs: (() => boolean | "wait" | void)[]; sig: string; specs: PaintSpec[] } {
+  private plan(): { jobs: (() => boolean | "wait" | "more" | void)[]; sig: string; specs: PaintSpec[] } {
     if (this.warmJobs) return this.warmJobs;
-    const jobs: (() => boolean | "wait" | void)[] = [];
+    const jobs: (() => boolean | "wait" | "more" | void)[] = [];
     const sig: string[] = [];
     const P = () => this.pics!;
     // (Each picture painted fresh, the first time a job comes to it, for the paint workers to paint ahead (paint-pool.ts): its index there.)
     const specs: PaintSpec[] = [];
-    for (const w of townWants(this.art, this.frameCount)) {
+    for (const w of this.wants ?? townWants(this.art, this.frameCount)) {
       sig.push(w.sig);
       const { name } = w;
       if (w.kind === "frame") {
@@ -3349,21 +3353,40 @@ export class Renderer {
    * the town now at every size (TAG_SIZES, as `tag` sizes them), the sky's clouds and sun, the tables' clock digits, the bubble's tail.
    * Someone arriving later has theirs made as they show (a few small pictures, once), and a line said its bubble (one).
    */
-  private makeLabels(keep: (c: HTMLCanvasElement) => void): void {
-    for (const sg of this.signs) keep(this.signArt(sg));
-    for (let i = 0; i < this.places.length; i++) for (let s = NAME_SIZES[0]; s <= NAME_SIZES[1]; s++) keep(this.nameArtOf(i, s).cv);
-    const people = this.town.people;
-    // (Room for them all, and as many again: the tags are let go only past it.)
-    this.tagArt.max = Math.max(TAG_ART_MAX, 2 * people.length * (TAG_SIZES[1] - TAG_SIZES[0] + 1));
-    for (const p of people) {
-      if (p.remote && !p.name) continue;
-      const kind: TagKind = p.you ? "you" : isSprite(p.look) ? "sidekick" : "bot";
-      for (let s = TAG_SIZES[0]; s <= TAG_SIZES[1]; s++) keep(this.tagReady(p.name, s, kind).cv);
+  private makeLabels(keep: (c: HTMLCanvasElement) => void): "more" | void {
+    // (A step a call, Nov 28: the signs, each home's names, each person's tags, the sky's: all at once they were one 250 ms task on a
+    // slowed phone's loading screen, its bar stopped. The people are read as the first step comes, as before.)
+    if (!this.labelSteps) {
+      const steps: (() => void)[] = (this.labelSteps = []);
+      steps.push(() => {
+        for (const sg of this.signs) keep(this.signArt(sg));
+      });
+      for (let i = 0; i < this.places.length; i++)
+        steps.push(() => {
+          for (let s = NAME_SIZES[0]; s <= NAME_SIZES[1]; s++) keep(this.nameArtOf(i, s).cv);
+        });
+      const people = this.town.people;
+      // (Room for them all, and as many again: the tags are let go only past it.)
+      this.tagArt.max = Math.max(TAG_ART_MAX, 2 * people.length * (TAG_SIZES[1] - TAG_SIZES[0] + 1));
+      for (const p of people) {
+        if (p.remote && !p.name) continue;
+        const kind: TagKind = p.you ? "you" : isSprite(p.look) ? "sidekick" : "bot";
+        const name = p.name;
+        steps.push(() => {
+          for (let s = TAG_SIZES[0]; s <= TAG_SIZES[1]; s++) keep(this.tagReady(name, s, kind).cv);
+        });
+      }
+      steps.push(() => this.sky.warm(keep));
+      steps.push(() => {
+        keep(this.clockStrip());
+        keep(this.tailArt());
+      });
     }
-    this.sky.warm(keep);
-    keep(this.clockStrip());
-    keep(this.tailArt());
+    this.labelSteps.shift()?.();
+    return this.labelSteps.length ? "more" : undefined;
   }
+  /** (`makeLabels`) The labels' steps still to run (null: not started). */
+  private labelSteps: (() => void)[] | null = null;
 
   /** (The loading screen) Whether the labels' fonts are in (asked for the first time it's called): their pictures wait for them. */
   private fontsIn(): boolean {

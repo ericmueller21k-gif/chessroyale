@@ -643,8 +643,25 @@ export function statueFrame(id: StatueId, s: number, layers: readonly Painted[])
   };
 }
 
-/** A statue (pedestal and figure) drawn `s` times finer than the world, all at once (the world's figure is small). */
-export const statueArt = (id: StatueId, s: number): Character => statueFrame(id, s, run(statueSteps(id, s)));
+/**
+ * A statue (pedestal and figure) drawn `s` times finer than the world, all at once (the world's figure is small). Sculpted the first
+ * time its parts or its frame are read (Nov 28): its name and size are known without it, and a town that loads the build's baked
+ * pictures (town/baked.ts) never reads them (each sculpting was about 25 ms of a slowed phone's start).
+ */
+export const statueArt = (id: StatueId, s: number): Character => {
+  let made: Character | undefined;
+  const of = () => (made ??= statueFrame(id, s, run(statueSteps(id, s))));
+  const { parts: _p, anims: _a, ...plain } = statueFrame(id, s, []);
+  return {
+    ...plain,
+    get parts() {
+      return of().parts;
+    },
+    get anims() {
+      return of().anims;
+    },
+  };
+};
 
 /** Where the quote goes on a statue's pedestal, in its picture's pixels at the world's scale (x, y from its top left). */
 export function quoteFace(id: StatueId): { x: number; y: number; w: number; h: number } {
