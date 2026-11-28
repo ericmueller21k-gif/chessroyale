@@ -70,7 +70,7 @@ import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
 import { rideMoving, rideSoundState, rideStep, warmRideSound } from "../ride-sound.ts";
-import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_ITEM_FRAMES, TOWN_PICTURES, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_ITEM_FRAMES, TOWN_PICTURES, WATCH_GUEST, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { APP_VERSION, reportTownFallback } from "../problems.ts";
@@ -198,6 +198,7 @@ export function TownScreen({
   onAway,
   onSignIn,
   tower = null,
+  fromWatch,
   pages,
 }: {
   /**
@@ -207,6 +208,11 @@ export function TownScreen({
   pages?: TownPages;
   /** Back from a Battle Tower floor's match (PR 11b): the town opens straight in the tower, in the floor room or (a free leave) the lobby. */
   tower?: TowerBack | null;
+  /**
+   * Whether this town opens back from a table's Spectate (read once, as it opens; App.tsx's `backFromWatch`): the same visit, as a tower
+   * floor's return is, so no second "has entered the town" line (the director's call on #1027's review, N9).
+   */
+  fromWatch?: () => boolean;
   onBack: () => void;
   /** Leaving the town for another screen (the back button, a guest's chat sign-up): the app's "Leave Chess Town?" first (LeaveTown.tsx). */
   askLeave: (dest: string, go: () => void) => void;
@@ -1121,8 +1127,8 @@ export function TownScreen({
       onOut: () => awayOut.current(),
       onOthers: t.others,
       onTables: t.tables,
-      // (Back from a tower floor's match: the same visit, no "entered the town" line: Eric, Nov 22.)
-      floor: !!tower,
+      // (Back from a tower floor's match: the same visit, no "entered the town" line: Eric, Nov 22. Back from a Spectate too: #1027, N9.)
+      floor: !!tower || !!fromWatch?.(),
     });
     return () => {
       gone.current = true;
@@ -1425,13 +1431,15 @@ export function TownScreen({
                 <div class="town-soon">Coming soon</div>
               </>
             )}
-            {/* A ranked game at this table (Nov 27): who's playing, and Spectate (its spectator view; back to the town where you stood). */}
+            {/* A ranked game at this table (Nov 27): who's playing, and Spectate (its spectator view; back to the town where you stood).
+                Watching needs an account (the director's call on #1027's review, S6): a guest's Spectate shows greyed, with why. */}
             {card?.kind === "table" && card.match && (
               <>
                 <p class="town-sub town-vs">{card.vs}</p>
-                <button type="button" class="town-btn primary" onClick={() => ctl.current?.watch()}>
+                <button type="button" class="town-btn primary" disabled={!account().profile?.user.signedIn} onClick={() => ctl.current?.watch()}>
                   Spectate
                 </button>
+                {!account().profile?.user.signedIn && <div class="town-soon">{WATCH_GUEST}</div>}
               </>
             )}
             {/* Two bots playing here: not a game you can watch. */}

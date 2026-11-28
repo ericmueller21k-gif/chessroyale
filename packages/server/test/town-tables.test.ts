@@ -51,10 +51,23 @@ describe("the town's tables: seat, found, end, disconnect, two tables meeting", 
     const t = new TownTables();
     h.beat("ann", "Ann", "town", beat(10, 20, [3, 0]), T0);
     t.found("ABCDE", [seat("ann"), seat("bo")], (uid) => h.seatOf(uid, T0), T0);
-    expect(t.over("ZZZZZ")).toBeNull();
-    expect(t.over("ABCDE")).toMatchObject({ table: 3 });
+    expect(t.over("ZZZZZ", T0)).toBeNull();
+    expect(t.over("ABCDE", T0)).toMatchObject({ table: 3 });
     expect(t.view("town", null)).toEqual([]);
     expect(t.heldAt("town", 3) || t.playing("ann", "town")).toBe(false);
+  });
+
+  it("a found landing after its game's over (#1027's review, N2): never seated; the code is free again once its results are gone", () => {
+    const h = new TownHere();
+    const t = new TownTables();
+    h.beat("ann", "Ann", "town", beat(10, 20, [3, 0]), T0);
+    expect(t.over("ABCDE", T0)).toBeNull();
+    expect(t.found("ABCDE", [seat("ann"), seat("bo")], (uid) => h.seatOf(uid, T0), T0 + 1000)).toBeNull();
+    expect(t.heldAt("town", 3)).toBe(false);
+    // (The code's next game, once the old one's room has closed: seated as any.)
+    const later = T0 + RANKED_1V1.resultsKeepMinutes * 60_000;
+    h.beat("ann", "Ann", "town", beat(10, 20, [3, 0]), later);
+    expect(t.found("ABCDE", [seat("ann"), seat("bo")], (uid) => h.seatOf(uid, later), later)?.table).toBe(3);
   });
 
   it("disconnect: a searcher the town has dropped (gone, past its limit, or standing) has no table; the other's is used, else none", () => {
@@ -99,8 +112,9 @@ describe("the town's tables: seat, found, end, disconnect, two tables meeting", 
     expect(t.found("CCCCC", [seat("cy"), seat("ed")], (uid) => h.seatOf(uid, T0), T0)).toBeNull();
     expect(t.found("AAAAA", [seat("di"), seat("ed")], (uid) => h.seatOf(uid, T0), T0)).toBeNull();
     expect(t.found("DDDDD", [seat("di"), seat("di")], (uid) => h.seatOf(uid, T0), T0)).toBeNull();
-    // (A table the beat names past the park's guard is never held.)
-    expect(t.found("EEEEE", [seat("x"), seat("y")], () => ({ table: TOWN_TABLES.tableMax + 1, stool: 0, room: "town" }), T0)).toBeNull();
+    // (A table past the park's own (#1027's review, N4: a forged seat no device can draw) is never held; its last one is.)
+    expect(t.found("EEEEE", [seat("x"), seat("y")], () => ({ table: TOWN_TABLES.parkTables, stool: 0, room: "town" }), T0)).toBeNull();
+    expect(t.found("EEEEE", [seat("x"), seat("y")], () => ({ table: TOWN_TABLES.parkTables - 1, stool: 0, room: "town" }), T0)?.table).toBe(TOWN_TABLES.parkTables - 1);
   });
 
   it("a timeout: a match held past TOWN_TABLES.matchMaxMinutes is let go whatever its game says", () => {
@@ -113,7 +127,8 @@ describe("the town's tables: seat, found, end, disconnect, two tables meeting", 
 
   it("a beat's seat is read only as [table, stool] within the guard, and never inside a shop", () => {
     expect(readSeat([3, 1])).toEqual({ table: 3, stool: 1 });
-    for (const bad of [[3, 2], [-1, 0], [TOWN_TABLES.tableMax + 1, 0], [1.5, 0], "3.1", [3], null]) expect(readSeat(bad)).toBeNull();
+    expect(readSeat([TOWN_TABLES.parkTables - 1, 0])).toEqual({ table: TOWN_TABLES.parkTables - 1, stool: 0 });
+    for (const bad of [[3, 2], [-1, 0], [TOWN_TABLES.parkTables, 0], [1.5, 0], "3.1", [3], null]) expect(readSeat(bad)).toBeNull();
     expect(readBeat({ c: 1, r: 2, seat: [3, 0] })?.seat).toEqual({ table: 3, stool: 0 });
     expect(readBeat({ c: 1, r: 2, seat: [3, 0], shop: "tiger" })).not.toHaveProperty("seat");
   });

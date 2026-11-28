@@ -1,4 +1,4 @@
-import { TOWN_TABLES, type ItemLook, type PawnColor } from "@chessroyale/core";
+import { RANKED_1V1, TOWN_TABLES, type ItemLook, type PawnColor } from "@chessroyale/core";
 
 /**
  * Ranked at the park's tables (Eric, Nov 27: "if people were in the town, they would also see 1v1s going on, and then they could
@@ -46,6 +46,11 @@ export type SeatOf = (uid: string) => (HereSeat & { room: string }) | null;
 
 export class TownTables {
   private claims = new Map<string, TableClaim>();
+  /**
+   * Games heard to be over, and when (#1027's review, N2): a pair's `found` landing after its game's "over" is never seated, so a late
+   * call can't hold a table until the backstop. Kept RANKED_1V1.resultsKeepMinutes, as long as the game's code stays its (in memory only).
+   */
+  private overAt = new Map<string, number>();
 
   get size(): number {
     return this.claims.size;
@@ -79,10 +84,11 @@ export class TownTables {
    * their stool; the other takes the one across. Answers the match held (null: none). A code already held is left as it is.
    */
   found(code: string, order: readonly [TableSeat, TableSeat], seatOf: SeatOf, now: number): TableClaim | null {
-    if (this.claims.has(code) || order[0].uid === order[1].uid) return null;
+    this.forgetOver(now);
+    if (this.claims.has(code) || this.overAt.has(code) || order[0].uid === order[1].uid) return null;
     for (const k of [0, 1] as const) {
       const at = seatOf(order[k].uid);
-      if (!at || !Number.isInteger(at.table) || at.table < 0 || at.table > TOWN_TABLES.tableMax || this.heldAt(at.room, at.table)) continue;
+      if (!at || !Number.isInteger(at.table) || at.table < 0 || at.table >= TOWN_TABLES.parkTables || this.heldAt(at.room, at.table)) continue;
       const mine = order[k];
       const theirs = order[1 - k]!;
       const seats = at.stool === 0 ? [mine, theirs] : [theirs, mine];
@@ -93,11 +99,17 @@ export class TownTables {
     return null;
   }
 
-  /** The game is over (or gone): its table is free. Answers the match let go (null: none held). */
-  over(code: string): TableClaim | null {
+  /** The game is over (or gone): its table is free, and a `found` for it later seats nothing. Answers the match let go (null: none held). */
+  over(code: string, now: number): TableClaim | null {
+    this.forgetOver(now);
+    this.overAt.set(code, now);
     const c = this.claims.get(code) ?? null;
     if (c) this.claims.delete(code);
     return c;
+  }
+
+  private forgetOver(now: number) {
+    for (const [code, at] of this.overAt) if (now - at >= RANKED_1V1.resultsKeepMinutes * 60_000) this.overAt.delete(code);
   }
 
   /** Lets go every match held longer than TOWN_TABLES.matchMaxMinutes; answers their codes. */

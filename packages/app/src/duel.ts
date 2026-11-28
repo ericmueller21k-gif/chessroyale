@@ -1,4 +1,4 @@
-import { BOSS_BRAIN, ENGINE_MAX_ELO, ENGINE_MIN_ELO, RANKED_1V1, RESIDENTS, botLook, rankView, type DuelZone, type ItemLook, type RankView } from "@chessroyale/core";
+import { BOSS_BRAIN, ENGINE_MAX_ELO, ENGINE_MIN_ELO, RANKED_1V1, RESIDENTS, WATCH_REFUSED, botLook, rankView, type DuelZone, type ItemLook, type RankView } from "@chessroyale/core";
 import { applyMove, toSan, type ClientMessage, type HumanUciEngine } from "@chessroyale/chess";
 import {
   DUEL_PROTOCOL,
@@ -117,6 +117,9 @@ export interface DuelSession {
 }
 
 const wsBase = () => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
+
+/** A refused watch's line when its close came without the server's reason. */
+const watchRefusedLine = (code: number) => (code === WATCH_REFUSED.full ? "Too many are watching this game." : "This game can't be watched.");
 const sideOf = (moves: readonly string[]): Color => (moves.length % 2 === 0 ? "w" : "b");
 
 /** Your own side as the screens show it: your account's name, look and 1 v 1 rank. */
@@ -210,6 +213,9 @@ export class NetDuel implements DuelSession {
     ws.onclose = (e) => {
       if (this.closed) return;
       if (e.code === 4000) return this.goneNow("That game has ended.");
+      // (A refused watch, #1027's review, S5: a guest, a full game, or one not from the town. Its reason on the watch screen, and no more
+      // tries: before, the refusal said nothing and it tried again for as long as the game lasted.)
+      if (this.watch && (e.code === WATCH_REFUSED.full || e.code === WATCH_REFUSED.notAllowed)) return this.goneNow(e.reason || watchRefusedLine(e.code));
       const again = () => {
         if (this.closed) return;
         this.retryTimer = setTimeout(() => this.connect(), Math.min(8000, 500 * 2 ** this.retry++));

@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { CHAT_MOD, TOWN_TABLES, coinsPaid } from "@chessroyale/core";
+import { CHAT_MOD, TOWN_TABLES, WATCH_REFUSED, coinsPaid } from "@chessroyale/core";
 import { DUEL_PROTOCOL, DUEL_UPDATE, type Color, type DuelClientMessage, type DuelOutcome, type DuelPlayerView } from "@chessroyale/chess/duel";
 import { DuelCore, RECORD_RETRY_MS, newDuelRecord, type DuelRecord } from "./duel-room.ts";
 import { accountOf, ageAnswer, isSignedIn, signInRequired, withSecrets } from "./api.ts";
@@ -26,6 +26,8 @@ interface Attached {
   resident?: boolean;
   /** Watching (`?watch=1`, the town's spectator view, Nov 27): hears the game as both players do, says nothing to it. */
   watch?: true;
+  /** A watcher's one hello has been answered (any message after it closes its socket: `watcherMessage`). */
+  hello?: true;
 }
 
 /**
@@ -191,8 +193,6 @@ export class DuelGame extends DurableObject<Env> {
     // A finished game not recorded yet (D1 failing): the room stays, trying again, up to RANKED_1V1.recordRetryHours (Nov 10).
     const core = this.core();
     if (core.toRecord()) return false;
-    // (The town not told yet that the game is over (`tellTown` failing): a last try.)
-    if (r.town && !r.townTold && this.env.LIVE) await liveHub(this.env as Required<Pick<Env, "LIVE">>).townMatchOver(r.code).catch(() => undefined);
     if (core.recordGivenUp()) {
       countCall("ranked.recordLost");
       serverError(this.env, { kind: "DuelGame.recordLost", route: "DuelGame.close", code: r.code }, new Error(`closing with the game never recorded (${r.recordTries} tries)`), (p) => this.ctx.waitUntil(p));
@@ -211,6 +211,10 @@ export class DuelGame extends DurableObject<Env> {
       await this.ctx.storage.deleteAlarm();
       await this.ctx.storage.deleteAll();
     });
+    // (The town not told yet that the game is over (`tellTown` failing): a last try, after the close, never awaited before it (#1027's
+    // review, S3: a wait on the hub between the check and the close let this code's next game be made meanwhile, and the close then
+    // wiped it; and every call to a closing room waited on a hung hub).)
+    if (r.town && !r.townTold && this.env.LIVE) this.ctx.waitUntil(liveHub(this.env as Required<Pick<Env, "LIVE">>).townMatchOver(r.code).catch(() => undefined));
     return true;
   }
 
@@ -262,11 +266,12 @@ export class DuelGame extends DurableObject<Env> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 });
     if (!this.record || (await this.closeIfDue())) return new Response("No such game", { status: 404 });
     // Watching (the town's spectator view, Nov 27): a game found from a town's table only (its players sat down in front of everyone),
-    // anyone with the code, at most TOWN_TABLES.watchersMax at once; it hears the game as both players do and nothing it sends reaches the
-    // game (webSocketMessage answers only its hello).
+    // an account with the code (the Worker turns a guest away, S6), at most TOWN_TABLES.watchersMax at once; it hears the game as both
+    // players do and nothing it sends reaches the game (webSocketMessage answers only its one hello). Refused: the socket is opened and
+    // closed at once with why (#1027's review, S5: a refused upgrade says nothing, and the app tried again for as long as the game lasted).
     if (new URL(request.url).searchParams.get("watch") === "1") {
-      if (!this.record.town) return new Response(JSON.stringify({ message: "This game can't be watched." }), { status: 403 });
-      if (this.watchers().length >= TOWN_TABLES.watchersMax) return new Response(JSON.stringify({ message: "Too many are watching this game." }), { status: 429 });
+      if (!this.record.town) return refusedSocket(WATCH_REFUSED.notAllowed, "This game can't be watched.");
+      if (this.watchers().length >= TOWN_TABLES.watchersMax) return refusedSocket(WATCH_REFUSED.full, "Too many are watching this game.");
       const pair = new WebSocketPair();
       this.ctx.acceptWebSocket(pair[1]);
       pair[1].serializeAttachment({ color: null, watch: true } satisfies Attached);
@@ -292,6 +297,8 @@ export class DuelGame extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer) {
+    const attached = ws.deserializeAttachment() as Attached | null;
+    if (attached?.watch) return this.watcherMessage(ws, attached, raw);
     if (!this.record || (await this.closeIfDue())) return;
     let msg: DuelClientMessage;
     try {
@@ -300,18 +307,7 @@ export class DuelGame extends DurableObject<Env> {
       return;
     }
     if (!msg || typeof msg !== "object" || typeof msg.t !== "string") return;
-    const attached = ws.deserializeAttachment() as Attached | null;
     const color = attached?.color;
-    // (A watcher's hello: the game as it is now. Anything else it sends is nothing to the game.)
-    if (!color && attached?.watch && msg.t === "hello") {
-      const now = Date.now();
-      try {
-        ws.send(JSON.stringify(msg.v !== DUEL_PROTOCOL ? { t: "error", message: DUEL_UPDATE, reload: true, now } : { ...this.core().welcomeWatcher(), now }));
-      } catch {
-        // Already gone.
-      }
-      return;
-    }
     if (!color) return;
     // The residents' kill switch (PAUSE_RESIDENTS; residents.ts): a resident's hello is refused, and any other message of theirs closes
     // their socket, a disconnect as anyone's (their clock runs on, or the abort rule applies).
@@ -366,6 +362,39 @@ export class DuelGame extends DurableObject<Env> {
   }
 
   /**
+   * A watcher's message (#1027's review, S1: anyone signed in can watch a town game, so nothing a watcher sends may cost the players'
+   * clocks). Its one hello is answered with the game as it is now; anything else (a second hello, anything but a hello, a message
+   * longer than TOWN_TABLES.watchMessageMax, left unread) closes its socket. Its app sends nothing but that hello (NetDuel's `watch`).
+   */
+  private async watcherMessage(ws: WebSocket, a: Attached, raw: string | ArrayBuffer) {
+    const size = typeof raw === "string" ? raw.length : raw.byteLength;
+    let msg: { t?: unknown; v?: unknown } | null = null;
+    if (!a.hello && size <= TOWN_TABLES.watchMessageMax) {
+      try {
+        msg = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw));
+      } catch {
+        msg = null;
+      }
+    }
+    if (!msg || typeof msg !== "object" || msg.t !== "hello") {
+      try {
+        ws.close(1008, "Watching only.");
+      } catch {
+        // Already gone.
+      }
+      return;
+    }
+    ws.serializeAttachment({ ...a, hello: true } satisfies Attached);
+    if (!this.record || (await this.closeIfDue())) return;
+    const now = Date.now();
+    try {
+      ws.send(JSON.stringify(msg.v !== DUEL_PROTOCOL ? { t: "error", message: DUEL_UPDATE, reload: true, now } : { ...this.core().welcomeWatcher(), now }));
+    } catch {
+      // Already gone.
+    }
+  }
+
+  /**
    * PAUSE_RESIDENTS (residents.ts): a resident's socket is told "Residents are paused." and closed; one that had said hello
    * (`connected`) disconnects as anyone's does, unless another of its sockets is still here. Its attachment loses its side first, so
    * its close does nothing more.
@@ -402,6 +431,14 @@ export class DuelGame extends DurableObject<Env> {
     // (Always stored: the alarm is set again for whatever's next, a recording due included.)
     await this.persist(core);
   }
+}
+
+/** A WebSocket opened and closed at once with `code` and `reason`: a refusal the app can read (a refused upgrade carries no reason). */
+export function refusedSocket(code: number, reason: string): Response {
+  const pair = new WebSocketPair();
+  pair[1].accept();
+  pair[1].close(code, reason);
+  return new Response(null, { status: 101, webSocket: pair[0] });
 }
 
 /** A seat's player as the queue hands it over: their account and a name. */

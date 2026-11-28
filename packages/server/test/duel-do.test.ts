@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RANKED_1V1 } from "@chessroyale/core";
+import { RANKED_1V1, TOWN_TABLES, WATCH_GUEST } from "@chessroyale/core";
 import { DUEL_PROTOCOL, DUEL_UPDATE, type DuelServerMessage } from "@chessroyale/chess/duel";
-import { createGuest, d1Sql, ensureSchema } from "../src/accounts.ts";
+import { createGuest, createSession, d1Sql, ensureSchema, signInWithIdentity } from "../src/accounts.ts";
 import { duelEntrant, duelGamesOf, rankedRecordOf } from "../src/ranked.ts";
 import { DuelGame } from "../src/duel-do.ts";
 import { xpOf } from "../src/xp.ts";
@@ -26,9 +26,12 @@ class FakeSocket {
   send(text: string) {
     this.sent.push(JSON.parse(text));
   }
-  close(code: number) {
+  reason = "";
+  close(code: number, reason = "") {
     this.closed = code;
+    this.reason = reason;
   }
+  accept() {}
   last<T extends DuelServerMessage["t"]>(t: T) {
     return [...this.sent].reverse().find((m) => m.t === t) as Extract<DuelServerMessage, { t: T }> | undefined;
   }
@@ -40,7 +43,7 @@ const T0 = 1_800_000_000_000;
  * A fake runtime: storage (writes counted), alarms, sockets, waitUntil. `envExtra`: the Worker's variables;
  * `slowDb`: D1's next batch hangs until `failBatch` is called (a recording slow to fail, or cut short by an eviction).
  */
-async function runtime(envExtra: Record<string, string> = {}) {
+async function runtime(envExtra: Record<string, unknown> = {}) {
   const store = new Map<string, unknown>();
   const writes = { put: 0 };
   let alarm: number | null = null;
@@ -59,6 +62,7 @@ async function runtime(envExtra: Record<string, string> = {}) {
       deleteAll: async () => store.clear(),
     },
     getWebSockets: () => sockets.filter((s) => s.closed === null),
+    acceptWebSocket: (ws: FakeSocket) => void sockets.push(ws),
     waitUntil: (p: Promise<unknown>) => void pending.push(p.catch(() => undefined)),
     blockConcurrencyWhile: (fn: () => Promise<unknown>) => fn(),
   };
@@ -434,3 +438,171 @@ describe("a game's recording waits out a D1 outage (Nov 10, finding 7: before, f
   });
 });
 
+
+// (The Worker, for its watch route: the engine server's container class mocked, as engine-pool.test.ts does.)
+vi.mock("@cloudflare/containers", () => ({ Container: class {}, getContainer: () => ({ fetch: async () => new Response("{}") }) }));
+const { default: worker } = await import("../src/index.ts");
+
+describe("a game found from a town's table (#1027's review: S1, S3, S5, S6, S7)", () => {
+  const RealResponse = Response;
+  let pair: FakeSocket[] = [];
+  beforeEach(() => {
+    // (The Workers runtime's WebSocketPair and 101 answer, on Node.)
+    vi.stubGlobal("WebSocketPair", function () {
+      pair = [new FakeSocket(), new FakeSocket()];
+      return pair;
+    });
+    vi.stubGlobal(
+      "Response",
+      class extends RealResponse {
+        constructor(body?: BodyInit | null, init?: ResponseInit) {
+          super(body, init?.status === 101 ? { ...init, status: 200 } : init);
+        }
+      },
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** The town's hub as the game calls it: `townMatchOver` tells it, fails (`down`) or never answers (`hang`), as `mode` says now. */
+  const hubOf = () => {
+    const h = { calls: 0, mode: "ok" as "ok" | "down" | "hang" };
+    const LIVE = {
+      idFromName: (n: string) => n,
+      get: () => ({
+        async townMatchOver() {
+          h.calls++;
+          if (h.mode === "down") throw new Error("hub busy");
+          if (h.mode === "hang") await new Promise(() => {});
+        },
+      }),
+    };
+    return { h, LIVE };
+  };
+  /** A game found from the town (or not, `town` false), Ann v Bob. */
+  const townGame = async (env: Record<string, unknown> = {}, town = true) => {
+    const rt = await runtime(env);
+    const game = await rt.make();
+    const sql = d1Sql(rt.d1);
+    const players = { w: (await duelEntrant(sql, rt.ann)).player, b: (await duelEntrant(sql, rt.bob)).player };
+    expect(await game.create("ABCDE", players, town ? { town: true } : {})).toBe(true);
+    const closeAt = () => (rt.store.get("game") as { closeAt: number }).closeAt;
+    const told = () => (rt.store.get("game") as { townTold?: boolean } | undefined)?.townTold === true;
+    return { rt, game, players, closeAt, told };
+  };
+
+  it("tellTown (S7): the end tells the town once, and that's stored; nothing more after, nor at the close", async () => {
+    const { h, LIVE } = hubOf();
+    const { rt, game, closeAt, told } = await townGame({ LIVE });
+    await game.alarm();
+    await rt.settle();
+    expect(h.calls, "not over yet: nobody told").toBe(0);
+    await game.abandon(rt.bob.id);
+    await rt.settle();
+    expect([h.calls, told()]).toEqual([1, true]);
+    vi.setSystemTime(closeAt());
+    await game.alarm();
+    await rt.settle();
+    expect([rt.store.has("game"), h.calls]).toEqual([false, 1]);
+  });
+
+  it("tellTown (S7): a tell that failed is tried again at the next change, then stored; a game not from the town tells nobody", async () => {
+    const { h, LIVE } = hubOf();
+    h.mode = "down";
+    const { rt, game, told } = await townGame({ LIVE });
+    await game.abandon(rt.bob.id);
+    await rt.settle();
+    const tries = h.calls;
+    expect(tries).toBeGreaterThanOrEqual(1);
+    expect(told()).toBe(false);
+    h.mode = "ok";
+    vi.setSystemTime(T0 + 1000);
+    await game.alarm();
+    await rt.settle();
+    expect([h.calls, told()]).toEqual([tries + 1, true]);
+    const other = await townGame({ LIVE }, false);
+    await other.game.abandon(other.rt.bob.id);
+    await other.rt.settle();
+    expect(h.calls).toBe(tries + 1);
+  });
+
+  it("still untold as the room closes (S7, S3): one last try after the close, never awaited: a hung hub holds nothing, and the code's next game is kept", async () => {
+    const { h, LIVE } = hubOf();
+    h.mode = "down";
+    const { rt, game, players, closeAt } = await townGame({ LIVE });
+    await game.abandon(rt.bob.id);
+    await rt.settle();
+    h.mode = "hang";
+    const before = h.calls;
+    vi.setSystemTime(closeAt());
+    // (Before: the close awaited the hub between its check and the close. Hung, this never came back.)
+    await game.alarm();
+    expect([rt.store.has("game"), h.calls]).toEqual([false, before + 1]);
+    expect(await game.create("ABCDE", players)).toBe(true);
+    await Promise.resolve();
+    expect((rt.store.get("game") as { players: { w: { uid: string } } }).players.w.uid).toBe(rt.ann.id);
+    expect(await game.exists()).toBe(true);
+  });
+
+  it("a watcher (S1): its one hello is answered with the game; a second hello, anything else or a long message closes it, unread", async () => {
+    const { rt, game } = await townGame();
+    const watcher = () => {
+      const ws = new FakeSocket();
+      ws.serializeAttachment({ color: null, watch: true });
+      rt.sockets.push(ws);
+      return ws;
+    };
+    const hello = JSON.stringify({ t: "hello", v: DUEL_PROTOCOL });
+    const a = watcher();
+    // (Before: 500 hellos, 500 full welcomes, each read off every socket.)
+    for (let i = 0; i < 500; i++) await game.webSocketMessage(a as never, hello);
+    expect(a.sent.map((m) => m.t)).toEqual(["welcome"]);
+    expect(a.closed).toBe(1008);
+    const writes = rt.writes.put;
+    for (const text of [JSON.stringify({ t: "move", uci: "e2e4", ply: 0 }), JSON.stringify({ t: "resign" }), "{", JSON.stringify({ t: "hello", v: DUEL_PROTOCOL, x: "x".repeat(TOWN_TABLES.watchMessageMax) })]) {
+      const ws = watcher();
+      await game.webSocketMessage(ws as never, text);
+      expect([ws.sent, ws.closed], text.slice(0, 30)).toEqual([[], 1008]);
+    }
+    // (Nothing a watcher sent reached the game.)
+    expect(rt.writes.put).toBe(writes);
+    expect(await game.status()).toMatchObject({ phase: "waiting" });
+  });
+
+  it("a refused watch is a socket closed at once with why (S5): 4003 for a game not found from the town, 4029 once TOWN_TABLES.watchersMax watch", async () => {
+    const watchOf = (game: DuelGame) => () => game.fetch(new Request("https://x/api/1v1/game/ABCDE/ws?watch=1", { headers: { Upgrade: "websocket" } }));
+    const plain = await townGame({}, false);
+    await watchOf(plain.game)();
+    expect([pair[1]!.closed, pair[1]!.reason]).toEqual([4003, "This game can't be watched."]);
+    const { game } = await townGame();
+    const watch = watchOf(game);
+    for (let i = 0; i < TOWN_TABLES.watchersMax; i++) {
+      await watch();
+      expect(pair[1]!.closed).toBeNull();
+    }
+    await watch();
+    expect([pair[1]!.closed, pair[1]!.reason]).toEqual([4029, "Too many are watching this game."]);
+  });
+
+  it("watching needs an account (S6): a guest's watch is refused at the Worker, 4003 with why, never asking the game; an account's goes to it", async () => {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql, d1);
+    const guest = await createGuest(sql, Date.now(), "Gus");
+    const ann = await signInWithIdentity(sql, (await createGuest(sql, Date.now(), "Ann")).user, "email", "ann@example.com", {}, Date.now());
+    const asked: string[] = [];
+    const DUELS = {
+      idFromName: (n: string) => n,
+      get: () => ({
+        exists: async () => (asked.push("exists"), true),
+        fetch: async () => (asked.push("fetch"), new Response(null, { status: 101 })),
+      }),
+    };
+    const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
+    let ip = 0;
+    const watch = (cookie: string) =>
+      worker.fetch(new Request("https://hunchess.test/api/1v1/game/ABCDE/ws?watch=1", { headers: { Upgrade: "websocket", cookie, "cf-connecting-ip": `10.3.0.${++ip}` } }), { DB: d1, DUELS } as never, ctx);
+    await watch(`hc_session=${guest.token}`);
+    expect([pair[1]!.closed, pair[1]!.reason, asked]).toEqual([4003, WATCH_GUEST, []]);
+    await watch(`hc_session=${await createSession(sql, ann.id, Date.now())}`);
+    expect(asked).toEqual(["exists", "fetch"]);
+  });
+});

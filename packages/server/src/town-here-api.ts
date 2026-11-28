@@ -69,7 +69,7 @@ export function readBeat(b: Record<string, unknown>): HereBeat | null {
 /** A beat's seat at a park table ([table, stool]), checked (null: none). */
 export function readSeat(v: unknown): HereSeat | null {
   if (!Array.isArray(v) || v.length !== 2) return null;
-  const table = int(v[0], 0, TOWN_TABLES.tableMax);
+  const table = int(v[0], 0, TOWN_TABLES.parkTables - 1);
   return table !== null && (v[1] === 0 || v[1] === 1) ? { table, stool: v[1] } : null;
 }
 

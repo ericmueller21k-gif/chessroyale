@@ -1,10 +1,10 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { OPS, RAID_SETTINGS, bossDef, bossIdFromLink, lockedLine, modeSettings, pawnColorOf, type RankedLeaves } from "@chessroyale/core";
+import { OPS, RAID_SETTINGS, WATCH_GUEST, WATCH_REFUSED, bossDef, bossIdFromLink, lockedLine, modeSettings, pawnColorOf, type RankedLeaves } from "@chessroyale/core";
 import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
 import { Matchmaker } from "./matchmaker.ts";
-import { DuelGame } from "./duel-do.ts";
+import { DuelGame, refusedSocket } from "./duel-do.ts";
 import { LiveHub, liveHub } from "./live-hub.ts";
 import { cachedUserId } from "./presence.ts";
 import { TOWER_PARTY_LINES } from "./squads-party.ts";
@@ -515,7 +515,8 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
  *     found: called off, no dodge). The other player hears it at once.
  *     `town=1`: a search begun at a town's park table (Nov 27): the pair is seated at a table there once found (live-hub.ts townMatch).
  *   GET /api/1v1/game/CODE → { open, phase } | 404; /api/1v1/game/CODE/ws: its WebSocket (the two players; `?watch=1`: anyone's,
- *     watching only, the town's spectator view).
+ *     watching only, the town's spectator view: an account's; a guest's, a full game's or a game not from the town is opened and closed at
+ *     once with why, WATCH_REFUSED).
  */
 async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<Response | null> {
   if (!url.pathname.startsWith("/api/1v1/")) return null;
@@ -585,6 +586,8 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
   }
   const m = url.pathname.match(/^\/api\/1v1\/game\/([A-Z2-9]{5})(\/ws)?$/i);
   if (!m) return json({ message: "Not found" }, 404);
+  // (Watching needs an account, the director's call on #1027's review, S6: a guest's socket is opened and closed at once with why.)
+  if (m[2] && url.searchParams.get("watch") === "1" && !isSignedIn(await accountOf(request, env, waitUntil).catch(() => null))) return refusedSocket(WATCH_REFUSED.notAllowed, WATCH_GUEST);
   const stub = env.DUELS.get(env.DUELS.idFromName(m[1]!.toUpperCase()));
   if (m[2]) return (await stub.exists()) ? stub.fetch(request) : json({ message: "That game has ended." }, 404);
   const status = request.method === "GET" ? await stub.status() : null;

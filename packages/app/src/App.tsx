@@ -945,10 +945,18 @@ export function App() {
       return { session: d, stand };
     });
   };
+  /** The town opening now is back from a Spectate (read once by the town as it opens: the same visit, no "entered" line; #1027, N9). */
+  const townFromWatch = useRef(false);
+  const fromWatchOnce = () => {
+    const back = townFromWatch.current;
+    townFromWatch.current = false;
+    return back;
+  };
   /** Leaving the spectator view: back to the town where you stood. */
   const backFromWatch = () => {
     const w = watchingRef.current;
     if (!w) return;
+    townFromWatch.current = true;
     w.session.dispose();
     setWatching(null);
     setTownSeat(null);
@@ -2507,6 +2515,7 @@ export function App() {
           seat={townSeat}
           stand={townStand}
           tower={towerBack}
+          fromWatch={fromWatchOnce}
           onBossChallenge={challengeFromTown}
           onHiddenFight={hiddenFight}
           onPlayBot={playTownBot}

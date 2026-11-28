@@ -340,10 +340,10 @@ export class LiveHub extends DurableObject<Env> {
     return !!c;
   }
 
-  /** A game found from a town's table is over (duel-do.ts `tellTown`): its table is free. */
+  /** A game found from a town's table is over (duel-do.ts `tellTown`): its table is free (and a late `townMatch` for it seats nothing). */
   async townMatchOver(code: string): Promise<void> {
     countCall("hub.townMatchOver");
-    if (this.tables.over(code)) await this.ctx.storage.delete(`town-match:${code}`);
+    if (this.tables.over(code, Date.now())) await this.ctx.storage.delete(`town-match:${code}`);
   }
 
   /**

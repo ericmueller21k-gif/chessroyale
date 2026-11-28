@@ -158,8 +158,14 @@ export class Matchmaker extends DurableObject<Env> {
     return code;
   }
 
-  /** Ranked 1 v 1's Cancel: the ticket leaves the line. Answers its game if it was paired already (the app then leaves it). */
+  /**
+   * Ranked 1 v 1's Cancel: the ticket leaves the line. Answers its game if it was paired already (the app then leaves it). A ticket being
+   * seated this moment (its game being opened, the town seating it) waits for its batch first (#1027's review, S4): placed, its game is
+   * answered and the Worker calls it off for them (never connected: excused, nobody's dodge); put back, it leaves the line. Before, it
+   * answered nothing, and the held ask was still handed the game: a no-show charged as a dodge for pressing Cancel.
+   */
   async cancel(ticketId: string): Promise<{ code?: string }> {
+    while (this.forming && this.q.seatingNow(ticketId)) await this.forming;
     const code = this.q.cancel(ticketId);
     return code ? { code } : {};
   }
@@ -209,8 +215,11 @@ export class Matchmaker extends DurableObject<Env> {
       const groups = this.q.admit(now, await this.playersNow(now), this.lobbyOptions.duel ? PAIR_BY_RATING : this.rules);
       if (!groups.length) return this.q.waiting > 0;
       countCall("mm.batch");
+      // (One deadline for the whole batch's town seating (#1027's review, S2): a slow hub holds it up at most seatWaitMs, never that for
+      // each town pair in it, with every pair behind them waiting too.)
+      const townBy = Date.now() + TOWN_TABLES.seatWaitMs;
       for (const g of groups) {
-        const seated = await this.seat(g.key, g.tickets).catch((e: unknown) => {
+        const seated = await this.seat(g.key, g.tickets, townBy).catch((e: unknown) => {
           countCall("mm.seatThrew");
           this.formFailed(e);
           return false;
@@ -231,9 +240,9 @@ export class Matchmaker extends DurableObject<Env> {
    * Seats a group: the seats left in its filling lobby first, then new lobbies. False: not all of them (form puts the
    * rest back).
    */
-  private async seat(key: string, tickets: Ticket[]): Promise<boolean> {
+  private async seat(key: string, tickets: Ticket[], townBy: number): Promise<boolean> {
     if (this.lobbyOptions.squads) return this.seatSquads(key, tickets);
-    if (this.lobbyOptions.duel) return this.seatDuel(tickets);
+    if (this.lobbyOptions.duel) return this.seatDuel(tickets, townBy);
     // A 50 v 50 party's ticket is seated whole (seatParty); the players between parties as before, in the order they pressed.
     if (!tickets.some(crowdParty)) return this.seatSingles(key, tickets);
     let run: Ticket[] = [];
@@ -376,9 +385,9 @@ export class Matchmaker extends DurableObject<Env> {
    * Ranked 1 v 1: a pair gets a game of its own, White by each player's colors in their last ranked games, read with the
    * ticket (core's firstGetsWhite: never a third game in a row on one color when it can be helped, then whoever had Black
    * more, then whoever had Black last, then a coin flip). A game that couldn't be opened puts them back in line for the
-   * next batch (form does).
+   * next batch (form does). `townBy`: the batch's deadline for the town's seating (form).
    */
-  private async seatDuel(tickets: Ticket[]): Promise<boolean> {
+  private async seatDuel(tickets: Ticket[], townBy: number): Promise<boolean> {
     // (Never a game with a seat nobody can take: a ticket without its player is dropped, its partner back in line.)
     const whole = tickets.filter(duelTicketComplete);
     if (whole.length !== tickets.length) {
@@ -399,15 +408,18 @@ export class Matchmaker extends DurableObject<Env> {
       countCall("mm.createFailed");
       return false;
     }
-    // Ranked at the park's tables (Eric, Nov 27): the town seats the pair at a table, the first's (the one who searched longer) if they
-    // still sit there (live-hub.ts townMatch, town-tables.ts found). Before they hear the code: once they do, their towns close and say
-    // they've left, and a table is seated only where the town still has one of them sitting. At most TOWN_TABLES.seatWaitMs: the game is
-    // theirs whatever the town says.
+    // Ranked at the park's tables (Eric, Nov 27): the town seats the pair at a table, the first's if they still sit there (live-hub.ts
+    // townMatch, town-tables.ts found): the one who searched from the town (#1027's review, N1: never the table of a device left sitting
+    // there while its player searched from home), then the one who searched longer. Before they hear the code: once they do, their towns
+    // close and say they've left, and a table is seated only where the town still has one of them sitting. Until the batch's deadline at
+    // most (`townBy`, TOWN_TABLES.seatWaitMs from its start): the game is theirs whatever the town says.
     if (town && this.env.LIVE) {
       const seat = (t: Ticket): TableSeat => ({ uid: view(t).uid, name: view(t).name, look: view(t).look ?? null, pawn: pawnColorOf(t.info?.pawn as string | undefined) });
-      const [first, second] = [...tickets].sort((x, y) => x.at - y.at);
+      const fromTown = (t: Ticket) => (t.info?.town === true ? 0 : 1);
+      const [first, second] = [...tickets].sort((x, y) => fromTown(x) - fromTown(y) || x.at - y.at);
       const told = liveHub(this.env).townMatch(code, [seat(first!), seat(second!)]).catch(() => false);
-      await Promise.race([told, new Promise((ok) => setTimeout(ok, TOWN_TABLES.seatWaitMs))]);
+      const left = townBy - Date.now();
+      if (left > 0) await Promise.race([told, sleep(left)]);
     }
     this.placeAll(tickets, code);
     return true;
